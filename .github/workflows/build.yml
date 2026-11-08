@@ -1,0 +1,36 @@
+# Builds the mod and runs the pure-logic unit tests for every supported
+# Minecraft version on every push and pull request.
+name: build
+on: [pull_request, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - minecraft: '26.2'
+            fabric_api: '0.161.0+26.2'
+          - minecraft: '26.3'
+            fabric_api: '0.165.2+26.3'
+    name: build (Minecraft ${{ matrix.minecraft }})
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: build and test
+        run: ./gradlew build -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }}
+      - name: capture build artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: audiozone-mc${{ matrix.minecraft }}
+          path: build/libs/

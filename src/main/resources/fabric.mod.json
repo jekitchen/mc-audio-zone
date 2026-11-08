@@ -1,0 +1,37 @@
+{
+	"schemaVersion": 1,
+	"id": "audiozone",
+	"version": "${version}",
+	"name": "Audio Zone",
+	"description": "Mute, turn down, boost or rate-limit any sound, everywhere or only inside areas you choose, without ever hearing more than vanilla allows.",
+	"authors": [
+		"maxismagical",
+		"Sciencode"
+	],
+	"contact": {
+		"sources": "https://github.com/jekitchen/mc-audio-zone",
+		"issues": "https://github.com/jekitchen/mc-audio-zone/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"audiozone.AudioZoneClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "audiozone.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}

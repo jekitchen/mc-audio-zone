@@ -1,0 +1,60 @@
+plugins {
+	// Loom for unobfuscated Minecraft (26.x): uses Mojang's official names, no remapping.
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+version = "${project.mod_version}+${project.minecraft_version}"
+group = project.maven_group
+
+base {
+	archivesName = project.archives_base_name
+}
+
+repositories {
+	// Loom adds the Minecraft, Fabric and Mojang repositories automatically.
+	// Add mod repositories here when needed (e.g. Mod Menu at M8: https://maven.terraformersmc.com/).
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Pure-logic unit tests that run without Minecraft (PRD 7.6).
+	testImplementation platform("org.junit:junit-bom:${project.junit_version}")
+	testImplementation 'org.junit.jupiter:junit-jupiter'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+processResources {
+	def props = [version: project.version, minecraft_version: project.minecraft_version]
+	inputs.properties props
+
+	filesMatching('fabric.mod.json') {
+		expand props
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	withSourcesJar()
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}
+
+test {
+	useJUnitPlatform()
+}
+
+jar {
+	def projectName = project.name
+	inputs.property 'projectName', projectName
+
+	from('LICENSE') {
+		rename { "${it}_${projectName}" }
+	}
+}
