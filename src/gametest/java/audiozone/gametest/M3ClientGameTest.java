@@ -35,7 +35,7 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			context.runOnClient(mc -> {
 				RecentLog.get().sounds().clear();
-				AudioZoneSettings.showDistance = true;
+				AudioZoneSettings.setShowDistance(true);
 			});
 			context.setScreen(AudioZoneScreen::new);
 			context.waitForScreen(AudioZoneScreen.class);
@@ -123,12 +123,12 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("m3-recently-played");
 
 			// AC 5: "Show distance" off hides the distance column; on shows it again.
-			context.runOnClient(mc -> AudioZoneSettings.showDistance = false);
+			context.runOnClient(mc -> AudioZoneSettings.setShowDistance(false));
 			context.waitTicks(SETTLE);
 			List<String> hidden = rowTexts(context, VILLAGER);
 			check(!hidden.contains("Near") && !hidden.contains("Close") && !hidden.contains("Far"), "with Show distance off, no band should be shown, was " + hidden);
 			context.takeScreenshot("m3-no-distance");
-			context.runOnClient(mc -> AudioZoneSettings.showDistance = true);
+			context.runOnClient(mc -> AudioZoneSettings.setShowDistance(true));
 			context.waitTicks(SETTLE);
 			check(rowTexts(context, VILLAGER).contains("Near"), "with Show distance on, the band should be back");
 
