@@ -94,7 +94,12 @@ public abstract class AzScreen extends Screen {
 		return false;
 	}
 
-	protected void saveChanges() {
+	/**
+	 * Saves the unsaved changes. Returns false if they cannot be saved (invalid input); the screen then stays open
+	 * with its errors shown.
+	 */
+	protected boolean saveChanges() {
+		return true;
 	}
 
 	protected void discardChanges() {
@@ -104,6 +109,11 @@ public abstract class AzScreen extends Screen {
 
 	public int currentTab() {
 		return currentTab;
+	}
+
+	/** Height of the tab bar: none when the screen has a single tab. */
+	protected int tabBarHeight() {
+		return tabs().size() > 1 ? TAB_BAR_HEIGHT : 0;
 	}
 
 	public List<AzTabButton> tabButtons() {
@@ -124,7 +134,9 @@ public abstract class AzScreen extends Screen {
 		LAST_TAB.put(getClass(), currentTab);
 		rebuildWidgets();
 		// After switching tabs, keep focus on the tab bar so Ctrl+Tab and Tab continue from there.
-		setInitialFocus(tabButtons.get(currentTab));
+		if (!tabButtons.isEmpty()) {
+			setInitialFocus(tabButtons.get(currentTab));
+		}
 	}
 
 	/**
@@ -345,9 +357,9 @@ public abstract class AzScreen extends Screen {
 		header.add(AzButton.icon(CLOSE_ICON, Component.translatable("audiozone.ui.close"), this::onClose));
 		placeRow(header, width - Theme.PADDING, (HEADER_HEIGHT - Theme.WIDGET_HEIGHT) / 2);
 
-		// Tab bar.
+		// Tab bar (not shown for a single tab, e.g. an editor).
 		int tabWidth = Math.min(MAX_TAB_WIDTH, (width - 2 * Theme.PADDING) / tabs.size());
-		for (int i = 0; i < tabs.size(); i++) {
+		for (int i = 0; tabs.size() > 1 && i < tabs.size(); i++) {
 			int index = i;
 			AzTabButton button = new AzTabButton(tabWidth, tabs.get(i).title(), i, tabs.size(), i == currentTab, () -> selectTab(index));
 			button.setPosition(Theme.PADDING + i * tabWidth, HEADER_HEIGHT);
@@ -355,7 +367,7 @@ public abstract class AzScreen extends Screen {
 		}
 
 		// Body.
-		int bodyTop = HEADER_HEIGHT + TAB_BAR_HEIGHT + Theme.PADDING;
+		int bodyTop = HEADER_HEIGHT + tabBarHeight() + Theme.PADDING;
 		int bodyBottom = height - FOOTER_HEIGHT - Theme.PADDING;
 		body = new Body(Theme.PADDING, bodyTop, width - 2 * Theme.PADDING, bodyBottom - bodyTop);
 		buildTab(currentTab, body);
@@ -382,7 +394,9 @@ public abstract class AzScreen extends Screen {
 	/** Vanilla calls this after {@link #init()}: focus the first body widget, or the selected tab. */
 	@Override
 	protected void setInitialFocus() {
-		setInitialFocus(bodyWidgets.isEmpty() ? tabButtons.get(currentTab) : bodyWidgets.get(0));
+		if (!bodyWidgets.isEmpty() || !tabButtons.isEmpty()) {
+			setInitialFocus(bodyWidgets.isEmpty() ? tabButtons.get(currentTab) : bodyWidgets.get(0));
+		}
 	}
 
 	/** Places widgets in a row ending at {@code right}, and adds them left to right. */
@@ -426,8 +440,9 @@ public abstract class AzScreen extends Screen {
 				Component.translatable("audiozone.ui.unsaved.message"),
 				List.of(
 						new AzDialog.Choice(Component.translatable("audiozone.ui.save"), () -> {
-							saveChanges();
-							closeNow();
+							if (saveChanges()) {
+								closeNow();
+							}
 						}),
 						new AzDialog.Choice(Component.translatable("audiozone.ui.discard"), () -> {
 							discardChanges();
@@ -458,8 +473,8 @@ public abstract class AzScreen extends Screen {
 	@Override
 	public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(g, mouseX, mouseY, partialTick);
-		Draw.fill(g, 0, 0, width, HEADER_HEIGHT + TAB_BAR_HEIGHT, Theme.PANEL);
-		Draw.fill(g, 0, HEADER_HEIGHT + TAB_BAR_HEIGHT, width, 1, Theme.SEPARATOR);
+		Draw.fill(g, 0, 0, width, HEADER_HEIGHT + tabBarHeight(), Theme.PANEL);
+		Draw.fill(g, 0, HEADER_HEIGHT + tabBarHeight(), width, 1, Theme.SEPARATOR);
 		Draw.fill(g, 0, height - FOOTER_HEIGHT, width, FOOTER_HEIGHT, Theme.PANEL);
 		Draw.fill(g, 0, height - FOOTER_HEIGHT, width, 1, Theme.SEPARATOR);
 
