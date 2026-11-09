@@ -5,7 +5,9 @@ import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.input.InputWithModifiers;
+import java.util.function.Supplier;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -18,6 +20,7 @@ import net.minecraft.resources.Identifier;
 public class AzButton extends AbstractButton {
 	private final Runnable onPress;
 	private final Identifier icon;
+	private Supplier<Component> narrationContext;
 
 	protected AzButton(int width, int height, Component label, Identifier icon, Runnable onPress) {
 		super(0, 0, width, height, label);
@@ -44,6 +47,18 @@ public class AzButton extends AbstractButton {
 		AzButton button = new AzButton(Theme.ICON_BUTTON_SIZE, Theme.ICON_BUTTON_SIZE, label, icon, onPress);
 		button.setTooltip(Tooltip.create(label));
 		return button;
+	}
+
+	/** Text read before the button's own narration, e.g. the row a list button belongs to. */
+	public AzButton narrationContext(Supplier<Component> context) {
+		this.narrationContext = context;
+		return this;
+	}
+
+	@Override
+	protected MutableComponent createNarrationMessage() {
+		MutableComponent own = super.createNarrationMessage();
+		return narrationContext == null ? own : Component.translatable("audiozone.ui.in_context", narrationContext.get(), own);
 	}
 
 	public boolean isIconButton() {

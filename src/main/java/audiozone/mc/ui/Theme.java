@@ -22,6 +22,15 @@ public final class Theme {
 	/** Warning text and outlines (e.g. volume above 100%), about 13:1 on PANEL. */
 	public static final int WARNING = 0xFFFFD24D;
 
+	/** Scrolling list background; row text on it is about 17:1. */
+	public static final int LIST_BACKGROUND = 0xC0000000;
+	/** Row with keyboard focus (paired with the focus ring on its button and the narration). */
+	public static final int ROW_FOCUSED = 0x60FFFFFF;
+	/** Row under the mouse. */
+	public static final int ROW_HOVER = 0x30FFFFFF;
+	/** Toast background. */
+	public static final int TOAST = 0xF0202020;
+
 	/** Keyboard focus ring (PRD A-1). */
 	public static final int FOCUS = 0xFFFFFFFF;
 	/** Selected tab background. */

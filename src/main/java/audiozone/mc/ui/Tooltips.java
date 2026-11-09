@@ -4,6 +4,7 @@ import java.time.Duration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.events.ContainerEventHandler;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 
@@ -25,10 +26,17 @@ public final class Tooltips {
 	}
 
 	public static void refresh(Iterable<? extends GuiEventListener> children) {
-		boolean keyboard = Minecraft.getInstance().getLastInputType().isKeyboard();
+		refresh(children, Minecraft.getInstance().getLastInputType().isKeyboard());
+	}
+
+	/** Also walks into containers (list rows hold their own buttons). */
+	private static void refresh(Iterable<? extends GuiEventListener> children, boolean keyboard) {
 		for (GuiEventListener child : children) {
 			if (child instanceof AbstractWidget widget) {
 				widget.setTooltipDelay(keyboard && widget.isFocused() ? Duration.ZERO : HOVER_DELAY);
+			}
+			if (child instanceof ContainerEventHandler container) {
+				refresh(container.children(), keyboard);
 			}
 		}
 	}

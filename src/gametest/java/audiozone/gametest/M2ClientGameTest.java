@@ -25,6 +25,7 @@ import net.minecraft.client.gui.screens.Screen;
  */
 public final class M2ClientGameTest implements FabricClientGameTest {
 	private static final int SETTLE = 2;
+	private static final int TAB_COUNT = 5;
 	private static final int MOD_SHIFT = InputConstants.MOD_SHIFT;
 	private static final int MOD_CONTROL = InputConstants.MOD_CONTROL;
 
@@ -33,7 +34,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 		context.setScreen(() -> new UiKitDemoScreen(null));
 		context.waitForScreen(UiKitDemoScreen.class);
 
-		for (int tab = 0; tab < 3; tab++) {
+		for (int tab = 0; tab < TAB_COUNT; tab++) {
 			selectTab(context, tab);
 			checkTabOrderAndNarration(context, tab);
 		}
@@ -102,20 +103,20 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 	}
 
 	private static void checkCtrlTab(ClientGameTestContext context) {
-		selectTab(context, 0);
+		selectTab(context, UiKitDemoScreen.TAB_BUTTONS);
 		pressWithModifiers(context, InputConstants.KEY_TAB, MOD_CONTROL);
-		check(context.computeOnClient(mc -> demo(mc).currentTab()) == 1, "Ctrl+Tab did not switch to the next tab");
+		check(context.computeOnClient(mc -> demo(mc).currentTab()) == UiKitDemoScreen.TAB_INPUTS, "Ctrl+Tab did not switch to the next tab");
 		pressWithModifiers(context, InputConstants.KEY_TAB, MOD_CONTROL | MOD_SHIFT);
-		check(context.computeOnClient(mc -> demo(mc).currentTab()) == 0, "Ctrl+Shift+Tab did not switch back");
+		check(context.computeOnClient(mc -> demo(mc).currentTab()) == UiKitDemoScreen.TAB_BUTTONS, "Ctrl+Shift+Tab did not switch back");
 		check(context.computeOnClient(mc -> mc.gui.screen().isPauseScreen()), "the Buttons tab should pause the game");
-		selectTab(context, 2);
+		selectTab(context, UiKitDemoScreen.TAB_DIALOGS);
 		check(!context.computeOnClient(mc -> mc.gui.screen().isPauseScreen()), "the Dialogs tab should not pause the game");
 	}
 
 	// ---- Component behaviors ----
 
 	private static void checkSliderKeys(ClientGameTestContext context) {
-		selectTab(context, 1);
+		selectTab(context, UiKitDemoScreen.TAB_INPUTS);
 		context.runOnClient(mc -> {
 			demo(mc).volumeSlider.setTypedValue(100);
 			demo(mc).setFocused(demo(mc).volumeSlider);
@@ -160,7 +161,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 	}
 
 	private static void checkToggleAndButtons(ClientGameTestContext context) {
-		selectTab(context, 0);
+		selectTab(context, UiKitDemoScreen.TAB_BUTTONS);
 		context.runOnClient(mc -> demo(mc).setFocused(demo(mc).showCueToggle));
 		check(context.computeOnClient(mc -> narrationOf(demo(mc).showCueToggle)).contains("Show cue: On"), "toggle should narrate 'Show cue: On'");
 		press(context, InputConstants.KEY_SPACE);
@@ -183,7 +184,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 	 * not set the game's "last input" type, so the keyboard case sets it the way a real Tab press does.
 	 */
 	private static void captureTooltips(ClientGameTestContext context) {
-		selectTab(context, 0);
+		selectTab(context, UiKitDemoScreen.TAB_BUTTONS);
 		AbstractWidget plain = context.computeOnClient(mc -> findByMessage(demo(mc), "Plain button"));
 		AbstractWidget mute = context.computeOnClient(mc -> findByMessage(demo(mc), "Mute"));
 		double scale = context.computeOnClient(mc -> (double) mc.getWindow().getGuiScale());
@@ -200,7 +201,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 	}
 
 	private static void checkTextFields(ClientGameTestContext context) {
-		selectTab(context, 1);
+		selectTab(context, UiKitDemoScreen.TAB_INPUTS);
 		context.runOnClient(mc -> {
 			demo(mc).setFocused(demo(mc).patternField);
 			demo(mc).patternField.setValue("");
@@ -224,7 +225,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 	}
 
 	private static void checkDialogs(ClientGameTestContext context) {
-		selectTab(context, 2);
+		selectTab(context, UiKitDemoScreen.TAB_DIALOGS);
 		// Three buttons: default (Save) focused; Esc picks the safest choice (Keep editing).
 		context.runOnClient(mc -> demo(mc).openThreeButtonDialog());
 		context.waitForScreen(AzDialog.class);
@@ -257,7 +258,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 	}
 
 	private static void checkUnsavedChangesGuard(ClientGameTestContext context) {
-		selectTab(context, 2);
+		selectTab(context, UiKitDemoScreen.TAB_DIALOGS);
 		context.runOnClient(mc -> demo(mc).pretendUnsaved = true);
 		press(context, InputConstants.KEY_ESCAPE);
 		context.waitForScreen(AzDialog.class);
@@ -290,7 +291,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 				});
 				context.waitTicks(SETTLE);
 				int actual = context.computeOnClient(mc -> mc.getWindow().getGuiScale());
-				for (int tab = 0; tab < 3; tab++) {
+				for (int tab = 0; tab < TAB_COUNT; tab++) {
 					selectTab(context, tab);
 					String where = window[0] + "x" + window[1] + " scale " + (scale == 0 ? "auto" : scale) + " (actual " + actual + "), tab " + tab;
 					checkLayout(context, where);
@@ -307,7 +308,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 			mc.resizeGui();
 		});
 		context.getInput().resizeWindow(854, 480);
-		selectTab(context, 0);
+		selectTab(context, UiKitDemoScreen.TAB_BUTTONS);
 	}
 
 	private static void checkLayout(ClientGameTestContext context, String where) {
