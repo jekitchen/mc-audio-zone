@@ -44,7 +44,7 @@ class TraceTextTest {
 				"Audio Zone trace for minecraft:entity.villager.ambient",
 				"Global rules",
 				"  minecraft:entity.villager.ambient: Volume 60%",
-				"    Decides loudness (exact ID)",
+				"    Decides loudness (Exact sound ID)",
 				"  *:*villager*: Muted",
 				"    loudness overridden by minecraft:entity.villager.ambient",
 				"Zones",
@@ -67,12 +67,12 @@ class TraceTextTest {
 				"Zones",
 				"  far (Inside): weight 100%, 9 blocks from its anchor",
 				"    *:*villager*: Volume 80%",
-				"      Decides loudness (only match)",
+				"      Decides loudness (Only matching rule)",
 				"  near (Inside): weight 100%, 3 blocks from its anchor",
 				"    *:*villager*: Volume 20%",
-				"      Decides loudness (only match)",
+				"      Decides loudness (Only matching rule)",
 				"Deciding zones",
-				"  loudness: near (closest anchor)",
+				"  loudness: near (Closest anchor)",
 				"Result",
 				"  Volume 20%")), text);
 		assertTrue(text.startsWith("Audio Zone trace for " + AMBIENT + "\nGlobal rules\n  No rule matches this sound\n"), text);
@@ -82,7 +82,7 @@ class TraceTextTest {
 	void noticesComeFirst() {
 		Precedence p = new Precedence(List.of(Rule.of("m", AMBIENT).withMute(true)), List.of());
 		List<String> lines = text(p, playAt(0, 100, false, false), true).lines().toList();
-		assertEquals("  Bypass is on: nothing is changed", lines.get(1));
+		assertEquals("  Bypass is on: nothing is changed.", lines.get(1));
 		assertEquals("Global rules", lines.get(2));
 	}
 

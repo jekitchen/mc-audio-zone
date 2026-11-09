@@ -184,7 +184,7 @@
 	"audiozone.rule_editor.volume": "Volume",
 	"audiozone.rule_editor.volume.not_set": "Not set",
 	"audiozone.rule_editor.volume.not_set_short": "–",
-	"audiozone.rule_editor.volume.tip": "Loudness of matching sounds, on top of Minecraft's own volume sliders. Arrow keys change it by 5%, Shift+arrow by 1%.",
+	"audiozone.rule_editor.volume.tip": "Loudness of matching sounds, on top of Minecraft's own volume sliders. Arrow keys change it by 5%%, Shift+arrow by 1%%.",
 	"audiozone.rule_editor.volume_typed": "Volume in percent",
 	"audiozone.rule_editor.volume_typed.tip": "Type 0 to 100, or leave it empty to leave the volume to other rules",
 	"audiozone.rule_editor.reset.pattern": "Reset pattern",
