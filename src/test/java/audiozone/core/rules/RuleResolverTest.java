@@ -161,6 +161,18 @@ class RuleResolverTest {
 	}
 
 	@Test
+	void cacheCountsHitsAndMissesForDiagnostics() {
+		// FR-13.3: pattern cache hit rate.
+		RuleResolver r = resolver(Rule.of("r", "minecraft:entity.villager.*").withMute(true));
+		r.resolve(VILLAGER_AMBIENT);
+		r.resolve(VILLAGER_AMBIENT);
+		r.resolve(VILLAGER_AMBIENT);
+		r.resolve(VILLAGER_HURT);
+		assertEquals(2, r.cacheHits());
+		assertEquals(2, r.cacheMisses());
+	}
+
+	@Test
 	void cacheStaysBoundedForUnboundedIds() {
 		RuleResolver r = resolver(Rule.of("r", "x:*").withVolume(10));
 		for (int i = 0; i < RuleResolver.MAX_CACHED_IDS + 500; i++) {

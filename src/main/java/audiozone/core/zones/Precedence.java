@@ -139,6 +139,34 @@ public final class Precedence {
 		}
 	}
 
+	/** Cache hits across the global list and every zone's list (FR-13.3). */
+	public long cacheHits() {
+		long total = global.cacheHits();
+		for (RuleResolver r : zoneRules) {
+			total += r.cacheHits();
+		}
+		return total;
+	}
+
+	/** Cache misses across the global list and every zone's list. */
+	public long cacheMisses() {
+		long total = global.cacheMisses();
+		for (RuleResolver r : zoneRules) {
+			total += r.cacheMisses();
+		}
+		return total;
+	}
+
+	/** Enabled global rules. */
+	public int globalRuleCount() {
+		return global.ruleCount();
+	}
+
+	/** Zones in the profile, enabled or not. */
+	public int zoneCount() {
+		return zones.length;
+	}
+
 	/** Whether zone {@code i} at {@code dist} beats the current best zone (FR-9 steps 4 and 5). */
 	private boolean beats(int i, double dist, int best, double bestDist) {
 		if (best < 0) {

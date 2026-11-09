@@ -211,6 +211,19 @@ class PrecedenceTest {
 	}
 
 	@Test
+	void cacheStatsAddUpGlobalAndZoneLists() {
+		Zone a = sphere("a", 0, 0, 0, 10, villagers("ra").withVolume(50));
+		Precedence p = new Precedence(List.of(villagers("g").withMute(true)), List.of(a));
+		decide(p);
+		decide(p);
+		// Each decide looks up the global list and zone a: 2 misses the first time, 2 hits the second.
+		assertEquals(2, p.cacheHits());
+		assertEquals(2, p.cacheMisses());
+		assertEquals(1, p.zoneCount());
+		assertEquals(1, p.globalRuleCount());
+	}
+
+	@Test
 	void zoneAtTheProfileLimitStillWorks() {
 		// FR-8.9: up to 64 zones per profile.
 		Zone[] zones = new Zone[Precedence.MAX_ZONES];
