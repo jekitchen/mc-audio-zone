@@ -54,12 +54,17 @@ class PlayingSoundsBudgetTest {
 		for (int t = 0; t < 2_000; t++) {
 			tick(t); // warm up the JIT and the per-ID caches
 		}
-		int ticks = 500;
-		long start = System.nanoTime();
-		for (int t = 0; t < ticks; t++) {
-			tick(2_000 + t);
+		// Best of five batches: a shared CI machine can pause the test (another job, GC), which would inflate a single
+		// average. A slow implementation is slow in every batch, so this still catches one.
+		int ticks = 200;
+		double perTick = Double.MAX_VALUE;
+		for (int batch = 0; batch < 5; batch++) {
+			long start = System.nanoTime();
+			for (int t = 0; t < ticks; t++) {
+				tick(2_000 + batch * ticks + t);
+			}
+			perTick = Math.min(perTick, (System.nanoTime() - start) / (double) ticks);
 		}
-		double perTick = (System.nanoTime() - start) / (double) ticks;
 		System.out.printf("Playing sounds: %.0f ns per tick for %d sounds (budget %.0f ns)%n", perTick, SOUNDS, BUDGET_NANOS);
 		assertTrue(perTick < BUDGET_NANOS, "average " + perTick + " ns per tick");
 	}
