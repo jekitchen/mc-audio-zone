@@ -131,7 +131,7 @@ The main entry point: a live list of sounds the player just heard, with one-clic
 
 **Acceptance criteria**
 
-- [ ] Stand near a villager; within 5 seconds of it making a sound, a row "minecraft:entity.villager.ambient" (or similar) appears with category Friendly Creatures and band Close or Near.
+- [ ] Stand near a villager; within 5 seconds of it making a sound, a row "minecraft:entity.villager.ambient" (or similar) appears with category Friendly Mobs (vanilla's name for the `neutral` category; Audio Zone shows vanilla's translated category names) and band Close or Near.
 - [ ] Walk 30 blocks from all villagers and wait 10 seconds: no new villager rows appear and existing counts stop increasing.
 - [ ] Click Mute on a row: the next play of that sound is silent and the row status changes to "Muted".
 - [ ] With the list open in singleplayer, the world keeps running (mobs move, sounds keep arriving).
@@ -957,3 +957,7 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Lists narrate the row with keyboard focus, never the row under the mouse; a row's buttons read the row's text before their own label ("Glass breaks, minecraft:block.glass.break: Mute button") | M2b |
 | 2026-11-09 | Dropdowns open in an overlay on the screen that traps focus (Up/Down, Enter picks, Esc or a click outside cancels, focus returns to the dropdown); the current option is marked with a check mark, not only color | M2b |
 | 2026-11-09 | Toasts show for 5 seconds above the footer, are narrated once, and stay while their Undo button has keyboard focus so focus is never pulled away mid-use; with Reduced motion they appear without sliding in (A-6) | M2b |
+| 2026-11-09 | Recently Played rows use two lines so every FR-1.2 field fits at 854 × 480: subtitle and status on top; ID, category, plays and time, and distance band below. Category names are vanilla's translated names (e.g. "Friendly Mobs") | M3 |
+| 2026-11-09 | Read-only list rows (no buttons yet, M3) are still keyboard-reachable and narrated: the list gives each such row an invisible focus target | M3 |
+| 2026-11-09 | "Show distance" lives on a Settings tab and is kept in memory until the profile store (M4) saves settings | M3 |
+| 2026-11-09 | The recently played log is cleared when joining or leaving a world | M3 |
