@@ -28,6 +28,7 @@ import audiozone.core.outline.ZoneColor;
 import audiozone.core.recent.DistanceBand;
 import audiozone.core.recent.PlayStatus;
 import audiozone.core.rules.PatternError;
+import audiozone.core.trace.TraceEditError;
 import audiozone.core.trace.RuleWinReason;
 import audiozone.core.trace.TraceNotice;
 import audiozone.core.trace.ZoneWinReason;
@@ -57,6 +58,7 @@ class LangKeysTest {
 				"audiozone.recent.distance.", keys(DistanceBand.values(), DistanceBand::translationKey),
 				"audiozone.recent.status.", keys(PlayStatus.values(), PlayStatus::translationKey),
 				"audiozone.trace.notice.", keys(TraceNotice.values(), TraceNotice::translationKey),
+				"audiozone.trace.edit.error.", keys(TraceEditError.values(), TraceEditError::translationKey),
 				"audiozone.trace.rule_reason.", keys(RuleWinReason.values(), RuleWinReason::translationKey),
 				"audiozone.trace.zone_reason.", keys(ZoneWinReason.values(), ZoneWinReason::translationKey));
 	}
