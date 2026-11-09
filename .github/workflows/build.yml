@@ -46,6 +46,8 @@ jobs:
           - minecraft: '26.3'
             fabric_api: '0.165.2+26.3'
     name: client game tests (Minecraft ${{ matrix.minecraft }})
+    # A game that cannot create a window hangs instead of exiting; fail fast instead of after 6 hours.
+    timeout-minutes: 20
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
@@ -54,12 +56,14 @@ jobs:
         with:
           java-version: '25'
           distribution: 'temurin'
-      - name: install virtual display and software OpenGL
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
+      # Loom wraps the game in xvfb-run by itself when CI is set, so no outer xvfb-run is needed.
+      # Mesa provides software OpenGL and Vulkan; 26.3's renderer tries both (same setup as Fabric API's CI).
+      - name: install virtual display and software graphics drivers
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri mesa-vulkan-drivers
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: run client game tests
-        run: xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientGameTest -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }}
+        run: ./gradlew runClientGameTest -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }}
       - name: capture screenshots and logs
         if: always()
         uses: actions/upload-artifact@v7
