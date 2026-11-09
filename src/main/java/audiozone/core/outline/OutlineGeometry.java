@@ -25,6 +25,7 @@ public final class OutlineGeometry {
 		return switch (zone.shape()) {
 			case Shape.Box box -> box(a, box.width() / 2, box.height() / 2, box.depth() / 2);
 			case Shape.Sphere sphere -> sphere(a, sphere.radius());
+			case Shape.Cylinder cylinder -> throw new UnsupportedOperationException("cylinder outline: step 4");
 		};
 	}
 

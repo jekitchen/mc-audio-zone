@@ -1,7 +1,6 @@
 package audiozone.core.outline;
 
 import audiozone.core.zones.Point;
-import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
 
 /**
@@ -60,14 +59,6 @@ public final class OutlineVisibility {
 		double dx = camX - a.x();
 		double dy = camY - a.y();
 		double dz = camZ - a.z();
-		return switch (zone.shape()) {
-			case Shape.Sphere s -> Math.max(0, Math.sqrt(dx * dx + dy * dy + dz * dz) - s.radius());
-			case Shape.Box b -> {
-				double ox = Math.max(0, Math.abs(dx) - b.width() / 2);
-				double oy = Math.max(0, Math.abs(dy) - b.height() / 2);
-				double oz = Math.max(0, Math.abs(dz) - b.depth() / 2);
-				yield Math.sqrt(ox * ox + oy * oy + oz * oz);
-			}
-		};
+		return zone.shape().distanceOutside(dx, dy, dz);
 	}
 }
