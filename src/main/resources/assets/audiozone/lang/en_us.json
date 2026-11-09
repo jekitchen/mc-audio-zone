@@ -147,6 +147,7 @@
 	"audiozone.recent.edit": "Edit rule",
 	"audiozone.recent.unmute": "Unmute",
 	"audiozone.settings.bypass_hint": "Bypass hotkey: %s. On laptops you may need Fn+F10.",
+	"audiozone.diag.memory": "Memory used (estimate): %1$s MB of %2$s MB",
 	"audiozone.notice.profile_broken.title": "Audio Zone profile could not be loaded",
 	"audiozone.notice.profile_broken.message": "%s It was renamed to .broken and an empty profile is used.",
 	"audiozone.notice.save_failed.title": "Audio Zone could not save",

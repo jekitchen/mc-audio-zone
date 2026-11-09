@@ -2,6 +2,8 @@ package audiozone.core.limit;
 
 import java.util.Arrays;
 
+import audiozone.core.diag.MemoryEstimate;
+
 /**
  * Per-source counters for one rule (PRD FR-6.5): one {@link SlidingWindow} per block position, at most
  * {@link RepeatLimiter#MAX_SOURCES_PER_RULE}, least recently used forgotten first.
@@ -61,6 +63,18 @@ final class SourceTable {
 
 	int size() {
 		return size;
+	}
+
+	/** The table and every counter it holds, including recycled ones, for the Diagnostics memory readout. */
+	long estimatedBytes() {
+		long bytes = MemoryEstimate.object(4 * MemoryEstimate.REFERENCE + 4 + 8) + MemoryEstimate.array(4, TABLE_SIZE)
+				+ 2 * MemoryEstimate.array(8, CAPACITY) + MemoryEstimate.array(MemoryEstimate.REFERENCE, CAPACITY);
+		for (SlidingWindow w : windows) {
+			if (w != null) {
+				bytes += w.estimatedBytes();
+			}
+		}
+		return bytes;
 	}
 
 	void clear() {

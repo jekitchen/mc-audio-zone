@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import audiozone.core.diag.MemoryEstimate;
+
 /**
  * Resolves one rule list (the global list, or one zone's list) for a sound ID, per property (PRD FR-4.5).
  *
@@ -25,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class RuleResolver {
 	/** Cache size cap. Servers can send arbitrary sound IDs, so the cache must not grow without bound. */
 	static final int MAX_CACHED_IDS = 4096;
+	private static final long RESOLUTION_BYTES = MemoryEstimate.object(3 * MemoryEstimate.REFERENCE);
 
 	private static final Comparator<Rule> MOST_SPECIFIC_FIRST = Comparator
 			.comparing((Rule r) -> !r.pattern().isExact())
@@ -127,6 +130,22 @@ public final class RuleResolver {
 	/** Number of sound IDs currently cached (for diagnostics, FR-13.3). */
 	public int cachedIdCount() {
 		return cache.size();
+	}
+
+	/**
+	 * Estimated bytes of the per-ID cache, for the Diagnostics memory readout (PRD 9.1). The rules themselves belong
+	 * to the profile and are not counted. It walks the cache, so call it on demand through {@code MemoryMeter}.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(2 * MemoryEstimate.REFERENCE + 2 * 8) + MemoryEstimate.CONCURRENT_HASH_MAP
+				+ MemoryEstimate.hashTable(cache.size()) + cache.size() * MemoryEstimate.HASH_NODE;
+		for (Map.Entry<String, RuleResolution> entry : cache.entrySet()) {
+			bytes += MemoryEstimate.string(entry.getKey());
+			if (entry.getValue() != RuleResolution.NONE) {
+				bytes += RESOLUTION_BYTES;
+			}
+		}
+		return bytes;
 	}
 
 	/** Lookups answered from the cache (FR-13.3 hit rate). */

@@ -3,6 +3,8 @@ package audiozone.core.inspect;
 import java.util.ArrayList;
 import java.util.List;
 
+import audiozone.core.diag.MemoryEstimate;
+
 /**
  * What the point-at-entity inspector knows (PRD FR-2.2 to FR-2.4): for each entity within vanilla hearing range, its
  * last {@value #SOUNDS_PER_ENTITY} sounds from the last 30 seconds, at most {@value #MAX_ENTITIES} entities, each
@@ -118,6 +120,22 @@ public final class EntitySounds {
 			out.add(new EntitySound(soundIds[index], kinds[index], times[index]));
 		}
 		return List.copyOf(out);
+	}
+
+	/**
+	 * Estimated bytes this linker keeps, for the Diagnostics memory readout (PRD 9.1). The arrays have a fixed size;
+	 * it walks the stored sound IDs, so call it on demand through {@code MemoryMeter}, not per sound.
+	 */
+	public long estimatedBytes() {
+		int slots = MAX_ENTITIES * SOUNDS_PER_ENTITY;
+		long bytes = MemoryEstimate.object(8 * MemoryEstimate.REFERENCE + 2 * 4)
+				+ 3 * MemoryEstimate.array(4, MAX_ENTITIES) + MemoryEstimate.array(1, MAX_ENTITIES)
+				+ MemoryEstimate.array(8, MAX_ENTITIES)
+				+ 2 * MemoryEstimate.array(MemoryEstimate.REFERENCE, slots) + MemoryEstimate.array(8, slots);
+		for (String id : soundIds) {
+			bytes += MemoryEstimate.string(id);
+		}
+		return bytes;
 	}
 
 	/** How many entities have a memory slot. */

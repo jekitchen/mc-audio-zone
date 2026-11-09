@@ -1,5 +1,7 @@
 package audiozone.core.limit;
 
+import audiozone.core.diag.MemoryEstimate;
+
 /**
  * One repeat-limit counter (PRD FR-6.2, FR-6.3): the start times of the last {@code count} allowed plays. A new play
  * is allowed if fewer than {@code count} allowed plays started in the last {@code windowMs}; dropped plays are not
@@ -23,6 +25,11 @@ final class SlidingWindow {
 		this.count = count;
 		this.windowMs = windowMs;
 		reset();
+	}
+
+	/** This counter and its times array, for the Diagnostics memory readout. */
+	long estimatedBytes() {
+		return MemoryEstimate.object(MemoryEstimate.REFERENCE + 3 * 4 + 8) + MemoryEstimate.array(8, times.length);
 	}
 
 	void reset() {
