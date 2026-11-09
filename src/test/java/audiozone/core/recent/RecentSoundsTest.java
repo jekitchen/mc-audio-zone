@@ -176,4 +176,38 @@ class RecentSoundsTest {
 	private static List<String> ids(List<RecentRow> rows) {
 		return rows.stream().map(RecentRow::id).toList();
 	}
+
+	// --- Review fixes ---
+
+	@Test
+	void listedRowNeverShowsZeroPlays() {
+		// One play at 1.5 s. Just before it is 3 minutes old the row is still listed, so its count must be 1.
+		heard(VILLAGER, 1500);
+		List<RecentRow> rows = rows(1500 + RecentSounds.WINDOW_MS - 1);
+		assertEquals(1, rows.size());
+		assertEquals(1, rows.get(0).count());
+	}
+
+	@Test
+	void playsOlderThanTheWindowAreNotCounted() {
+		heard(VILLAGER, 0);
+		heard(VILLAGER, 100_000);
+		assertEquals(1, rows(181_000).get(0).count());
+	}
+
+	@Test
+	void playCountTiesAreBrokenByIdSoRowsDoNotSwap() {
+		// "zz" and "aa" land in the same hash bucket, so a HashMap lists them in insertion order: zz first.
+		log.record("zz", "neutral", true, 8.0, true, PlayStatus.PLAYING, null, 1000);
+		log.record("aa", "neutral", true, 8.0, true, PlayStatus.PLAYING, null, 1000);
+		List<RecentRow> rows = log.snapshot(1000, SortOrder.PLAY_COUNT, null);
+		assertEquals(List.of("aa", "zz"), rows.stream().map(RecentRow::id).toList());
+	}
+
+	@Test
+	void nullCategoryIsRecordedWithoutThrowing() {
+		log.record(VILLAGER, null, true, 8.0, true, PlayStatus.PLAYING, null, 1000);
+		assertEquals(1, rows(1000).size());
+		assertNull(rows(1000).get(0).category());
+	}
 }

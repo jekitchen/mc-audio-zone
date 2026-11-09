@@ -22,7 +22,8 @@ import java.util.function.Function;
  * hide them (FR-3.1).
  *
  * <p>Rows are grouped by sound ID and kept for 3 minutes after their last play, at most {@link #MAX_IDS} of them.
- * Play counts use one-second buckets, so a play leaves the count within a second of turning 3 minutes old.
+ * Play counts use one-second buckets, so a play leaves the count within a second of turning 3 minutes old. The
+ * bucket holding a row's most recent play always counts while the row is listed, so a listed row never shows 0 plays.
  *
  * <p>Not thread-safe: record and snapshot on the same thread (the render thread, where sounds start). Recording a
  * sound already in the list allocates nothing.
@@ -47,17 +48,18 @@ public final class RecentSounds {
 	 * Records one sound start.
 	 *
 	 * @param soundId    e.g. {@code minecraft:entity.villager.ambient}
-	 * @param category   the sound source name, e.g. {@code neutral}
+	 * @param category   the sound source name, e.g. {@code neutral} (null is accepted and listed as unknown)
 	 * @param positional whether the sound has a world position (not relative to the listener)
 	 * @param distance   distance from the listener in blocks (ignored when not positional)
 	 * @param audible    whether vanilla would treat it as heard (range check from the un-boosted volume)
 	 * @param status     what Audio Zone did with this play
 	 * @param zoneName   the zone that decided, or {@code null}
-	 * @param nowMs      current time in milliseconds (real time, any fixed origin)
+	 * @param nowMs      current time in milliseconds from a clock that never goes backwards, such as Minecraft's
+	 *                   {@code Util.getMillis()} (not the wall clock); the same clock must be passed to {@link #snapshot}
 	 */
 	public void record(String soundId, String category, boolean positional, double distance, boolean audible,
 			PlayStatus status, String zoneName, long nowMs) {
-		if (EXCLUDED_CATEGORIES.contains(category)) {
+		if (category != null && EXCLUDED_CATEGORIES.contains(category)) {
 			if (seenExcluded.size() < MAX_SEEN_IDS) {
 				seenExcluded.add(soundId);
 			}
@@ -125,7 +127,7 @@ public final class RecentSounds {
 		Comparator<RecentRow> recent = Comparator.comparingLong(RecentRow::lastPlayedMs).reversed();
 		return switch (order) {
 			case MOST_RECENT -> recent.thenComparing(RecentRow::id);
-			case PLAY_COUNT -> Comparator.comparingInt(RecentRow::count).reversed().thenComparing(recent);
+			case PLAY_COUNT -> Comparator.comparingInt(RecentRow::count).reversed().thenComparing(recent).thenComparing(RecentRow::id);
 			case NAME -> Comparator.comparing((RecentRow r) -> nameOf(r.id(), displayName)).thenComparing(RecentRow::id);
 		};
 	}
@@ -140,7 +142,11 @@ public final class RecentSounds {
 		return Collections.unmodifiableSet(seenExcluded);
 	}
 
-	/** The category a sound last played in this session, or {@code null} (search's "Seen as", FR-3.2). */
+	/**
+	 * The category a sound last played in this session within the player's hearing range, or {@code null} (search's
+	 * "Seen as", FR-3.2). Out-of-range plays are deliberately not remembered: showing "Seen as" for a sound the player
+	 * could not hear would reveal that it played (fair play).
+	 */
 	public String seenCategory(String soundId) {
 		return seenCategories.get(soundId);
 	}
@@ -185,11 +191,18 @@ public final class RecentSounds {
 			return nowMs - lastPlayedMs >= WINDOW_MS;
 		}
 
+		/**
+		 * Plays in the last 3 minutes, to the second. While the row is listed, the bucket of its most recent play
+		 * counts even at the window's edge, so a listed row never shows 0 plays. (That bucket cannot have been reused:
+		 * reusing it needs a newer play, which would be the most recent one.)
+		 */
 		int count(long nowMs) {
 			long oldestKept = Math.floorDiv(nowMs, 1000) - BUCKETS;
+			long lastSecond = Math.floorDiv(lastPlayedMs, 1000);
+			boolean listed = !expired(nowMs);
 			int total = 0;
 			for (int i = 0; i < BUCKETS; i++) {
-				if (seconds[i] > oldestKept) {
+				if (seconds[i] > oldestKept || (listed && seconds[i] == lastSecond)) {
 					total += counts[i];
 				}
 			}
