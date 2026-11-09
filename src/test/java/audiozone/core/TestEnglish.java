@@ -56,21 +56,21 @@ public final class TestEnglish implements Translator {
 			Map.entry("audiozone.trace.property.limit", "limit"),
 			Map.entry("audiozone.trace.property.cue", "cue"),
 			// Existing keys (their en_us.json text comes with #44)
-			Map.entry("audiozone.trace.notice.bypass", "Bypass is on: nothing is changed"),
-			Map.entry("audiozone.trace.notice.vanilla_covered", "This sound has its own vanilla slider"),
-			Map.entry("audiozone.trace.notice.not_heard_yet", "Not heard yet; zones depend on where it plays"),
-			Map.entry("audiozone.trace.notice.non_positional", "Non-positional: zones never apply"),
-			Map.entry("audiozone.trace.notice.boosted", "Above 100%%: boost applied"),
-			Map.entry("audiozone.trace.notice.changed_since_play", "Rules changed since this sound last played"),
-			Map.entry("audiozone.trace.rule_reason.only_match", "only match"),
-			Map.entry("audiozone.trace.rule_reason.exact_id", "exact ID"),
-			Map.entry("audiozone.trace.rule_reason.more_literal", "more specific pattern"),
-			Map.entry("audiozone.trace.rule_reason.fewer_stars", "fewer *"),
-			Map.entry("audiozone.trace.rule_reason.list_order", "higher in the list"),
-			Map.entry("audiozone.trace.zone_reason.only_zone", "only zone"),
-			Map.entry("audiozone.trace.zone_reason.closest", "closest anchor"),
-			Map.entry("audiozone.trace.zone_reason.tie_smaller_zone", "tie on distance; smaller zone wins"),
-			Map.entry("audiozone.trace.zone_reason.tie_list_order", "tie on distance and size; higher in the list")));
+			Map.entry("audiozone.trace.notice.bypass", "Bypass is on: nothing is changed."),
+			Map.entry("audiozone.trace.notice.vanilla_covered", "This sound has its own vanilla slider, so Audio Zone does not handle it."),
+			Map.entry("audiozone.trace.notice.not_heard_yet", "Not heard yet; zones depend on where it plays."),
+			Map.entry("audiozone.trace.notice.non_positional", "Non-positional: zones never apply."),
+			Map.entry("audiozone.trace.notice.boosted", "Above 100%%: boost applied."),
+			Map.entry("audiozone.trace.notice.changed_since_play", "Rules or zones changed since this sound last played, so what you heard may differ."),
+			Map.entry("audiozone.trace.rule_reason.only_match", "Only matching rule"),
+			Map.entry("audiozone.trace.rule_reason.exact_id", "Exact sound ID"),
+			Map.entry("audiozone.trace.rule_reason.more_literal", "More specific pattern"),
+			Map.entry("audiozone.trace.rule_reason.fewer_stars", "Fewer *"),
+			Map.entry("audiozone.trace.rule_reason.list_order", "Higher in the list"),
+			Map.entry("audiozone.trace.zone_reason.only_zone", "Only zone"),
+			Map.entry("audiozone.trace.zone_reason.closest", "Closest anchor"),
+			Map.entry("audiozone.trace.zone_reason.tie_smaller_zone", "Tie on distance; smaller zone wins"),
+			Map.entry("audiozone.trace.zone_reason.tie_list_order", "Tie on distance and size; higher in the list")));
 
 	@Override
 	public String translate(String key, Object... args) {
