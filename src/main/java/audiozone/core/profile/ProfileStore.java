@@ -6,7 +6,11 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Stream;
 
 /**
  * Profile files on disk (PRD FR-11.8): one human-readable JSON file per profile in {@code config/audiozone/profiles/},
@@ -50,6 +54,46 @@ public final class ProfileStore {
 		}
 		String name = out.toString();
 		return name.isEmpty() || name.chars().allMatch(c -> c == '.') ? "_" + name : name;
+	}
+
+	/**
+	 * A profile file in the folder.
+	 *
+	 * @param file     the file
+	 * @param worldKey the key recorded in it, or null if it records none (saved before keys were recorded) or cannot be
+	 *                 read; such a file's key is unknown, because file names are made safe and cannot be turned back
+	 */
+	public record Stored(Path file, String worldKey) {
+	}
+
+	/**
+	 * Every profile file in the folder, sorted by file name, for the Profiles tab (FR-11.3). Backups ({@code .bak}),
+	 * {@code .broken} copies and temp files are not profiles and are left out. Only each file's key is read; load a
+	 * profile with {@link #load} to show its details.
+	 */
+	public List<Stored> list() throws IOException {
+		if (!Files.isDirectory(directory)) {
+			return List.of();
+		}
+		List<Path> files;
+		try (Stream<Path> entries = Files.list(directory)) {
+			files = entries.filter(f -> f.getFileName().toString().endsWith(".json") && Files.isRegularFile(f))
+					.sorted(Comparator.comparing(f -> f.getFileName().toString()))
+					.toList();
+		}
+		List<Stored> stored = new ArrayList<>(files.size());
+		for (Path file : files) {
+			String key = null;
+			try {
+				if (Files.size(file) <= MAX_FILE_BYTES) {
+					key = ProfileCodec.worldKeyOf(Files.readString(file, StandardCharsets.UTF_8)).orElse(null);
+				}
+			} catch (IOException e) {
+				// Unreadable: listed without a key.
+			}
+			stored.add(new Stored(file, key));
+		}
+		return stored;
 	}
 
 	/** Loads the profile for {@code key}; a missing file gives an empty profile named {@code defaultName}. */
@@ -97,12 +141,12 @@ public final class ProfileStore {
 		return true;
 	}
 
-	/** Saves atomically, keeping the previous file as {@code .bak}. */
+	/** Saves atomically, keeping the previous file as {@code .bak}. The file records {@code key} (see {@link #list}). */
 	public void save(String key, Profile profile) throws IOException {
 		Files.createDirectories(directory);
 		Path file = fileFor(key);
 		Path temp = file.resolveSibling(file.getFileName() + ".tmp");
-		Files.writeString(temp, ProfileCodec.toJson(profile), StandardCharsets.UTF_8);
+		Files.writeString(temp, ProfileCodec.toJson(profile, key), StandardCharsets.UTF_8);
 		if (Files.exists(file)) {
 			Files.copy(file, file.resolveSibling(file.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
 		}
