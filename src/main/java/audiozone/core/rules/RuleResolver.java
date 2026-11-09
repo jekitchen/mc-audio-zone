@@ -1,6 +1,7 @@
 package audiozone.core.rules;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -27,7 +28,14 @@ import audiozone.core.diag.MemoryEstimate;
 public final class RuleResolver {
 	/** Cache size cap. Servers can send arbitrary sound IDs, so the cache must not grow without bound. */
 	public static final int MAX_CACHED_IDS = 4096;
+	/**
+	 * Distinct results (combinations of winning rules) kept per list. Every cached ID points at one of these, so a
+	 * lookup the cache cannot hold allocates nothing once its combination has been seen. Past this cap, a result is
+	 * neither kept nor cached.
+	 */
+	static final int MAX_RESULTS = 128;
 	private static final long RESOLUTION_BYTES = MemoryEstimate.object(3 * MemoryEstimate.REFERENCE);
+	private static final int NO_RULE = 0x1FFFFF;
 
 	private static final Comparator<Rule> MOST_SPECIFIC_FIRST = Comparator
 			.comparing((Rule r) -> !r.pattern().isExact())
@@ -37,12 +45,26 @@ public final class RuleResolver {
 	/** Enabled rules, most specific first. The sort is stable, so equal rules keep list order (step 4). */
 	private final Rule[] ordered;
 	private final Map<String, RuleResolution> cache = new ConcurrentHashMap<>();
+	/** Shared with other resolvers, or null for only this resolver's own cap. */
+	private final CacheBudget budget;
 	// Diagnostics counters (FR-13.3). Plain fields: sounds are resolved on one thread, and a readout that is off by
 	// a few counts would not matter.
 	private long hits;
 	private long misses;
+	/** Results by their winners' positions in {@link #ordered}, packed by {@link #resultKey}; empty until needed. */
+	private long[] resultKeys = new long[0];
+	private RuleResolution[] results = new RuleResolution[0];
+	private int resultCount;
 
 	public RuleResolver(List<Rule> rules) {
+		this(rules, null);
+	}
+
+	/**
+	 * @param budget a cap shared with other resolvers (PRD 9.1), or null for only {@value #MAX_CACHED_IDS} IDs here
+	 */
+	public RuleResolver(List<Rule> rules, CacheBudget budget) {
+		this.budget = budget;
 		List<Rule> enabled = new ArrayList<>(rules.size());
 		for (Rule rule : rules) {
 			if (rule.enabled()) {
@@ -55,6 +77,10 @@ public final class RuleResolver {
 
 	/** The winning rule per property for {@code soundId}. */
 	public RuleResolution resolve(String soundId) {
+		if (ordered.length == 0) {
+			hits++; // nothing to match, so nothing worth caching
+			return RuleResolution.NONE;
+		}
 		RuleResolution cached = cache.get(soundId);
 		if (cached != null) {
 			hits++;
@@ -62,37 +88,79 @@ public final class RuleResolver {
 		}
 		misses++;
 		RuleResolution result = compute(soundId);
-		if (cache.size() < MAX_CACHED_IDS) {
+		boolean shared = result == RuleResolution.NONE || result == findResult(result);
+		if (shared && cache.size() < MAX_CACHED_IDS && (budget == null || budget.take())) {
 			cache.put(soundId, result);
 		}
 		return result;
 	}
 
 	private RuleResolution compute(String soundId) {
-		Rule loudness = null;
-		Rule limit = null;
-		Rule cue = null;
-		for (Rule rule : ordered) {
+		int loudness = NO_RULE;
+		int limit = NO_RULE;
+		int cue = NO_RULE;
+		for (int i = 0; i < ordered.length; i++) {
+			Rule rule = ordered[i];
 			if (!rule.pattern().matches(soundId)) {
 				continue;
 			}
-			if (loudness == null && rule.setsLoudness()) {
-				loudness = rule;
+			if (loudness == NO_RULE && rule.setsLoudness()) {
+				loudness = i;
 			}
-			if (limit == null && rule.setsLimit()) {
-				limit = rule;
+			if (limit == NO_RULE && rule.setsLimit()) {
+				limit = i;
 			}
-			if (cue == null && rule.setsCue()) {
-				cue = rule;
+			if (cue == NO_RULE && rule.setsCue()) {
+				cue = i;
 			}
-			if (loudness != null && limit != null && cue != null) {
+			if (loudness != NO_RULE && limit != NO_RULE && cue != NO_RULE) {
 				break;
 			}
 		}
-		if (loudness == null && limit == null && cue == null) {
+		if (loudness == NO_RULE && limit == NO_RULE && cue == NO_RULE) {
 			return RuleResolution.NONE;
 		}
-		return new RuleResolution(loudness, limit, cue);
+		return result(resultKey(loudness, limit, cue));
+	}
+
+	/** The kept result for these winners, keeping a new one if there is room; a new unkept one if not. */
+	private synchronized RuleResolution result(long key) {
+		for (int i = 0; i < resultCount; i++) {
+			if (resultKeys[i] == key) {
+				return results[i];
+			}
+		}
+		RuleResolution r = new RuleResolution(rule(key, 42), rule(key, 21), rule(key, 0));
+		if (resultCount < MAX_RESULTS) {
+			if (resultCount == results.length) {
+				int grown = Math.min(MAX_RESULTS, Math.max(4, resultCount * 2));
+				resultKeys = Arrays.copyOf(resultKeys, grown);
+				results = Arrays.copyOf(results, grown);
+			}
+			resultKeys[resultCount] = key;
+			results[resultCount] = r;
+			resultCount++;
+		}
+		return r;
+	}
+
+	/** {@code r} itself if it is a kept result, otherwise null. */
+	private synchronized RuleResolution findResult(RuleResolution r) {
+		for (int i = 0; i < resultCount; i++) {
+			if (results[i] == r) {
+				return r;
+			}
+		}
+		return null;
+	}
+
+	private static long resultKey(int loudness, int limit, int cue) {
+		return ((long) loudness << 42) | ((long) limit << 21) | cue;
+	}
+
+	private Rule rule(long key, int shift) {
+		int i = (int) (key >>> shift) & NO_RULE;
+		return i == NO_RULE ? null : ordered[i];
 	}
 
 	/** Enabled rules, most specific first: the order winners are picked in. For the sound trace (FR-14). */
@@ -137,13 +205,14 @@ public final class RuleResolver {
 	 * to the profile and are not counted. It walks the cache, so call it on demand through {@code MemoryMeter}.
 	 */
 	public long estimatedBytes() {
-		long bytes = MemoryEstimate.object(2 * MemoryEstimate.REFERENCE + 2 * 8) + MemoryEstimate.CONCURRENT_HASH_MAP
+		long bytes = MemoryEstimate.object(4 * MemoryEstimate.REFERENCE + 2 * 8 + 4) + MemoryEstimate.CONCURRENT_HASH_MAP
 				+ MemoryEstimate.hashTable(cache.size()) + cache.size() * MemoryEstimate.HASH_NODE;
-		for (Map.Entry<String, RuleResolution> entry : cache.entrySet()) {
-			bytes += MemoryEstimate.string(entry.getKey());
-			if (entry.getValue() != RuleResolution.NONE) {
-				bytes += RESOLUTION_BYTES;
-			}
+		for (String id : cache.keySet()) {
+			bytes += MemoryEstimate.string(id);
+		}
+		if (results.length > 0) {
+			bytes += MemoryEstimate.array(8, results.length) + MemoryEstimate.array(MemoryEstimate.REFERENCE, results.length)
+					+ resultCount * RESOLUTION_BYTES;
 		}
 		return bytes;
 	}

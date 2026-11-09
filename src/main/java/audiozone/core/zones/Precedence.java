@@ -1,11 +1,11 @@
 package audiozone.core.zones;
 
-import audiozone.core.diag.MemoryEstimate;
-
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import audiozone.core.diag.MemoryEstimate;
+import audiozone.core.rules.CacheBudget;
 import audiozone.core.rules.Rule;
 import audiozone.core.rules.RuleResolution;
 import audiozone.core.rules.RuleResolver;
@@ -31,6 +31,16 @@ import audiozone.core.rules.RuleResolver;
 public final class Precedence {
 	/** Most zones a profile can hold (FR-8.9). */
 	public static final int MAX_ZONES = 64;
+	/**
+	 * Sound IDs all zones' rule lists cache together (PRD 9.1 memory budget): about 1 MB when full. Without it, 64 zones
+	 * could each cache 4,096 IDs, about 32 MB. Past the cap a zone answers the same, just by matching patterns again.
+	 */
+	public static final int ZONE_CACHE_IDS = 8192;
+	/**
+	 * Sound IDs whose resolutions in every list are kept together in one row (see {@code rows}): at most about 0.3 MB
+	 * with 64 zones. A real session hears a few hundred IDs; past the cap a sound is resolved list by list, as before.
+	 */
+	public static final int ROW_CACHE_IDS = 1024;
 
 	private static final double TIE_DISTANCE = 0.01;
 	private static final float DISCRETE_WEIGHT = 0.5F;
@@ -96,9 +106,10 @@ public final class Precedence {
 		this.hx = new double[n];
 		this.hy = new double[n];
 		this.hz = new double[n];
+		CacheBudget zoneCaches = new CacheBudget(ZONE_CACHE_IDS);
 		for (int i = 0; i < n; i++) {
 			Zone zone = this.zones[i];
-			zoneRules[i] = new RuleResolver(zone.rules());
+			zoneRules[i] = new RuleResolver(zone.rules(), zoneCaches);
 			volumes[i] = zone.shape().volume();
 			enabled[i] = zone.enabled();
 			bubble[i] = zone.isBubble();
@@ -154,7 +165,7 @@ public final class Precedence {
 		} else {
 			row = new RuleResolution[zones.length + 1];
 			resolve(soundId, row);
-			if (rows.size() < RuleResolver.MAX_CACHED_IDS) {
+			if (rows.size() < ROW_CACHE_IDS) {
 				rows.put(soundId, row);
 			}
 		}
@@ -176,19 +187,6 @@ public final class Precedence {
 			hereDimension = dimension;
 		}
 		return here;
-	}
-
-	/**
-	 * Estimated bytes of the per-ID caches (this one and every list's), for the Diagnostics memory readout (PRD 9.1).
-	 * Walks the caches; call it on demand.
-	 */
-	public long estimatedBytes() {
-		long bytes = global.estimatedBytes() + MemoryEstimate.CONCURRENT_HASH_MAP + MemoryEstimate.hashTable(rows.size())
-				+ rows.size() * (MemoryEstimate.HASH_NODE + MemoryEstimate.array(MemoryEstimate.REFERENCE, zones.length + 1));
-		for (RuleResolver resolver : zoneRules) {
-			bytes += resolver.estimatedBytes();
-		}
-		return bytes;
 	}
 
 	/**
@@ -360,6 +358,25 @@ public final class Precedence {
 			total += r.cacheMisses();
 		}
 		return total;
+	}
+
+	/**
+	 * Estimated bytes of the global list's and every zone's per-ID caches, the per-ID rows and the flat zone arrays, for
+	 * the Diagnostics memory readout (PRD 9.1).
+	 * The rules and zones belong to the profile and are not counted. Walks the caches: call it through
+	 * {@code MemoryMeter}, not per sound.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(5 * MemoryEstimate.REFERENCE)
+				+ MemoryEstimate.array(MemoryEstimate.REFERENCE, zoneRules.length) + MemoryEstimate.array(8, volumes.length)
+				+ 6 * MemoryEstimate.array(8, ax.length) + 4 * MemoryEstimate.array(1, enabled.length)
+				+ MemoryEstimate.CONCURRENT_HASH_MAP + MemoryEstimate.hashTable(rows.size())
+				+ rows.size() * (MemoryEstimate.HASH_NODE + MemoryEstimate.array(MemoryEstimate.REFERENCE, zones.length + 1))
+				+ global.estimatedBytes();
+		for (RuleResolver r : zoneRules) {
+			bytes += r.estimatedBytes();
+		}
+		return bytes;
 	}
 
 	/** Enabled global rules. */
