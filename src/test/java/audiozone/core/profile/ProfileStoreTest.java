@@ -51,7 +51,7 @@ class ProfileStoreTest {
 	void fileHasSchemaVersionAndOmitsUnsetProperties() throws IOException {
 		store().save("default", Profile.empty("Default").muteExact(VILLAGER));
 		String json = Files.readString(store().fileFor("default"));
-		assertTrue(json.contains("\"schemaVersion\": 1"), json);
+		assertTrue(json.contains("\"schemaVersion\": 2"), json);
 		assertTrue(json.contains("\"mute\": true"), json);
 		assertFalse(json.contains("\"volume\""), "unset properties must be omitted: " + json);
 	}

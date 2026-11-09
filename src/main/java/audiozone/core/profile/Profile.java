@@ -2,6 +2,7 @@ package audiozone.core.profile;
 
 import audiozone.core.rules.Rule;
 import audiozone.core.zones.Zone;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -19,11 +20,14 @@ import java.util.Set;
  * @param globalRules rules that apply everywhere, in the order the player sees them
  * @param zones    fixed zones and personal bubbles, in the order the player sees them
  * @param zoneColors outline color of each zone that has one, as {@code 0xRRGGBB}, keyed by zone ID
+ * @param lastJoined when the player last joined this server or world (FR-11.3), or null if never
+ * @param boostConfirmed whether the player has confirmed the boost dialog for this profile (FR-5.4: asked once per
+ *                   profile, the first time a volume goes above 100%)
  */
 public record Profile(String name, ProfileSettings settings, List<Rule> globalRules, List<Zone> zones,
-		Map<String, Integer> zoneColors) {
+		Map<String, Integer> zoneColors, Instant lastJoined, boolean boostConfirmed) {
 	/** Bumped on every change to the file format, with a migration step (PRD 7.6). */
-	public static final int SCHEMA_VERSION = 1;
+	public static final int SCHEMA_VERSION = 2;
 
 	public Profile {
 		Objects.requireNonNull(name, "name");
@@ -44,6 +48,12 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		zoneColors = Map.copyOf(zoneColors);
 	}
 
+	/** A profile never joined, with boost not yet confirmed. */
+	public Profile(String name, ProfileSettings settings, List<Rule> globalRules, List<Zone> zones,
+			Map<String, Integer> zoneColors) {
+		this(name, settings, globalRules, zones, zoneColors, null, false);
+	}
+
 	/** A profile with no zones. */
 	public Profile(String name, ProfileSettings settings, List<Rule> globalRules) {
 		this(name, settings, globalRules, List.of(), Map.of());
@@ -54,15 +64,35 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	}
 
 	public Profile withSettings(ProfileSettings value) {
-		return new Profile(name, value, globalRules, zones, zoneColors);
+		return new Profile(name, value, globalRules, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
 	public Profile withName(String value) {
-		return new Profile(value, settings, globalRules, zones, zoneColors);
+		return new Profile(value, settings, globalRules, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
 	public Profile withGlobalRules(List<Rule> value) {
-		return new Profile(name, settings, value, zones, zoneColors);
+		return new Profile(name, settings, value, zones, zoneColors, lastJoined, boostConfirmed);
+	}
+
+	/** Records a join (FR-11.3); called with the time the player joined this server or world. */
+	public Profile withLastJoined(Instant value) {
+		return new Profile(name, settings, globalRules, zones, zoneColors, value, boostConfirmed);
+	}
+
+	/** Set after the player confirms the boost dialog, so it is not shown again for this profile (FR-5.4). */
+	public Profile withBoostConfirmed(boolean value) {
+		return new Profile(name, settings, globalRules, zones, zoneColors, lastJoined, value);
+	}
+
+	/**
+	 * Whether setting a rule to this volume must first show the boost dialog (FR-5.4): only above 100%, and only until
+	 * the player has confirmed it once for this profile.
+	 *
+	 * @param volume the new volume in percent, or null if the rule does not set one
+	 */
+	public boolean needsBoostConfirm(Integer volume) {
+		return !boostConfirmed && volume != null && volume > 100;
 	}
 
 	/** Replaces the zones; colors of zones no longer present are dropped. */
@@ -74,14 +104,14 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 				colors.put(zone.id(), rgb);
 			}
 		}
-		return new Profile(name, settings, globalRules, value, colors);
+		return new Profile(name, settings, globalRules, value, colors, lastJoined, boostConfirmed);
 	}
 
 	/** Sets the outline color of a zone in this profile. */
 	public Profile withZoneColor(String zoneId, int rgb) {
 		Map<String, Integer> colors = new LinkedHashMap<>(zoneColors);
 		colors.put(zoneId, rgb);
-		return new Profile(name, settings, globalRules, zones, colors);
+		return new Profile(name, settings, globalRules, zones, colors, lastJoined, boostConfirmed);
 	}
 
 	/** The zone's color as {@code 0xRRGGBB}, or null if it has none. */

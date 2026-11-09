@@ -19,6 +19,15 @@ public record ProfileSummary(String displayName, String worldKey, int ruleCount,
 			.thenComparing(ProfileSummary::worldKey);
 
 	/**
+	 * The row for a stored profile, with the last joined date it records.
+	 *
+	 * @param connectedWorldKey the current server's world key, or null when not in a world
+	 */
+	public static ProfileSummary of(String worldKey, Profile profile, String connectedWorldKey) {
+		return of(worldKey, profile, profile.lastJoined(), connectedWorldKey);
+	}
+
+	/**
 	 * @param connectedWorldKey the current server's world key, or null when not in a world
 	 */
 	public static ProfileSummary of(String worldKey, Profile profile, Instant lastJoined, String connectedWorldKey) {

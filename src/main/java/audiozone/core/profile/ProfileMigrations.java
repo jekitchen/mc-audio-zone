@@ -25,8 +25,26 @@ public final class ProfileMigrations {
 		void save(int fromVersion) throws IOException;
 	}
 
-	/** The steps for this version of Audio Zone. Schema 1 is the first, so there are none yet. */
-	public static final ProfileMigrations CURRENT = new ProfileMigrations(List.of());
+	/**
+	 * Schema 1 → 2: profile settings gained {@code cueDefault}, {@code outlines} and {@code edge}, and the profile gained
+	 * {@code lastJoined} and {@code boostConfirmed}. All are optional, with defaults. Schema 1 readers ignored these
+	 * names, so a version 1 file that holds them (written by hand from the PRD sketch) meant nothing by them; the step
+	 * removes them, and the file loads exactly as version 1 loaded it.
+	 */
+	static final Step V1_TO_V2 = new Step(1, root -> {
+		root.remove("lastJoined");
+		root.remove("boostConfirmed");
+		JsonElement settings = root.get("settings");
+		if (settings != null && settings.isJsonObject()) {
+			JsonObject s = settings.getAsJsonObject();
+			s.remove("cueDefault");
+			s.remove("outlines");
+			s.remove("edge");
+		}
+	});
+
+	/** The steps for this version of Audio Zone. */
+	public static final ProfileMigrations CURRENT = new ProfileMigrations(List.of(V1_TO_V2));
 
 	private final List<Step> steps;
 
