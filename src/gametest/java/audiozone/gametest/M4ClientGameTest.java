@@ -104,7 +104,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ProfileManager.flushSaves());
 			Path file = context.computeOnClient(mc -> ProfileManager.store().fileFor(ProfileManager.DEFAULT_KEY));
 			String json = read(file);
-			check(json.contains("\"schemaVersion\": 1") && json.contains(VILLAGER) && json.contains("\"mute\": true"),
+			check(json.contains("\"schemaVersion\": " + Profile.SCHEMA_VERSION) && json.contains(VILLAGER) && json.contains("\"mute\": true"),
 					"the profile file should hold the mute rule, was:\n" + json);
 			// A restart only reads the file. Prove re-reading uses the disk, not memory: unmute in memory (which saves the
 			// unmuted profile), put the muted file back on disk, then re-read it.
