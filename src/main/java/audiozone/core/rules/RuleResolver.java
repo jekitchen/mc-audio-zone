@@ -34,6 +34,10 @@ public final class RuleResolver {
 	/** Enabled rules, most specific first. The sort is stable, so equal rules keep list order (step 4). */
 	private final Rule[] ordered;
 	private final Map<String, RuleResolution> cache = new ConcurrentHashMap<>();
+	// Diagnostics counters (FR-13.3). Plain fields: sounds are resolved on one thread, and a readout that is off by
+	// a few counts would not matter.
+	private long hits;
+	private long misses;
 
 	public RuleResolver(List<Rule> rules) {
 		List<Rule> enabled = new ArrayList<>(rules.size());
@@ -50,8 +54,10 @@ public final class RuleResolver {
 	public RuleResolution resolve(String soundId) {
 		RuleResolution cached = cache.get(soundId);
 		if (cached != null) {
+			hits++;
 			return cached;
 		}
+		misses++;
 		RuleResolution result = compute(soundId);
 		if (cache.size() < MAX_CACHED_IDS) {
 			cache.put(soundId, result);
@@ -116,5 +122,20 @@ public final class RuleResolver {
 	/** Number of sound IDs currently cached (for diagnostics, FR-13.3). */
 	public int cachedIdCount() {
 		return cache.size();
+	}
+
+	/** Lookups answered from the cache (FR-13.3 hit rate). */
+	public long cacheHits() {
+		return hits;
+	}
+
+	/** Lookups that had to match patterns. */
+	public long cacheMisses() {
+		return misses;
+	}
+
+	/** Enabled rules in this list ("rules active", FR-13.3). */
+	public int ruleCount() {
+		return ordered.length;
 	}
 }
