@@ -19,6 +19,10 @@ import audiozone.core.rules.Rule;
 import audiozone.core.rules.RuleResolver;
 import audiozone.core.rules.SoundPattern;
 import audiozone.core.trace.LastPlays;
+import audiozone.core.zones.Point;
+import audiozone.core.zones.Precedence;
+import audiozone.core.zones.Shape;
+import audiozone.core.zones.Zone;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -119,6 +123,37 @@ class MemoryBudgetTest {
 		return limiter;
 	}
 
+	/**
+	 * The limiter's worst case: {@link RepeatLimiter#MAX_RULES} limited rules with long zone-rule keys, and every one of
+	 * its {@link RepeatLimiter#MAX_COUNTERS} counters sized for the highest count.
+	 */
+	private static RepeatLimiter worstLimiter() {
+		RepeatLimiter limiter = new RepeatLimiter();
+		Limit limit = new Limit(Limit.MAX_COUNT, 1000, false);
+		for (int r = 0; r < RepeatLimiter.MAX_RULES; r++) {
+			limiter.tryStart("zone_" + (r % 64) + "\nexact:" + id(r), limit, 0, 64, 0, r);
+		}
+		return limiter;
+	}
+
+	/**
+	 * A full profile's per-ID caches: {@link Precedence#MAX_ZONES} zones, each with a rule matching every sound, and
+	 * enough sound IDs to fill the global list's cache and the zones' shared cap.
+	 */
+	private static Precedence worstPrecedence() {
+		List<Zone> zones = new ArrayList<>();
+		for (int z = 0; z < Precedence.MAX_ZONES; z++) {
+			zones.add(new Zone("zone_" + z, "Zone " + z, true, "world", "minecraft:overworld", new Point(z * 100, 0, 0),
+					new Shape.Sphere(10), List.of(Rule.of("r", "minecraft:*").withMute(true))));
+		}
+		Precedence precedence = new Precedence(List.of(Rule.of("g", "minecraft:*").withVolume(50)), zones);
+		audiozone.core.rules.RuleResolution[] out = new audiozone.core.rules.RuleResolution[zones.size() + 1];
+		for (int i = 0; i < 4096; i++) { // the global cache's cap; the zones' shared cap fills on the way
+			precedence.resolve(id(i), out);
+		}
+		return precedence;
+	}
+
 	// ---- estimates agree with what the JVM allocates ----------------------------------------------------------
 
 	/**
@@ -171,6 +206,25 @@ class MemoryBudgetTest {
 		estimateMatchesAllocation("shared limiter", MemoryBudgetTest::fiftySharedRules, RepeatLimiter::estimatedBytes);
 	}
 
+	@Test
+	void worstCaseLimiterEstimateMatchesAllocation() {
+		estimateMatchesAllocation("limiter, worst case", MemoryBudgetTest::worstLimiter, RepeatLimiter::estimatedBytes);
+	}
+
+	/**
+	 * Each sound ID string is one object shared by the global cache and all 64 zones' caches, but every cache counts
+	 * it, so this estimate errs high on purpose. It must never be lower than what was allocated, and not far above.
+	 */
+	@Test
+	void fullProfileCachesEstimateIsNeverLow() {
+		worstPrecedence();
+		Object[] keep = new Object[1];
+		long allocated = Allocations.fewestBytes(round -> keep[0] = worstPrecedence());
+		long estimated = ((Precedence) keep[0]).estimatedBytes();
+		assertTrue(estimated >= allocated && estimated <= allocated * 1.5,
+				"profile caches: estimated " + estimated + " bytes, allocated " + allocated);
+	}
+
 	// ---- the budget -------------------------------------------------------------------------------------------
 
 	@Test
@@ -181,15 +235,15 @@ class MemoryBudgetTest {
 		LastPlays lastPlays = fullLastPlays();
 		PlayingSounds playing = fullPlaying();
 		RuleResolver global = fullResolver();
-		RepeatLimiter shared = fiftySharedRules();
-		RepeatLimiter perSource = fullPerSourceRule();
+		RepeatLimiter limiter = worstLimiter();
+		Precedence profile = worstPrecedence();
 		meter.add("recent", recent::estimatedBytes);
 		meter.add("linker", linker::estimatedBytes);
 		meter.add("last plays", lastPlays::estimatedBytes);
 		meter.add("playing", playing::estimatedBytes);
-		meter.add("global pattern cache", global::estimatedBytes);
-		meter.add("limits, 50 shared", shared::estimatedBytes);
-		meter.add("limits, 1 per source", perSource::estimatedBytes);
+		meter.add("mc global pattern cache", global::estimatedBytes);
+		meter.add("limits, worst case", limiter::estimatedBytes);
+		meter.add("profile caches, 64 zones", profile::estimatedBytes);
 		StringBuilder parts = new StringBuilder();
 		for (int i = 0; i < meter.partCount(); i++) {
 			parts.append(meter.name(i)).append(' ').append(MemoryEstimate.megabytes(meter.bytes(i, 0))).append(" MB; ");

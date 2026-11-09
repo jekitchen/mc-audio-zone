@@ -2,6 +2,8 @@ package audiozone.core.zones;
 
 import java.util.List;
 
+import audiozone.core.diag.MemoryEstimate;
+import audiozone.core.rules.CacheBudget;
 import audiozone.core.rules.Rule;
 import audiozone.core.rules.RuleResolution;
 import audiozone.core.rules.RuleResolver;
@@ -27,6 +29,11 @@ import audiozone.core.rules.RuleResolver;
 public final class Precedence {
 	/** Most zones a profile can hold (FR-8.9). */
 	public static final int MAX_ZONES = 64;
+	/**
+	 * Sound IDs all zones' rule lists cache together (PRD 9.1 memory budget): about 1 MB when full. Without it, 64 zones
+	 * could each cache 4,096 IDs, about 32 MB. Past the cap a zone answers the same, just by matching patterns again.
+	 */
+	public static final int ZONE_CACHE_IDS = 8192;
 
 	private static final double TIE_DISTANCE = 0.01;
 	private static final float DISCRETE_WEIGHT = 0.5F;
@@ -54,8 +61,9 @@ public final class Precedence {
 		this.zones = zones.toArray(new Zone[0]);
 		this.zoneRules = new RuleResolver[this.zones.length];
 		this.volumes = new double[this.zones.length];
+		CacheBudget zoneCaches = new CacheBudget(ZONE_CACHE_IDS);
 		for (int i = 0; i < this.zones.length; i++) {
-			zoneRules[i] = new RuleResolver(this.zones[i].rules());
+			zoneRules[i] = new RuleResolver(this.zones[i].rules(), zoneCaches);
 			volumes[i] = this.zones[i].shape().volume();
 		}
 	}
@@ -249,6 +257,21 @@ public final class Precedence {
 			total += r.cacheMisses();
 		}
 		return total;
+	}
+
+	/**
+	 * Estimated bytes of the global list's and every zone's per-ID caches, for the Diagnostics memory readout (PRD 9.1).
+	 * The rules and zones belong to the profile and are not counted. Walks the caches: call it through
+	 * {@code MemoryMeter}, not per sound.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(5 * MemoryEstimate.REFERENCE)
+				+ MemoryEstimate.array(MemoryEstimate.REFERENCE, zoneRules.length) + MemoryEstimate.array(8, volumes.length)
+				+ global.estimatedBytes();
+		for (RuleResolver r : zoneRules) {
+			bytes += r.estimatedBytes();
+		}
+		return bytes;
 	}
 
 	/** Enabled global rules. */
