@@ -55,17 +55,29 @@ public final class SoundTracer {
 			List<Zone> zones = p.zones();
 			for (int i = 0; i < zones.size(); i++) {
 				Zone zone = zones.get(i);
-				if (!zone.enabled() || !play.worldKey().equals(zone.worldKey()) || !play.dimension().equals(zone.dimension())) {
+				if (!zone.enabled()) {
 					continue;
 				}
-				Point a = zone.anchor();
+				Point a;
+				if (zone.isBubble()) {
+					if (Double.isNaN(play.px())) {
+						continue;
+					}
+					a = new Point(play.px(), play.py(), play.pz());
+				} else {
+					if (!play.worldKey().equals(zone.worldKey()) || !play.dimension().equals(zone.dimension())) {
+						continue;
+					}
+					a = zone.anchor();
+				}
 				double dx = play.x() - a.x();
 				double dy = play.y() - a.y();
 				double dz = play.z() - a.z();
-				if (!zone.shape().contains(dx, dy, dz)) {
+				double w = zone.weight(dx, dy, dz, p.profileEdge());
+				if (w <= 0) {
 					continue;
 				}
-				lines.add(new ZoneLine(zone, 1.0, Math.sqrt(dx * dx + dy * dy + dz * dz), explain(p.zoneRules(i), soundId)));
+				lines.add(new ZoneLine(zone, w, Math.sqrt(dx * dx + dy * dy + dz * dz), explain(p.zoneRules(i), soundId)));
 				indices.add(i);
 			}
 		}
@@ -79,7 +91,8 @@ public final class SoundTracer {
 
 		SoundDecision d = new SoundDecision();
 		if (play != null) {
-			p.decide(soundId, play.positional(), play.worldKey(), play.dimension(), play.x(), play.y(), play.z(), d);
+			p.decide(soundId, play.positional(), play.worldKey(), play.dimension(), play.x(), play.y(), play.z(), play.px(),
+					play.py(), play.pz(), d);
 		} else {
 			p.decide(soundId, false, "", "", 0, 0, 0, d);
 		}
@@ -151,6 +164,10 @@ public final class SoundTracer {
 			}
 		}
 		if (best < 0) {
+			return null;
+		}
+		// FR-9 step 6: a limit or cue from a zone applies only at weight 0.5 or more; otherwise the global value stays.
+		if (property != TraceProperty.LOUDNESS && lines.get(best).weight() < 0.5) {
 			return null;
 		}
 		int runnerUp = -1;
