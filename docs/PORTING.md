@@ -9,6 +9,14 @@ Supported versions: **26.2, 26.3**. Each version gets its own jar from one sourc
 ./gradlew build runClientGameTest -Pminecraft_version=26.2 -Pfabric_api_version=0.161.0+26.2
 ```
 
+### Where version-specific code goes
+
+Most code compiles unchanged against every supported version, because each version gets its own jar. Only when the
+*source code* has to differ does a class go in `src/main/versions/<minecraft_version>/java/`, one copy per version,
+with the same class name and public API. Gradle adds the folder for the version being built and fails if it is
+missing. Today that is `audiozone.mc.compat.NarrationCompat` and `audiozone.mc.compat.KeyEventCompat`. When adding a
+version, copy the nearest version's folder and fix what does not compile.
+
 ## Version-sensitive touch points
 
 Add a row whenever you add a Mixin, an access widener entry or a call into version-sensitive Minecraft API.
@@ -20,6 +28,12 @@ Add a row whenever you add a Mixin, an access widener entry or a call into versi
 | M0 | Main screen (`audiozone.mc.AudioZoneScreen`) | `Screen.extractRenderState(GuiGraphicsExtractor, …)`, `GuiGraphicsExtractor.centeredText` | M0 game test (screenshot) |
 | M1 | **Mixin** `SoundEngineMixin`: sound start | `@Inject` into `SoundEngine.play(SoundInstance)` before its call to `calculateVolume(float, SoundSource)` | M1 game test; log has no Mixin errors |
 | M1 | Sound data (`audiozone.mc.SoundHook`) | `SoundInstance.getSound/getVolume/getAttenuation/isRelative/getIdentifier/getSource/getX/Y/Z`, `Sound.getAttenuationDistance()`, `SoundManager.getListenerTransform().position()` | M1 game test |
+| M2 | **Drawing adapter** `audiozone.mc.ui.Draw`: all UI drawing | `GuiGraphicsExtractor.fill/outline/text/centeredText/enableScissor/disableScissor/setTooltipForNextFrame/textRendererForWidget`, `blitSprite(RenderPipelines.GUI_TEXTURED, …)` | M2 game test (screenshots) |
+| M2 | UI kit widgets (`audiozone.mc.ui.Az*`) | Extend `AbstractButton` (`extractContents`, `extractDefaultSprite`, `extractDefaultLabel`), `AbstractSliderButton`, `EditBox`; narration via `updateWidgetNarration`/`createNarrationMessage`, `NarratedElementType`; `KeyEvent.key()/hasShiftDown()/hasControlDown()` with `InputConstants.KEY_*` | M2 game test |
+| M2 | Screen base and dialog (`AzScreen`, `AzDialog`) | `Screen.init()` then vanilla calls `setInitialFocus()` (overridden), `extractBackground`, `addRenderableWidget`, `rebuildWidgets`, `getNarrationMessage`, `Minecraft.gui.setScreen` | M2 game test |
+| M2 | Tooltip timing (`Tooltips`) | `AbstractWidget.setTooltipDelay`, `Minecraft.getLastInputType()`; relies on vanilla showing tooltips on hover or keyboard focus (`WidgetTooltipHolder`) | Manual: hover vs Tab |
+| M2 | Icons | GUI atlas sprites at `assets/audiozone/textures/gui/sprites/icon/*.png` (made by `tools/make_icons.py`) | M2 screenshots |
+| M2 | Version-specific: `NarrationCompat`, `KeyEventCompat` | `ScreenNarrationCollector.update` (26.3 adds a `NarrationTrigger`); `KeyEvent(int, int, int)` (second field is a scancode in 26.2, a layout keycode in 26.3) | M2 game test |
 | M1 | Range formula (`audiozone.core.SoundRange`) | Must match vanilla: `max(volume, 1) × attenuation distance`, infinite if relative or `NONE`; audible when strictly closer (`Vec3.closerThan`, used by `SubtitleOverlay$Subtitle.isAudibleFrom`) | `SoundRangeTest`, M1 game test |
 
 ## Known differences between 26.2 and 26.3
@@ -34,8 +48,12 @@ Found at M0 by comparing the two game jars. Code that touches any of these needs
 | Key types | `InputConstants.Type.KEYSYM`, `SCANCODE`, `MOUSE` | `KEYBOARD`, `MOUSE` (`SCANCODE` removed) | Use `KeyMapping(String, int, Category)` and `InputConstants.getKey(String)`, which exist in both |
 | Screen narration | `updateNarratorStatus(boolean)` | Takes a `NarrationTrigger` argument; new `scheduleNarration()` | M2 UI kit (narration) |
 | World rendering | — | `LevelRenderer` changed substantially (75 signature lines differ) | M7 zone outlines |
+| **Keyboard input** | GLFW codes: `KEY_TAB` = 258, `MOD_SHIFT` = 1, `MOD_CONTROL` = 2; `KeyEvent(key, scancode, modifiers)` | **SDL3** codes: `KEY_TAB` = 43, `MOD_SHIFT` = 3, `MOD_CONTROL` = 192; `KeyEvent(key, keycode, modifiers)`, and vanilla matches shortcuts on the new layout `keycode` (`shortcutKey()`), with `KEYCODE_*` constants | Always use `InputConstants` names (values are compiled per version), never numbers. Building `KeyEvent`s goes through `KeyEventCompat` |
+| Render pipelines | `com.mojang.blaze3d.pipeline.RenderPipeline` | moved to `com.mojang.renderpearl.api.pipeline.RenderPipeline`; 26.3 also tries OpenGL then Vulkan | Source is unchanged as long as code names `RenderPipelines.GUI_TEXTURED` and never the type |
+| Narration collector | `ScreenNarrationCollector.update(Consumer)` | `update(Consumer, NarrationTrigger)`; `NarrationElementOutput` gains `narrationTrigger()` | `NarrationCompat`; never implement `NarrationElementOutput` directly |
+| Vanilla tab bar | `TabButton` is abstract; only vanilla's menu tab bar has a concrete one | same | Audio Zone uses its own `AzTabButton` |
 
-Unchanged between the two versions: `SoundEngine.play(SoundInstance)` and both `calculateVolume` overloads, `SoundSource` (categories), `ChannelAccess`, `SoundEngineExecutor`, `com.mojang.blaze3d.audio.Channel`/`Library`/`Listener`, `KeyMapping` signatures, `GuiGraphicsExtractor`.
+Unchanged between the two versions: `SoundEngine.play(SoundInstance)` and both `calculateVolume` overloads, `SoundSource` (categories), `ChannelAccess`, `SoundEngineExecutor`, `com.mojang.blaze3d.audio.Channel`/`Library`/`Listener`, `KeyMapping` signatures, `AbstractWidget`, `AbstractButton`, `AbstractSliderButton`, `EditBox`, `Tooltip`, and every `GuiGraphicsExtractor` method the drawing adapter uses (text, fill, outline, scissor, tooltip).
 
 ### How to compare two versions
 
