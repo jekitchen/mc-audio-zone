@@ -1,11 +1,16 @@
-package audiozone.core.search;
+package audiozone.core;
 
-/** Whole-string match where {@code *} matches any run of characters. No other special characters. */
-final class Glob {
+/**
+ * Whole-string match where {@code *} matches any run of characters, including none. No other character is special,
+ * and matching is case-sensitive (callers lowercase first). Shared by rule patterns (FR-4.1) and search (FR-3.5).
+ *
+ * <p>Allocates nothing, so it is safe on the sound hot path (PRD 7.4).
+ */
+public final class Glob {
 	private Glob() {
 	}
 
-	static boolean matches(String pattern, String text) {
+	public static boolean matches(String pattern, String text) {
 		// Greedy match with backtracking to the last star; no allocation.
 		int p = 0;
 		int s = 0;

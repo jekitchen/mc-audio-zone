@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import audiozone.core.Glob;
+
 /**
  * A parsed search box query (PRD FR-3.5).
  *
