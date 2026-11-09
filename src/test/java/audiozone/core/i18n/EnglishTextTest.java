@@ -35,10 +35,11 @@ class EnglishTextTest {
 	}
 
 	@Test
-	void ruleSummariesAreTranslated() throws IOException {
+	void ruleSummariesAndTraceTextAreTranslated() throws IOException {
 		JsonObject english = english();
 		for (String key : TestEnglish.TEXT.keySet()) {
-			if (key.startsWith("audiozone.summary.rule.") || key.equals("audiozone.summary.separator")) {
+			if (key.startsWith("audiozone.summary.rule.") || key.equals("audiozone.summary.separator")
+					|| key.startsWith("audiozone.trace.")) {
 				assertTrue(english.has(key), "en_us.json is missing " + key);
 			}
 		}
