@@ -1,0 +1,15 @@
+{
+	"schemaVersion": 1,
+	"id": "audiozone-gametest",
+	"version": "1.0.0",
+	"name": "Audio Zone game tests",
+	"environment": "client",
+	"entrypoints": {
+		"fabric-client-gametest": [
+			"audiozone.gametest.M0ClientGameTest"
+		]
+	},
+	"depends": {
+		"audiozone": "*"
+	}
+}

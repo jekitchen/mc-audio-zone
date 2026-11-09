@@ -15,6 +15,17 @@ repositories {
 	// Add mod repositories here when needed (e.g. Mod Menu at M8: https://maven.terraformersmc.com/).
 }
 
+// Client game tests (src/gametest): launch the real game and drive it. Run with ./gradlew runClientGameTest
+fabricApi {
+	configureTests {
+		createSourceSet = true
+		modId = "audiozone-gametest"
+		enableGameTests = false
+		enableClientGameTests = true
+		eula = true
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"

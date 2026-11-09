@@ -2,7 +2,7 @@
 
 This page lists everything needed to build, test and run Audio Zone from source. Update it whenever a tool or version is added or changed.
 
-Last verified: 2026-11-08 on Windows 11. Both Minecraft targets built, unit tests passed, and the dev client launched with the mod loaded.
+Last verified: 2026-11-08 on Windows 11. Both Minecraft targets build, and the unit tests and client game tests pass on both.
 
 ## Tools to install
 
@@ -51,6 +51,7 @@ Run from the repo root. On Windows use `gradlew` (cmd/PowerShell) or `./gradlew`
 | Build and test for Minecraft 26.2 | `./gradlew build -Pminecraft_version=26.2 -Pfabric_api_version=0.161.0+26.2` |
 | Unit tests only | `./gradlew test` |
 | Launch the game with the mod (dev client) | `./gradlew runClient` |
+| Run the in-game milestone tests (opens a game window, needs a display) | `./gradlew runClientGameTest` (add the `-P` flags above for 26.2) |
 | Generate Minecraft sources for browsing | `./gradlew genSources` |
 | Clean | `./gradlew clean` |
 
@@ -60,7 +61,7 @@ The first build downloads Minecraft and the dependencies (about 1–2 minutes). 
 
 ## Continuous integration
 
-[`.github/workflows/build.yml`](../.github/workflows/build.yml) runs on every push and pull request. It validates the Gradle wrapper, sets up Temurin JDK 25, and builds and tests against Minecraft 26.2 and 26.3 in a matrix. The jars are uploaded as workflow artifacts. When a supported Minecraft version is added or a Fabric API version is bumped, update both `gradle.properties` and the matrix.
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) runs on every push and pull request. It validates the Gradle wrapper, sets up Temurin JDK 25, and builds and tests against Minecraft 26.2 and 26.3 in a matrix. The jars are uploaded as workflow artifacts. A second matrix job runs the client game tests (`runClientGameTest`) under a virtual display (Xvfb with Mesa software rendering). When a supported Minecraft version is added or a Fabric API version is bumped, update `gradle.properties`, both matrices and [`docs/PORTING.md`](PORTING.md).
 
 ## Project layout
 
@@ -71,9 +72,12 @@ src/main/java/audiozone/                           Mod code; client entry point 
 src/main/java/audiozone/mc/                        Version-sensitive code only (Mixins, adapters), PRD 7.6
 src/main/resources/fabric.mod.json                 Mod metadata (client-only, MIT)
 src/main/resources/audiozone.mixins.json           Mixin config
+src/main/resources/assets/audiozone/lang/          Translations (en_us.json)
 src/test/java/audiozone/                           JUnit tests for pure logic
+src/gametest/                                      Client game tests (Fabric client game-test API), one per milestone
 docs/PRD.md                                        Requirements (source of truth)
 docs/DEV_ENVIRONMENT.md                            This page
+docs/PORTING.md                                    Version-sensitive touch points and 26.2/26.3 differences
 ```
 
 ## Git identity
@@ -92,4 +96,5 @@ Your noreply address is listed in GitHub → Settings → Emails. Also turn on "
 
 1. `java -version` (with `JAVA_HOME` set) reports 25.
 2. `./gradlew build` ends with `BUILD SUCCESSFUL`, and `build/libs/` contains the jar.
-3. `./gradlew runClient` opens Minecraft, and the log shows `Loading N mods: - audiozone …` and `Audio Zone initialized` with no errors from Audio Zone.
+3. `./gradlew runClient` opens Minecraft, and the log shows `Loading N mods: - audiozone …` and `Audio Zone initialized` with no errors from Audio Zone. Press `;` in a world: the Audio Zone screen opens.
+4. `./gradlew runClientGameTest` ends with `BUILD SUCCESSFUL`. Screenshots are saved to `build/run/clientGameTest/screenshots/`.

@@ -10,20 +10,20 @@ maxismagical had not yet answered questions on scope, so this draft picks defaul
 
 | # | Assumption | Why this default | Sections affected |
 | --- | --- | --- | --- |
-| A1 | Initial build supports Minecraft Java 26.2 and 26.3 (decided by maxismagical). Java 26.x ships unobfuscated, so code uses Mojang's official names (e.g. `SoundEngine`, `SoundInstance`). | Matches the decided platform; Fabric dropped Yarn names after the de-obfuscation change. Verify at M0. | 7, 12 |
+| A1 | Initial build supports Minecraft Java 26.2 and 26.3 (decided by maxismagical). Java 26.x ships unobfuscated, so code uses Mojang's official names (e.g. `SoundEngine`, `SoundInstance`). | Matches the decided platform; Fabric dropped Yarn names after the de-obfuscation change. Verified at M0: `SoundEngine.play(SoundInstance)` and `calculateVolume` exist in both versions. | 7, 12 |
 | A2 | MVP ships global rules, the recently played list, search, **basic fixed zones** (sphere and box, Inside mode, hard edge). | Zones are the product's namesake, so a first release without any zone would miss the main promise. | 5, 10 |
 | A3 | Volume in MVP is 0–100%. Boost to 200% arrives in v1. | Boost needs the riskiest engine change (raising the gain clamp without raising range). | 5, 10 |
 | A4 | Each server or world has exactly one profile, created automatically (MVP). Copying settings from another server and import/export are v1. | Fixed zones need a server/world key from day one; full profile management is a lot of UI. | 5, 10 |
 | A5 | Distances in the recently played list are shown as coarse bands (Close, Near, Far), not exact block counts. | Exact distance to an unseen mob is more than vanilla subtitles give. See FR-1.4. | 5, 8 |
 | A6 | Zone checks run when a sound starts, then every client tick (20 times a second) for sounds that are still playing. | Handles minecarts, entity-bound sounds and the moving personal bubble without per-frame cost. | 5, 7 |
-| A7 | The default hotkey that opens Audio Zone is **K**. | Unused by vanilla; rebindable in Controls. | 5 |
+| A7 | The default hotkey that opens Audio Zone is **;** (semicolon). | Free in vanilla and in the 36 most-downloaded Fabric mods (K clashed with Iris, checked at M0); rebindable in Controls. | 5 |
 | A8 | English (en\_us) at launch, with every string in a language file ready for community translation. | Keeps launch small; localization is cheap to add later if planned now. | 9 |
 
 ## 1. Summary and problem statement
 
 **Summary.** Audio Zone gives players per-sound control over what they hear: mute, volume from 0% to 200%, repeat limits, and visual cues when a muted sound plays. Rules can apply everywhere, or only inside (or outside) zones placed at fixed coordinates or around the player. It runs on the client only, so it works on vanilla servers, Realms and singleplayer.
 
-**Problem.** Vanilla Minecraft offers only about ten volume sliders: Master plus one per sound category (Music, Jukebox/Note Blocks, Weather, Blocks, Hostile Creatures, Friendly Creatures, Players, Ambient/Environment, Voice, and others; the exact list for 26.2 is checked at M0). A *category* is a broad bucket; a player cannot silence one sound (villager "hmm") without silencing every friendly mob. This causes three recurring pain points:
+**Problem.** Vanilla Minecraft offers only about ten volume sliders: Master plus one per sound category (Music, Jukebox/Note Blocks, Weather, Blocks, Hostile Creatures, Friendly Creatures, Players, Ambient/Environment, Voice, and others; checked at M0, 26.2 and 26.3 both have Master, Music, Jukebox/Note Blocks (`record`), Weather, Blocks, Hostile Creatures, Friendly Creatures (`neutral`), Players, Ambient/Environment, Voice/Speech and UI). A *category* is a broad bucket; a player cannot silence one sound (villager "hmm") without silencing every friendly mob. This causes three recurring pain points:
 
 - **Noise in farms and bases.** Iron farms, villager trading halls, mob farms and redstone clocks produce hundreds of sounds per second. Players turn whole categories off and lose sounds they need, such as creeper hiss or a player's footsteps.
 - **Sensory and hearing needs.** Players with sound sensitivity or sensory overload need specific harsh sounds removed (explosions, ghast screams, glass breaking). Players with hearing loss need some quiet sounds louder, which vanilla cannot do beyond 100%.
@@ -101,7 +101,7 @@ Each story maps to the FRs that satisfy it. Release tags show when the story fir
 | US-13 | server admin | read a clear fair-play statement | I can decide to allow the mod | section 8 | MVP |
 | US-14 | player | see every rule and zone that affected a sound and which one won | I can fix a setup that isn't doing what I expect | FR-14 | MVP |
 
-**Example flow (US-1 + US-5; the cue part works from v1).** Alex hears a loud glass-breaking sound. They press **K**, the Recently Played tab is already open, and the top row reads "Glass breaks · minecraft:block.glass.break · Blocks · ×2 · Near". They press the Mute button on that row and tick "Show cue". The next time glass breaks, no sound plays and a cue reads "(muted) Glass breaks" in the subtitle area.
+**Example flow (US-1 + US-5; the cue part works from v1).** Alex hears a loud glass-breaking sound. They press **;**, the Recently Played tab is already open, and the top row reads "Glass breaks · minecraft:block.glass.break · Blocks · ×2 · Near". They press the Mute button on that row and tick "Show cue". The next time glass breaks, no sound plays and a cue reads "(muted) Glass breaks" in the subtitle area.
 
 ## 5. Functional requirements
 
@@ -416,7 +416,7 @@ Each multiplayer server, Realm and singleplayer world has exactly one *profile*:
 ### FR-12 Config screen, hotkey and Mod Menu (MVP)
 
 - **FR-12.1** One main screen with tabs: Recently Played, Inspect (v1), Search, Rules, Zones, Profiles, Settings. The header always shows the active profile and a "Bypass Audio Zone" toggle (FR-13.1).
-- **FR-12.2** Hotkey **K opens the screen on the last used tab. It is rebindable in vanilla Options → Controls under the category "Audio Zone". At M0, K is checked against the default keys of the \~30 most-downloaded Fabric mods; if it clashes, another free key is chosen and recorded in the Decisions Log**.
+- **FR-12.2** Hotkey **;** (semicolon) **opens the screen on the last used tab. It is rebindable in vanilla Options → Controls under the category "Audio Zone". At M0, K was checked against the default keys of the 36 most-downloaded Fabric mods, clashed with Iris, and was replaced by ; (see the Decisions Log)**.
 - **FR-12.3** If Mod Menu is installed, its config button opens the same screen. Without Mod Menu, the mod works identically.
 - **FR-12.4** Editors (rule, zone, profile settings) use Save and Cancel. Pressing Esc or Cancel with unsaved changes opens a dialog: Save, Discard, Keep editing.
 - **FR-12.5** Quick actions in lists apply immediately and show a 5-second toast with Undo (v1).
@@ -425,7 +425,7 @@ Each multiplayer server, Realm and singleplayer world has exactly one *profile*:
 
 **Acceptance criteria**
 
-- [ ] Press K in game: the screen opens. Rebind to L in Controls: L opens it, K does nothing. With JourneyMap installed, Controls shows no key conflict for Audio Zone.
+- [ ] Press ; in game: the screen opens. Rebind to ' (apostrophe) in Controls: ' opens it, ; does nothing. With JourneyMap or Iris installed, Controls shows no key conflict for Audio Zone. (Rebind to a free key: a key that vanilla already uses, such as L for Advancements, opens that screen instead.)
 - [ ] With Mod Menu installed, its Audio Zone config button opens the screen; remove Mod Menu: the game still launches.
 - [ ] Change a zone radius and press Esc: the discard dialog appears; Keep editing returns with the value intact.
 - [ ] Change a setting, press its reset button: it returns to the default.
@@ -485,7 +485,7 @@ All screens are hand-built on Minecraft's own Screen and widget classes from a s
 
 | Screen / tab | Wireframe description | Primary flow |
 | --- | --- | --- |
-| Recently Played | Toolbar: Pause, Sort dropdown, filter text field, "Apply to" selector. Scrolling list of rows (FR-1.2), each with icon buttons Mute, Volume, Limit, Cue, Edit, Why? (FR-14). | Hear sound → K → find row → Mute (2 actions) |
+| Recently Played | Toolbar: Pause, Sort dropdown, filter text field, "Apply to" selector. Scrolling list of rows (FR-1.2), each with icon buttons Mute, Volume, Limit, Cue, Edit, Why? (FR-14). | Hear sound → ; → find row → Mute (2 actions) |
 | Inspect (v1) | Left: selected entity name and type, link legend (Linked / Likely / Uncertain). Right: its sound rows with the same buttons. "No sounds linked yet" message when empty. | Look at mob → Inspect key → row → action |
 | Search | Search field with "?" help button that expands the syntax table (FR-3.5); result count; result rows with quick actions (Preview after 1.0). | Type → pick result → action |
 | Rules | List of global rules: enabled checkbox, pattern, summary ("Muted, cue on"), match count, move up/down buttons. Add rule button. Rule editor dialog: pattern field with live preview, Mute toggle, Volume slider and number, Limit fields + Per source toggle, Cue toggle, Save/Cancel. | Add rule → type pattern → set values → Save |
@@ -579,7 +579,7 @@ The range check always uses the vanilla volume, so rules and boost can change lo
 
 ### 7.3 Fabric API usage
 
-Fabric API (assumed: no event that can cancel and modify every sound, to be confirmed at M0) supplies: client lifecycle and tick events (per-tick updates), play connection join/disconnect events (load the server's profile), key mapping registration, HUD element registration (cues, bypass label), world render events (outlines), and a resource reload listener (rebuild the sound ID list and clear caches). The client game-test API is recommended for automated launch and screenshot tests.
+Fabric API (confirmed at M0: it has no event that can cancel or modify sounds; its sound module only supplies custom audio streams, so the sound hooks are Mixins) supplies: client lifecycle and tick events (per-tick updates), play connection join/disconnect events (load the server's profile), key mapping registration, HUD element registration (cues, bypass label), world render events (outlines), and a resource reload listener (rebuild the sound ID list and clear caches). The client game-test API is recommended for automated launch and screenshot tests.
 
 ### 7.4 Hot path design (performance-critical)
 
@@ -622,7 +622,7 @@ Profile file sketch (field names final at M4):
 - All version-sensitive code lives in one package (`audiozone.mc`). A written porting checklist lists every Mixin target, the drawing adapter, the HUD and outline renderers, and the AC to re-run.
 - Mixins that the mod cannot work without fail at startup with a clear log message naming the missing target, instead of failing silently.
 - Pure logic (patterns, search syntax, precedence, limiter, validation, migrations) has JUnit tests that run without Minecraft, so they survive every port unchanged.
-- **Supported versions.** The first release supports Minecraft 26.2 and 26.3. Whether one jar covers both or each gets its own build is decided at M0, by checking whether the sound engine, GUI and render code that Audio Zone touches differ between them. Every supported version runs the full test plan before each release.
+- **Supported versions.** The first release supports Minecraft 26.2 and 26.3. Decided at M0: **each version gets its own jar**, built from one source tree with `-Pminecraft_version`. The code Audio Zone touches differs between 26.2 and 26.3 (the play path and range helper in `SoundEngine`, `SoundInstance.resolve` renamed, `InputConstants.Type` renamed, Screen narration and `LevelRenderer` changes); see `docs/PORTING.md`. Every supported version runs the full test plan before each release.
 - **Release cadence.** Later versions follow Mojang's release schedule. The goal is an Audio Zone release on the day of each official Minecraft release, or within 7 days. To make that possible, Audio Zone is tested against Mojang's preview builds (snapshots, pre-releases and release candidates) before the official release. Section 10.5 describes the process.
 
 ### 7.7 Where AI-written code is most likely to go wrong
@@ -711,7 +711,7 @@ Three releases: **MVP (0.1)** after milestones M0–M**8, v1 (1.0) after M9**–
 
 | # | Milestone | What exists at the end | Main risk |
 | --- | --- | --- | --- |
-| M0 | Project skeleton | Fabric mod for 26.2 and 26.3 that loads, shows in the mod list, K opens an empty screen; Mojang names and Fabric API sound events confirmed | Toolchain setup, wrong template version |
+| M0 | Project skeleton | Fabric mod for 26.2 and 26.3 that loads, shows in the mod list, ; opens an empty screen; Mojang names and Fabric API sound events confirmed | Toolchain setup, wrong template version |
 | M1 | Observe sounds | Mixin on sound start logs ID, category, position, vanilla volume and computed range; no behavior change | Wrong Mixin target names |
 | M2 | UI kit | Components from 6.2 plus a demo screen; keyboard navigation and narration | Drawing API differences |
 | M3 | Recently played list | FR-1 read-only (no actions), range filter, distance bands | Range formula |
@@ -772,7 +772,7 @@ Every test runs in game without reading code. Use a dedicated creative test worl
 
 | Milestone | In-game test |
 | --- | --- |
-| M0 | Game launches with the mod; it appears in the mod list (or Mod Menu); K opens an empty Audio Zone screen; log has no errors from Audio Zone |
+| M0 | Game launches with the mod; it appears in the mod list (or Mod Menu); ; opens an empty Audio Zone screen; log has no errors from Audio Zone |
 | M1 | Walk past animals: the log shows one line per sound with ID, category and range; sounds sound unchanged |
 | M2 | Demo screen: every component reachable with Tab; narrator reads each; correct at GUI scales 1–4 |
 | M3 | FR-1 AC rows 1, 2, 4, 5 |
@@ -857,7 +857,7 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 ### 12.2 Assumptions
 
 - A1–A8 from the draft status section.
-- A9: Fabric API for 26.2 has no event that can cancel and change the volume of every sound, so Mixin is required. Checked at M0.
+- A9: Fabric API for 26.2 and 26.3 has no event that can cancel and change the volume of every sound, so Mixin is required. Confirmed at M0.
 - A10: Vanilla's hearing range formula is `max(volume, 1) × attenuation distance` and subtitles use it. Checked at M1.
 - A11: Server-sent sounds already arrive only for players in range, so the client range check mainly matters for client-generated sounds and for consistency.
 - A12: Writing one small ID file into a singleplayer save folder is acceptable to players (decided in Q4).
@@ -909,7 +909,7 @@ In priority order. Answers will update the decisions log and the affected sectio
 - [ ] **Q3.** Resolved: cues have their own master switch, "Show muted-sound cues", on by default and independent of vanilla Subtitles; per-rule Cue toggles apply underneath (FR-7.7).
 - [ ] **Q4.** Resolved: singleplayer worlds are identified by a small ID file (audiozone\_id.txt) in the save folder, with the folder name as fallback (FR-11.1).
 - [ ] **Q5.** Resolved: Outside zones measure distance from their center, the same as every other zone (FR-9 step 4).
-- [ ] **Q6.** Resolved: K opens the screen by default (checked against popular mods' keys at M0); Bypass is F10 (FR-12.2, FR-13.1).
+- [ ] **Q6.** Resolved: ; opens the screen by default (K clashed with Iris in the M0 check of popular mods' keys); Bypass is F10, which no checked mod uses (FR-12.2, FR-13.1).
 - [ ] **Q7.** Resolved: the initial build supports 26.2 and 26.3; later versions follow Mojang's release schedule with releases on or shortly after each official Minecraft release (sections 7.6 and 10.5).
 - [ ] **Q8.** Resolved: Music, UI and Voice/Speech count as vanilla-covered and are excluded. Confirm the slider list against 26.2 at M1.
 
@@ -943,3 +943,6 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-08 | All zones, including Outside zones, measure conflict distance from their center (Q5) | maxismagical, decision card |
 | 2026-11-08 | Default key to open Audio Zone changes from J to K (J clashes with JourneyMap); confirmed against popular mods at M0 (Q6) | maxismagical, decision card |
 | 2026-11-08 | Feature review: cues move from MVP to v1 (now milestone M9; MVP is M0–M8). Sound trace stays in MVP read-only; inline editing moves to v1. Filled zones, regex search and Preview move to Future (after 1.0). All other features unchanged (Q1) | maxismagical |
+| 2026-11-08 | Default key to open Audio Zone changes from K to ; (semicolon). The M0 check loaded vanilla and the 36 most-downloaded Fabric mods: Iris binds K to "Toggle shaders", every letter is taken by vanilla or some mod, and ; ' , . ` are the only free keys. F10 (Bypass) is free (Q6, FR-12.2) | maxismagical, M0 check |
+| 2026-11-08 | One jar per Minecraft version, built from one source tree; version-specific code goes in `audiozone.mc` and is tracked in docs/PORTING.md (section 7.6) | M0 check |
+| 2026-11-08 | Automated client game tests (Fabric client game-test API, `./gradlew runClientGameTest`) cover each milestone's in-game test where possible | M0 |
