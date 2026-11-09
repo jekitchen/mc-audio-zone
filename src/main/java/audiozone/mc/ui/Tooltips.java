@@ -3,7 +3,9 @@ package audiozone.mc.ui;
 import java.time.Duration;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.network.chat.Component;
 
 /**
  * Tooltip timing (PRD 6.3): tooltips appear after 500 ms of mouse hover, and immediately when a widget gets
@@ -14,6 +16,12 @@ public final class Tooltips {
 	public static final Duration HOVER_DELAY = Duration.ofMillis(500);
 
 	private Tooltips() {
+	}
+
+	/** Gives any widget a tooltip (shown on hover after 500 ms, immediately on keyboard focus). */
+	public static <T extends AbstractWidget> T describe(T widget, Component text) {
+		widget.setTooltip(Tooltip.create(text));
+		return widget;
 	}
 
 	public static void refresh(Iterable<? extends GuiEventListener> children) {

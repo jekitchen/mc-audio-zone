@@ -7,6 +7,7 @@ import audiozone.mc.ui.AzScreen;
 import audiozone.mc.ui.AzSlider;
 import audiozone.mc.ui.AzTextField;
 import audiozone.mc.ui.AzToggle;
+import audiozone.mc.ui.Tooltips;
 import java.util.List;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
@@ -53,13 +54,13 @@ public final class UiKitDemoScreen extends AzScreen {
 
 	@Override
 	protected void addHeaderWidgets(List<AbstractWidget> header) {
-		header.add(new AzToggle(90, Component.translatable("audiozone.demo.bypass"), bypass, value -> bypass = value));
+		header.add(tip(new AzToggle(90, Component.translatable("audiozone.demo.bypass"), bypass, value -> bypass = value), "bypass"));
 	}
 
 	@Override
 	protected void addFooterWidgets(List<AbstractWidget> footer) {
 		footer.add(AzButton.icon(icon("help"), Component.translatable("audiozone.ui.help"), this::openHelp));
-		footer.add(AzButton.text(Component.translatable("audiozone.ui.done"), this::onClose));
+		footer.add(tip(AzButton.text(Component.translatable("audiozone.ui.done"), this::onClose), "done"));
 	}
 
 	@Override
@@ -75,15 +76,16 @@ public final class UiKitDemoScreen extends AzScreen {
 		body.label(() -> Component.translatable("audiozone.demo.last_action", lastAction));
 		AzButton disabled = AzButton.text(Component.translatable("audiozone.demo.disabled_button"), () -> lastAction = "disabled?!");
 		disabled.active = false;
-		body.row(AzButton.text(Component.translatable("audiozone.demo.plain_button"), () -> lastAction = "Plain button"), disabled);
+		tip(disabled, "disabled_button");
+		body.row(tip(AzButton.text(Component.translatable("audiozone.demo.plain_button"), () -> lastAction = "Plain button"), "plain_button"), disabled);
 		body.row(
 				AzButton.icon(icon("mute"), Component.translatable("audiozone.demo.mute"), () -> lastAction = "Mute"),
 				AzButton.icon(icon("volume"), Component.translatable("audiozone.demo.volume"), () -> lastAction = "Volume"),
 				AzButton.icon(icon("edit"), Component.translatable("audiozone.demo.edit"), () -> lastAction = "Edit"),
 				AzButton.icon(icon("help"), Component.translatable("audiozone.demo.why"), () -> lastAction = "Why?"));
-		showCueToggle = new AzToggle(TOGGLE_WIDTH, Component.translatable("audiozone.demo.show_cue"), showCue, value -> showCue = value);
+		showCueToggle = tip(new AzToggle(TOGGLE_WIDTH, Component.translatable("audiozone.demo.show_cue"), showCue, value -> showCue = value), "show_cue");
 		body.row(showCueToggle,
-				new AzToggle(TOGGLE_WIDTH, Component.translatable("audiozone.demo.reduced_motion"), reducedMotion, value -> reducedMotion = value));
+				tip(new AzToggle(TOGGLE_WIDTH, Component.translatable("audiozone.demo.reduced_motion"), reducedMotion, value -> reducedMotion = value), "reduced_motion"));
 	}
 
 	private void buildInputs(Body body) {
@@ -97,7 +99,8 @@ public final class UiKitDemoScreen extends AzScreen {
 						volumeField.setValue(Integer.toString((int) value));
 					}
 				});
-		volumeField = new AzTextField(font, 50, Component.translatable("audiozone.demo.volume_typed"));
+		tip(volumeSlider, "volume_slider");
+		volumeField = tip(new AzTextField(font, 50, Component.translatable("audiozone.demo.volume_typed")), "volume_typed");
 		volumeField.setMaxLength(3);
 		volumeField.setValue(Integer.toString((int) volume));
 		volumeField.validator(UiKitDemoScreen::validateVolume)
@@ -108,8 +111,8 @@ public final class UiKitDemoScreen extends AzScreen {
 				});
 		body.row(volumeSlider, volumeField);
 
-		patternField = new AzTextField(font, 220, Component.translatable("audiozone.demo.pattern"))
-				.placeholder(Component.literal("minecraft:entity.villager.*"));
+		patternField = tip(new AzTextField(font, 220, Component.translatable("audiozone.demo.pattern"))
+				.placeholder(Component.literal("minecraft:entity.villager.*")), "pattern");
 		patternField.setValue(pattern);
 		patternField.validator(UiKitDemoScreen::validatePattern).onChange(text -> pattern = text);
 		body.row(patternField);
@@ -118,9 +121,9 @@ public final class UiKitDemoScreen extends AzScreen {
 
 	private void buildDialogs(Body body) {
 		body.label(() -> Component.translatable("audiozone.demo.last_action", lastAction));
-		body.row(AzButton.text(Component.translatable("audiozone.demo.open_two"), this::openTwoButtonDialog));
-		body.row(AzButton.text(Component.translatable("audiozone.demo.open_three"), this::openThreeButtonDialog));
-		body.row(new AzToggle(200, Component.translatable("audiozone.demo.pretend_unsaved"), pretendUnsaved, value -> pretendUnsaved = value));
+		body.row(tip(AzButton.text(Component.translatable("audiozone.demo.open_two"), this::openTwoButtonDialog), "open_two"));
+		body.row(tip(AzButton.text(Component.translatable("audiozone.demo.open_three"), this::openThreeButtonDialog), "open_three"));
+		body.row(tip(new AzToggle(200, Component.translatable("audiozone.demo.pretend_unsaved"), pretendUnsaved, value -> pretendUnsaved = value), "pretend_unsaved"));
 	}
 
 	public void openTwoButtonDialog() {
@@ -184,6 +187,11 @@ public final class UiKitDemoScreen extends AzScreen {
 			return Component.translatable("audiozone.demo.error.pattern_space");
 		}
 		return null;
+	}
+
+	/** Every demo control gets a tooltip from "audiozone.demo.tip.<key>". */
+	private static <T extends AbstractWidget> T tip(T widget, String key) {
+		return Tooltips.describe(widget, Component.translatable("audiozone.demo.tip." + key));
 	}
 
 	private static Identifier icon(String name) {

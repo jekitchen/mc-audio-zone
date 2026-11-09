@@ -47,15 +47,6 @@ class SliderModelTest {
 	}
 
 	@Test
-	void homeAndEnd() {
-		SliderModel m = volume(70);
-		m.toMax();
-		assertEquals(200, m.value());
-		m.toMin();
-		assertEquals(0, m.value());
-	}
-
-	@Test
 	void typedValuesSnapToFineStep() {
 		SliderModel m = volume(0);
 		m.set(73.4);

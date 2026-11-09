@@ -59,14 +59,6 @@ public final class SliderModel {
 		value = snap(min + target * size, fineStep);
 	}
 
-	public void toMin() {
-		value = min;
-	}
-
-	public void toMax() {
-		value = max;
-	}
-
 	/** Position of the handle, 0 to 1. */
 	public double fraction() {
 		return (value - min) / (max - min);

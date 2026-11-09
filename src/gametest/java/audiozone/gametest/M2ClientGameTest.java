@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
+import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
@@ -39,6 +40,7 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 		checkCtrlTab(context);
 		checkSliderKeys(context);
 		checkToggleAndButtons(context);
+		captureTooltips(context);
 		checkTextFields(context);
 		checkDialogs(context);
 		checkLayouts(context);
@@ -114,21 +116,30 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 
 	private static void checkSliderKeys(ClientGameTestContext context) {
 		selectTab(context, 1);
-		context.runOnClient(mc -> demo(mc).setFocused(demo(mc).volumeSlider));
-		press(context, InputConstants.KEY_HOME);
-		checkVolume(context, 0, "Home");
-		press(context, InputConstants.KEY_END);
-		checkVolume(context, 200, "End");
-		check(context.computeOnClient(mc -> demo(mc).volumeSlider.isWarning()), "200% should be in the warning zone");
+		context.runOnClient(mc -> {
+			demo(mc).volumeSlider.setTypedValue(100);
+			demo(mc).setFocused(demo(mc).volumeSlider);
+		});
+		check(!context.computeOnClient(mc -> demo(mc).volumeSlider.isWarning()), "100% should not be in the warning zone");
+		press(context, InputConstants.KEY_RIGHT);
+		checkVolume(context, 105, "Right");
+		check(context.computeOnClient(mc -> demo(mc).volumeSlider.isWarning()), "105% should be in the warning zone");
 		String narration = context.computeOnClient(mc -> narrationOf(demo(mc).volumeSlider));
-		check(narration.contains("200%") && narration.contains("louder than vanilla"),
+		check(narration.contains("105%") && narration.contains("louder than vanilla"),
 				"slider narration should read the value and the warning, was: " + narration);
-		press(context, InputConstants.KEY_LEFT);
-		checkVolume(context, 195, "Left");
 		pressWithModifiers(context, InputConstants.KEY_LEFT, MOD_SHIFT);
-		checkVolume(context, 194, "Shift+Left");
-		check(context.computeOnClient(mc -> demo(mc).volumeField.getValue()).equals("194"),
+		checkVolume(context, 104, "Shift+Left");
+		pressWithModifiers(context, InputConstants.KEY_RIGHT, MOD_SHIFT);
+		checkVolume(context, 105, "Shift+Right");
+		press(context, InputConstants.KEY_LEFT);
+		press(context, InputConstants.KEY_LEFT);
+		checkVolume(context, 95, "Left twice");
+		check(context.computeOnClient(mc -> demo(mc).volumeField.getValue()).equals("95"),
 				"the number field should follow the slider");
+		// Home and End are not slider keys (they do nothing to the value).
+		press(context, InputConstants.KEY_HOME);
+		press(context, InputConstants.KEY_END);
+		checkVolume(context, 95, "Home and End");
 
 		// Typing a value moves the slider.
 		context.runOnClient(mc -> {
@@ -165,6 +176,27 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(mc -> demo(mc).lastAction).equals("Mute"), "Enter on the Mute button should press it");
 	}
 
+	/**
+	 * Tooltip screenshots: hover (after the 500 ms delay) and keyboard focus (immediate). Fabric's test input does
+	 * not set the game's "last input" type, so the keyboard case sets it the way a real Tab press does.
+	 */
+	private static void captureTooltips(ClientGameTestContext context) {
+		selectTab(context, 0);
+		AbstractWidget plain = context.computeOnClient(mc -> findByMessage(demo(mc), "Plain button"));
+		AbstractWidget mute = context.computeOnClient(mc -> findByMessage(demo(mc), "Mute"));
+		double scale = context.computeOnClient(mc -> (double) mc.getWindow().getGuiScale());
+		context.getInput().setCursorPos((plain.getX() + plain.getWidth() / 2.0) * scale, (plain.getY() + plain.getHeight() / 2.0) * scale);
+		context.waitTicks(20); // longer than the 500 ms hover delay
+		context.takeScreenshot("m2-tooltip-hover");
+		context.getInput().setCursorPos(0, 0);
+		context.runOnClient(mc -> {
+			mc.setLastInputType(InputType.KEYBOARD_TAB);
+			demo(mc).setFocused(mute);
+		});
+		context.waitTicks(1);
+		context.takeScreenshot("m2-tooltip-keyboard-focus");
+	}
+
 	private static void checkTextFields(ClientGameTestContext context) {
 		selectTab(context, 1);
 		context.runOnClient(mc -> {
@@ -172,13 +204,18 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 			demo(mc).patternField.setValue("");
 		});
 		AzTextField field = context.computeOnClient(mc -> demo(mc).patternField);
+		// A fresh, empty field is invalid (so Save could be disabled) but shows no error until it is edited.
 		check(!context.computeOnClient(mc -> field.isValid()), "an empty pattern should be invalid");
+		check(!context.computeOnClient(mc -> field.isErrorShown()), "a field the player has not edited should not show an error");
+		check(!context.computeOnClient(mc -> narrationOf(field)).contains("Error"), "an unedited field should not narrate an error");
+		context.takeScreenshot("m2-text-field-untouched");
 		context.getInput().typeChars("minecraft:entity.cow.*");
 		context.waitTicks(SETTLE);
 		check(context.computeOnClient(mc -> field.isValid()), "a valid pattern was rejected: " + context.computeOnClient(mc -> field.getValue()));
 		context.getInput().typeChars(" x");
 		context.waitTicks(SETTLE);
 		check(!context.computeOnClient(mc -> field.isValid()), "a pattern with a space should be invalid");
+		check(context.computeOnClient(mc -> field.isErrorShown()), "after editing, the error should be shown");
 		String narration = context.computeOnClient(mc -> narrationOf(field));
 		check(narration.contains("Patterns cannot contain spaces"), "the error should be narrated with the field, was: " + narration);
 		context.takeScreenshot("m2-text-field-error");

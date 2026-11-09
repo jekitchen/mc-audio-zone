@@ -11,7 +11,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Slider (PRD 6.2) on top of vanilla's slider. Keyboard: Left/Right move by one step, Shift+Left/Right by the fine
- * step, Home/End jump to the ends. Values above the warning threshold add the warning text to the label and the
+ * step. Values above the warning threshold add the warning text to the label and the
  * narration and draw a warning outline. Typed values come in through {@link #setTypedValue}.
  */
 public class AzSlider extends AbstractSliderButton {
@@ -58,8 +58,6 @@ public class AzSlider extends AbstractSliderButton {
 		switch (event.key()) {
 			case InputConstants.KEY_LEFT -> model.stepBy(-1, event.hasShiftDown());
 			case InputConstants.KEY_RIGHT -> model.stepBy(1, event.hasShiftDown());
-			case InputConstants.KEY_HOME -> model.toMin();
-			case InputConstants.KEY_END -> model.toMax();
 			default -> {
 				return super.keyPressed(event);
 			}

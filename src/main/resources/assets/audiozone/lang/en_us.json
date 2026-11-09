@@ -3,7 +3,6 @@
 	"key.audiozone.open": "Open Audio Zone",
 	"screen.audiozone.title": "Audio Zone",
 	"screen.audiozone.ui_demo": "UI kit demo",
-
 	"audiozone.ui.on": "On",
 	"audiozone.ui.off": "Off",
 	"audiozone.ui.toggle": "%s: %s",
@@ -25,7 +24,6 @@
 	"audiozone.ui.keep_editing": "Keep editing",
 	"audiozone.ui.unsaved.title": "Unsaved changes",
 	"audiozone.ui.unsaved.message": "You have changes that are not saved. Save them before closing?",
-
 	"audiozone.demo.title": "UI kit demo",
 	"audiozone.demo.profile": "Profile: Demo world",
 	"audiozone.demo.bypass": "Bypass",
@@ -44,7 +42,7 @@
 	"audiozone.demo.volume_typed": "Volume (typed)",
 	"audiozone.demo.louder_than_vanilla": "louder than vanilla",
 	"audiozone.demo.pattern": "Pattern",
-	"audiozone.demo.slider_keys": "Slider keys: Left/Right step 5, Shift for 1, Home/End for 0/200.",
+	"audiozone.demo.slider_keys": "Slider keys: Left/Right step 5, Shift+Left/Right step 1.",
 	"audiozone.demo.open_two": "Open two-button dialog",
 	"audiozone.demo.open_three": "Open three-button dialog",
 	"audiozone.demo.pretend_unsaved": "Pretend there are unsaved changes",
@@ -55,5 +53,17 @@
 	"audiozone.demo.help_message": "Every control here can be used with Tab, Shift+Tab, Enter, Space and the arrow keys. Ctrl+Tab switches tabs. Esc closes dialogs with the safest choice.",
 	"audiozone.demo.error.volume": "Enter a whole number from 0 to 200",
 	"audiozone.demo.error.pattern_empty": "Enter a pattern",
-	"audiozone.demo.error.pattern_space": "Patterns cannot contain spaces"
+	"audiozone.demo.error.pattern_space": "Patterns cannot contain spaces",
+	"audiozone.demo.tip.bypass": "Demo only: in Audio Zone this plays every sound as in vanilla, ignoring all rules.",
+	"audiozone.demo.tip.done": "Close the demo.",
+	"audiozone.demo.tip.plain_button": "An ordinary text button. Pressing it updates \"Last action\".",
+	"audiozone.demo.tip.disabled_button": "A disabled button: it cannot be pressed and Tab skips it.",
+	"audiozone.demo.tip.show_cue": "Show a short on-screen cue when a muted sound plays.",
+	"audiozone.demo.tip.reduced_motion": "Turn off list animations and toast slide-ins.",
+	"audiozone.demo.tip.volume_slider": "Volume from 0 to 200%%. Above 100%% is louder than vanilla.",
+	"audiozone.demo.tip.volume_typed": "Type a volume from 0 to 200; the slider follows.",
+	"audiozone.demo.tip.pattern": "A sound ID pattern. * matches any text, e.g. minecraft:entity.villager.*",
+	"audiozone.demo.tip.open_two": "Opens a dialog with two choices. Esc picks Cancel.",
+	"audiozone.demo.tip.open_three": "Opens a dialog with three choices. Esc picks Keep editing.",
+	"audiozone.demo.tip.pretend_unsaved": "When on, closing this screen asks whether to save first."
 }
