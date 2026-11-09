@@ -34,6 +34,6 @@ public final class RecentLog implements SoundObserver {
 
 	@Override
 	public void onSound(SoundObservation o) {
-		sounds.record(o.idString(), o.category().getName(), !o.relative(), o.distance(), o.audible(), o.status(), null, Util.getMillis());
+		sounds.record(o.idString(), o.category().getName(), !o.relative(), o.distance(), o.audible(), o.status(), o.zoneName(), Util.getMillis());
 	}
 }

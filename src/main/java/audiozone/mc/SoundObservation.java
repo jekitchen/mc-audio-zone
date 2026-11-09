@@ -21,6 +21,7 @@ public final class SoundObservation {
 	boolean relative;
 	boolean audible;
 	PlayStatus status;
+	String zoneName;
 
 	public Identifier id() {
 		return id;
@@ -34,6 +35,11 @@ public final class SoundObservation {
 	/** What Audio Zone did with this play (Playing, or Muted by a rule). */
 	public PlayStatus status() {
 		return status;
+	}
+
+	/** The zone that decided this play ("Zone: A" in the recently played list, FR-9 AC), or {@code null}. */
+	public String zoneName() {
+		return zoneName;
 	}
 
 	public SoundSource category() {

@@ -145,6 +145,7 @@
 	"audiozone.recent.status_line.boosted": "▲ %s",
 	"audiozone.recent.mute": "Mute",
 	"audiozone.recent.edit": "Edit rule",
+	"audiozone.recent.zone": "Zone: %s",
 	"audiozone.recent.unmute": "Unmute",
 	"audiozone.recent.apply_to.everywhere": "Everywhere",
 	"audiozone.recent.apply_to.zone": "Zone: %s",

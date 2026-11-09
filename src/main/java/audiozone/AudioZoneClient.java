@@ -3,9 +3,11 @@ package audiozone;
 import audiozone.mc.AudioZoneScreen;
 import audiozone.mc.BypassLabel;
 import audiozone.mc.Notices;
+import audiozone.mc.PlayingChannels;
 import audiozone.mc.ProfileManager;
 import audiozone.mc.RecentLog;
 import audiozone.mc.SoundLogger;
+import audiozone.mc.WorldSession;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -48,6 +50,7 @@ public final class AudioZoneClient implements ClientModInitializer {
 
 		Notices.register();
 		ProfileManager.init(FabricLoader.getInstance().getConfigDir());
+		WorldSession.register();
 		ClientTickEvents.END_CLIENT_TICK.register(AudioZoneClient::onEndTick);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ProfileManager.flushSaves());
 		SoundLogger.registerIfEnabled();
@@ -66,5 +69,7 @@ public final class AudioZoneClient implements ClientModInitializer {
 		while (bypassKey.consumeClick()) {
 			ProfileManager.toggleBypass();
 		}
+		// FR-8.8: re-decide playing sounds every tick (zones, moving sources, Bypass).
+		PlayingChannels.get().tick(minecraft);
 	}
 }
