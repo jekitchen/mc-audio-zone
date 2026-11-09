@@ -61,7 +61,7 @@ The first build downloads Minecraft and the dependencies (about 1–2 minutes). 
 
 ## Continuous integration
 
-[`.github/workflows/build.yml`](../.github/workflows/build.yml) runs on every push and pull request. It validates the Gradle wrapper, sets up Temurin JDK 25, and builds and tests against Minecraft 26.2 and 26.3 in a matrix. The jars are uploaded as workflow artifacts. A second matrix job runs the client game tests (`runClientGameTest`) under a virtual display (Xvfb with Mesa software rendering). When a supported Minecraft version is added or a Fabric API version is bumped, update `gradle.properties`, both matrices and [`docs/PORTING.md`](PORTING.md).
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) runs on every push and pull request. It validates the Gradle wrapper, sets up Temurin JDK 25, and builds and tests against Minecraft 26.2 and 26.3 in a matrix. The jars are uploaded as workflow artifacts. A second matrix job runs the client game tests (`runClientGameTest`) with Mesa software graphics. Loom starts the game under `xvfb-run` by itself when the `CI` variable is set, so the workflow only installs `xvfb` and the Mesa OpenGL and Vulkan drivers. The job has a 20-minute timeout, because a game that cannot create a window hangs instead of exiting. When a supported Minecraft version is added or a Fabric API version is bumped, update `gradle.properties`, both matrices and [`docs/PORTING.md`](PORTING.md).
 
 ## Project layout
 
