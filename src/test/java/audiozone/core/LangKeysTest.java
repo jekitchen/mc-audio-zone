@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import audiozone.core.boost.BoostWarning;
+import audiozone.core.inspect.LinkKind;
 import audiozone.core.outline.ColorError;
 import audiozone.core.outline.ZoneColor;
 import audiozone.core.recent.DistanceBand;
@@ -51,6 +52,7 @@ class LangKeysTest {
 				"audiozone.color.", Stream.concat(keys(ZoneColor.values(), ZoneColor::translationKey).stream(),
 						Palette.OKABE_ITO.stream().map(s -> "audiozone.color." + s.id())).distinct().toList(),
 				"audiozone.color.error.", keys(ColorError.values(), ColorError::translationKey),
+				"audiozone.inspect.link.", keys(LinkKind.values(), LinkKind::translationKey),
 				"audiozone.pattern.error.", keys(PatternError.values(), PatternError::translationKey),
 				"audiozone.recent.distance.", keys(DistanceBand.values(), DistanceBand::translationKey),
 				"audiozone.recent.status.", keys(PlayStatus.values(), PlayStatus::translationKey),

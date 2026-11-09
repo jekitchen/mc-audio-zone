@@ -175,5 +175,8 @@
 	"audiozone.trace.zone_reason.only_zone": "Only zone",
 	"audiozone.trace.zone_reason.closest": "Closest anchor",
 	"audiozone.trace.zone_reason.tie_smaller_zone": "Tie on distance; smaller zone wins",
-	"audiozone.trace.zone_reason.tie_list_order": "Tie on distance and size; higher in the list"
+	"audiozone.trace.zone_reason.tie_list_order": "Tie on distance and size; higher in the list",
+	"audiozone.inspect.link.linked": "Linked",
+	"audiozone.inspect.link.likely": "Likely",
+	"audiozone.inspect.link.uncertain": "Uncertain"
 }
