@@ -222,6 +222,71 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		}
 	}
 
+	// ---- Zones (Zones tab, PRD 6.1) ----
+
+	/** The zone with this ID, or null. */
+	public Zone zone(String id) {
+		for (Zone zone : zones) {
+			if (zone.id().equals(id)) {
+				return zone;
+			}
+		}
+		return null;
+	}
+
+	/** Saves a zone from the editor: replaces the zone with the same ID in place, or adds it at the end. */
+	public Profile putZone(Zone zone) {
+		List<Zone> list = new ArrayList<>(zones);
+		Zone existing = zone(zone.id());
+		if (existing == null) {
+			list.add(zone);
+		} else {
+			list.set(list.indexOf(existing), zone);
+		}
+		return withZones(list);
+	}
+
+	/** Deletes the zone with this ID, and its color; returns this profile if there is none. */
+	public Profile removeZone(String id) {
+		Zone existing = zone(id);
+		if (existing == null) {
+			return this;
+		}
+		List<Zone> list = new ArrayList<>(zones);
+		list.remove(existing);
+		return withZones(list);
+	}
+
+	/**
+	 * Moves a zone up ({@code delta < 0}) or down the list. List order is the last tie-break between zones (FR-9 step
+	 * 5). Returns this profile if the zone is missing or already at that end.
+	 */
+	public Profile moveZone(String id, int delta) {
+		Zone existing = zone(id);
+		if (existing == null) {
+			return this;
+		}
+		int from = zones.indexOf(existing);
+		int to = Math.max(0, Math.min(zones.size() - 1, from + delta));
+		if (to == from) {
+			return this;
+		}
+		List<Zone> list = new ArrayList<>(zones);
+		list.remove(from);
+		list.add(to, existing);
+		return withZones(list);
+	}
+
+	/** An ID for a new zone: {@code z1}, {@code z2}, … the first one not in use. */
+	public String newZoneId() {
+		for (int n = 1; ; n++) {
+			String id = "z" + n;
+			if (zone(id) == null) {
+				return id;
+			}
+		}
+	}
+
 	/** Stable ID for a quick-action rule, so muting the same sound twice cannot create two rules. */
 	static String exactRuleId(String soundId) {
 		return "exact:" + soundId;

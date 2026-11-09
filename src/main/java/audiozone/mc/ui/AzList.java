@@ -202,6 +202,8 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 	 * (read-only) gets an invisible focus target instead, so it can still be reached with the keyboard and narrated.
 	 */
 	public static class Row extends ContainerObjectSelectionList.Entry<Row> {
+		static final int SWATCH_SIZE = 12;
+
 		/**
 		 * A text column. {@code width} 0 means "take the remaining space" (at most one such column per line).
 		 * {@code line} 0 is the main line; line 1 is a second, dimmer line underneath.
@@ -216,6 +218,8 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 		private final List<Column> columns;
 		private final List<AzButton> buttons;
 		private final RowFocus focusTarget;
+		/** Color square at the start of the row (e.g. a zone's color), as 0xRRGGBB; -1 for none. */
+		private int swatch = -1;
 
 		public Row(Object key, List<Column> columns, List<AzButton> buttons) {
 			this.key = key;
@@ -229,6 +233,19 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 
 		public Object key() {
 			return key;
+		}
+
+		/**
+		 * Shows a color square before the text. The color is decoration only: the row's text must say everything
+		 * (A-5).
+		 */
+		public Row swatch(int rgb) {
+			this.swatch = rgb & 0xFFFFFF;
+			return this;
+		}
+
+		public int swatch() {
+			return swatch;
 		}
 
 		public List<AzButton> buttons() {
@@ -302,8 +319,16 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 				focusTarget.extractRenderState(g, mouseX, mouseY, partialTick);
 			}
 
-			// Text columns, line by line.
+			// Color square, then text columns, line by line.
 			Font font = Minecraft.getInstance().font;
+			int textLeft = x;
+			if (swatch >= 0) {
+				int size = SWATCH_SIZE;
+				int sy = y + (height - size) / 2;
+				Draw.fill(g, x, sy, size, size, Theme.SEPARATOR);
+				Draw.fill(g, x + 1, sy + 1, size - 2, size - 2, 0xFF000000 | swatch);
+				textLeft = x + size + Theme.GAP;
+			}
 			int textRight = x + width - buttonsWidth - Theme.GAP;
 			boolean twoLines = columns.stream().anyMatch(column -> column.line() == 1);
 			for (int line = 0; line <= 1; line++) {
@@ -317,12 +342,12 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 						? y + 1 + line * (font.lineHeight + 2)
 						: y + (height - font.lineHeight) / 2 + 1;
 				int color = line == 0 ? Theme.TEXT : Theme.TEXT_DIM;
-				int cx = x;
+				int cx = textLeft;
 				for (Column column : columns) {
 					if (column.line() != line) {
 						continue;
 					}
-					int columnWidth = column.width() > 0 ? column.width() : Math.max(0, textRight - x - fixed);
+					int columnWidth = column.width() > 0 ? column.width() : Math.max(0, textRight - textLeft - fixed);
 					columnWidth = Math.min(columnWidth, Math.max(0, textRight - cx));
 					String text = column.text().get();
 					boolean cut = Draw.truncatedText(g, font, text, cx, textY, columnWidth, color);

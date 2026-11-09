@@ -980,3 +980,6 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Outside a world no profile is loaded and every sound plays as in vanilla. The M4 single profile (`default.json`) is no longer read | M7 |
 | 2026-11-09 | A Realm uses its server address as its world key, because the client does not know the Realm ID (`realms:<id>` in FR-11.1 is not available) | M7 |
 | 2026-11-09 | A sound that a zone mutes, or that a zone could unmute while it plays, starts at an inaudible volume (gain 0.000001) instead of 0, because vanilla never starts a sound whose volume is exactly 0; the per-tick check then sets its real volume (FR-8.8) | M7 |
+| 2026-11-09 | A zone's own rules are edited on a "Zone rules" screen (same list and editor as the global Rules tab), opened from the zone row or the editor's footer. Opening it from the editor saves the zone first, because a zone must exist to hold rules | M7 |
+| 2026-11-09 | The MVP zone editor offers sphere and box only; Outside mode, fade edges, cylinders and personal bubbles arrive with M13, and a zone's existing settings for them are kept. Zones have Move up/down buttons, because list order is the last tie-break (FR-9 step 5) | M7 |
+| 2026-11-09 | A zone's color shows as a square at the start of its row in the zone list; the row's text still says everything (A-5) | M7 |
