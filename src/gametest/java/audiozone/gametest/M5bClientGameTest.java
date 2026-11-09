@@ -60,7 +60,7 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			});
 			context.waitForScreen(TraceScreen.class);
 			String trace = context.computeOnClient(mc -> trace(mc).text());
-			check(trace.contains("  minecraft:entity.villager.ambient: Volume 60%\n    Decides loudness (exact ID)\n"), "the exact rule should win:\n" + trace);
+			check(trace.contains("  minecraft:entity.villager.ambient: Volume 60%\n    Decides loudness (Exact sound ID)\n"), "the exact rule should win:\n" + trace);
 			check(trace.contains("  *:*villager*: Muted\n    loudness overridden by minecraft:entity.villager.ambient\n"),
 					"the wildcard should be shown as overridden:\n" + trace);
 			check(trace.contains("Result\n  Volume 60%\n"), "the final volume should be 60%:\n" + trace);
@@ -80,7 +80,7 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> mc.gui.setScreen(new TraceScreen(main(mc), AMBIENT)));
 			context.waitForScreen(TraceScreen.class);
 			String bypassed = context.computeOnClient(mc -> trace(mc).text());
-			check(bypassed.split("\n")[1].equals("  Bypass is on: nothing is changed"), "the trace should lead with Bypass:\n" + bypassed);
+			check(bypassed.split("\n")[1].equals("  Bypass is on: nothing is changed."), "the trace should lead with Bypass:\n" + bypassed);
 			context.runOnClient(mc -> {
 				ProfileManager.setBypass(false);
 				trace(mc).onClose();

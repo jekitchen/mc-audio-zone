@@ -1,19 +1,27 @@
 package audiozone.core.profile;
 
 import audiozone.core.rules.Rule;
+import audiozone.core.zones.Zone;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * A profile (PRD FR-11, section 7.5): its global rules and profile settings. Immutable; every change returns a new
- * profile, which the sound path then reads as a snapshot (PRD 7.4). Zones arrive in M7.
+ * A profile (PRD FR-11, section 7.5): its global rules, zones and profile settings. Immutable; every change returns a
+ * new profile, which the sound path then reads as a snapshot (PRD 7.4).
  *
  * @param name     display name
  * @param settings profile settings
  * @param globalRules rules that apply everywhere, in the order the player sees them
+ * @param zones    fixed zones and personal bubbles, in the order the player sees them
+ * @param zoneColors outline color of each zone that has one, as {@code 0xRRGGBB}, keyed by zone ID
  */
-public record Profile(String name, ProfileSettings settings, List<Rule> globalRules) {
+public record Profile(String name, ProfileSettings settings, List<Rule> globalRules, List<Zone> zones,
+		Map<String, Integer> zoneColors) {
 	/** Bumped on every change to the file format, with a migration step (PRD 7.6). */
 	public static final int SCHEMA_VERSION = 1;
 
@@ -21,6 +29,24 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		Objects.requireNonNull(name, "name");
 		Objects.requireNonNull(settings, "settings");
 		globalRules = List.copyOf(globalRules);
+		zones = List.copyOf(zones);
+		Set<String> ids = new HashSet<>();
+		for (Zone zone : zones) {
+			if (!ids.add(zone.id())) {
+				throw new IllegalArgumentException("zone id " + zone.id() + " is used twice");
+			}
+		}
+		for (String id : zoneColors.keySet()) {
+			if (!ids.contains(id)) {
+				throw new IllegalArgumentException("color for unknown zone " + id);
+			}
+		}
+		zoneColors = Map.copyOf(zoneColors);
+	}
+
+	/** A profile with no zones. */
+	public Profile(String name, ProfileSettings settings, List<Rule> globalRules) {
+		this(name, settings, globalRules, List.of(), Map.of());
 	}
 
 	public static Profile empty(String name) {
@@ -28,7 +54,39 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	}
 
 	public Profile withSettings(ProfileSettings value) {
-		return new Profile(name, value, globalRules);
+		return new Profile(name, value, globalRules, zones, zoneColors);
+	}
+
+	public Profile withName(String value) {
+		return new Profile(value, settings, globalRules, zones, zoneColors);
+	}
+
+	public Profile withGlobalRules(List<Rule> value) {
+		return new Profile(name, settings, value, zones, zoneColors);
+	}
+
+	/** Replaces the zones; colors of zones no longer present are dropped. */
+	public Profile withZones(List<Zone> value) {
+		Map<String, Integer> colors = new LinkedHashMap<>();
+		for (Zone zone : value) {
+			Integer rgb = zoneColors.get(zone.id());
+			if (rgb != null) {
+				colors.put(zone.id(), rgb);
+			}
+		}
+		return new Profile(name, settings, globalRules, value, colors);
+	}
+
+	/** Sets the outline color of a zone in this profile. */
+	public Profile withZoneColor(String zoneId, int rgb) {
+		Map<String, Integer> colors = new LinkedHashMap<>(zoneColors);
+		colors.put(zoneId, rgb);
+		return new Profile(name, settings, globalRules, zones, colors);
+	}
+
+	/** The zone's color as {@code 0xRRGGBB}, or null if it has none. */
+	public Integer colorOf(String zoneId) {
+		return zoneColors.get(zoneId);
 	}
 
 	/**
@@ -140,7 +198,7 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	}
 
 	private Profile withRules(List<Rule> rules) {
-		return new Profile(name, settings, rules);
+		return withGlobalRules(rules);
 	}
 
 	private List<Rule> append(Rule rule) {

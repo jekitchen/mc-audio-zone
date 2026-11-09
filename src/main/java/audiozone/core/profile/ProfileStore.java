@@ -63,7 +63,10 @@ public final class ProfileStore {
 			if (Files.size(file) > MAX_FILE_BYTES) {
 				problem = "The file is larger than 1 MB.";
 			} else {
-				return new LoadResult(ProfileCodec.fromJson(Files.readString(file, StandardCharsets.UTF_8)), null, null);
+				// An older file is saved as <name>.v<n>.bak before it is migrated (PRD 7.6).
+				String text = Files.readString(file, StandardCharsets.UTF_8);
+				return new LoadResult(ProfileCodec.read(text, version -> ProfileMigrations.backup(file, version)).profile(),
+						null, null);
 			}
 		} catch (ProfileFormatException e) {
 			problem = e.getMessage();
@@ -77,6 +80,21 @@ public final class ProfileStore {
 			broken = null;
 		}
 		return new LoadResult(Profile.empty(defaultName), problem, broken);
+	}
+
+	/**
+	 * Deletes the profile for {@code key} (PRD FR-11.3); a new empty one is created on the next join. The deleted file
+	 * is kept as {@code .bak}, so it can still be recovered by hand.
+	 *
+	 * @return whether there was a profile to delete
+	 */
+	public boolean delete(String key) throws IOException {
+		Path file = fileFor(key);
+		if (!Files.exists(file)) {
+			return false;
+		}
+		Files.move(file, file.resolveSibling(file.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
+		return true;
 	}
 
 	/** Saves atomically, keeping the previous file as {@code .bak}. */
