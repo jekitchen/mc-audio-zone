@@ -56,6 +56,7 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final int PLAYS_WIDTH = 75;
 	private static final int BAND_WIDTH = 60;
 	private static final int SUMMARY_WIDTH = 150;
+	private static final int ZONE_WIDTH = 110;
 	private static final int ON_OFF_WIDTH = 30;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/edit");
 	private static final Identifier UP_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/up");
@@ -249,6 +250,11 @@ public final class AudioZoneScreen extends AzScreen {
 		String plays = Component.translatable("audiozone.recent.plays", row.count(), ago(now - row.lastPlayedMs())).getString();
 		List<AzList.Row.Column> columns = new ArrayList<>();
 		columns.add(new AzList.Row.Column(() -> name, 0, 0));
+		if (row.zoneName() != null) {
+			// FR-9 AC: which zone decided the latest play.
+			String zone = Component.translatable("audiozone.recent.zone", row.zoneName()).getString();
+			columns.add(new AzList.Row.Column(() -> zone, ZONE_WIDTH, 0));
+		}
 		columns.add(new AzList.Row.Column(() -> status, STATUS_WIDTH, 0));
 		columns.add(new AzList.Row.Column(row::id, 0, 1));
 		columns.add(new AzList.Row.Column(() -> category, CATEGORY_WIDTH, 1));

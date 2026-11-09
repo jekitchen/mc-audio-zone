@@ -124,7 +124,7 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			String report = context.computeOnClient(mc -> mc.keyboardHandler.getClipboard()).replace("\r\n", "\n");
 			check(report.startsWith("Audio Zone ") && report.contains(", Minecraft ") && report.contains("Global rules: 2\n")
 					&& report.contains("Per sound: avg "), "the report should hold versions, counts and timings:\n" + report);
-			check(Diagnostics.report().contains("Errors this session: "), "the report should count errors");
+			check(context.computeOnClient(mc -> Diagnostics.report()).contains("Errors this session: "), "the report should count errors");
 
 			// Clean up for later tests.
 			context.runOnClient(mc -> {
