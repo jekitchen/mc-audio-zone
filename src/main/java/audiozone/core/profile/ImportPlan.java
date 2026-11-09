@@ -77,7 +77,8 @@ public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fix
 					"After the import this profile would have " + zones.size() + " zones; the maximum is "
 							+ Precedence.MAX_ZONES + ".");
 		}
-		Profile result = new Profile(current.name(), file.settings(), file.globalRules(), zones, colors);
+		Profile result = new Profile(current.name(), file.settings(), file.globalRules(), zones, colors, current.lastJoined(),
+				current.boostConfirmed());
 		return new ImportPlan(result, file.globalRules().size(), bubbles, fixedIn, skipped, null);
 	}
 

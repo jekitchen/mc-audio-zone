@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.outline.OutlineMode;
 import audiozone.core.outline.ZoneColors;
 import audiozone.core.rules.InvalidPatternException;
 import audiozone.core.rules.Limit;
@@ -20,10 +21,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -47,8 +51,8 @@ public final class ProfileCodec {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
 	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "worldKey", "settings", "globalRules",
-			"zones");
-	private static final Set<String> SETTINGS_FIELDS = Set.of("showDistance");
+			"zones", "lastJoined", "boostConfirmed");
+	private static final Set<String> SETTINGS_FIELDS = Set.of("showDistance", "cueDefault", "outlines", "edge");
 	private static final Set<String> RULE_FIELDS = Set.of("id", "enabled", "pattern", "mute", "volume", "cue", "limit");
 	private static final Set<String> LIMIT_FIELDS = Set.of("count", "windowMs", "perSource");
 	private static final Set<String> ZONE_FIELDS = Set.of("id", "name", "enabled", "color", "anchor", "shape", "mode", "edge",
@@ -87,9 +91,11 @@ public final class ProfileCodec {
 		if (worldKey != null) {
 			root.addProperty("worldKey", worldKey);
 		}
-		JsonObject settings = new JsonObject();
-		settings.addProperty("showDistance", profile.settings().showDistance());
-		root.add("settings", settings);
+		if (profile.lastJoined() != null) {
+			root.addProperty("lastJoined", profile.lastJoined().toString());
+		}
+		root.addProperty("boostConfirmed", profile.boostConfirmed());
+		root.add("settings", settingsToJson(profile.settings()));
 		root.add("globalRules", rulesToJson(profile.globalRules()));
 		JsonArray zones = new JsonArray();
 		for (Zone zone : profile.zones()) {
@@ -97,6 +103,21 @@ public final class ProfileCodec {
 		}
 		root.add("zones", zones);
 		return GSON.toJson(root) + "\n";
+	}
+
+	private static JsonObject settingsToJson(ProfileSettings s) {
+		JsonObject json = new JsonObject();
+		json.addProperty("showDistance", s.showDistance());
+		json.addProperty("cueDefault", s.cueDefault());
+		json.addProperty("outlines", s.outlines().name().toLowerCase(Locale.ROOT));
+		JsonObject edge = new JsonObject();
+		boolean fade = s.defaultEdge().mode() == ZoneEdge.Mode.FADE;
+		edge.addProperty("mode", fade ? "fade" : "hard");
+		if (fade) {
+			edge.addProperty("fade", s.defaultEdge().fadeDistance());
+		}
+		json.add("edge", edge);
+		return json;
 	}
 
 	private static JsonArray rulesToJson(List<Rule> rules) {
@@ -245,13 +266,11 @@ public final class ProfileCodec {
 		List<String> warnings = new ArrayList<>();
 		Fields top = new Fields(root, "", warnings, ROOT_FIELDS);
 		String name = top.has("name") ? top.string("name") : "Default";
-		ProfileSettings settings = ProfileSettings.DEFAULTS;
-		if (top.has("settings")) {
-			Fields s = top.object("settings", "Settings", SETTINGS_FIELDS);
-			if (s.has("showDistance")) {
-				settings = settings.withShowDistance(s.bool("showDistance"));
-			}
-		}
+		Instant lastJoined = top.has("lastJoined") ? top.instant("lastJoined") : null;
+		boolean boostConfirmed = top.has("boostConfirmed") && top.bool("boostConfirmed");
+		ProfileSettings settings = top.has("settings")
+				? readSettings(top.object("settings", "Settings", SETTINGS_FIELDS))
+				: ProfileSettings.DEFAULTS;
 		JsonArray ruleArray = top.has("globalRules") ? top.array("globalRules") : new JsonArray();
 		JsonArray zoneArray = top.has("zones") ? top.array("zones") : new JsonArray();
 		if (zoneArray.size() > Precedence.MAX_ZONES) {
@@ -282,7 +301,29 @@ public final class ProfileCodec {
 		if (ruleCount > MAX_RULES) {
 			throw new ProfileFormatException("The file has " + ruleCount + " rules; the maximum is " + MAX_RULES + ".");
 		}
-		return new Read(new Profile(name, settings, rules, zones, colors), warnings);
+		return new Read(new Profile(name, settings, rules, zones, colors, lastJoined, boostConfirmed), warnings);
+	}
+
+	/** Profile settings; a missing value takes its default. */
+	private static ProfileSettings readSettings(Fields s) throws ProfileFormatException {
+		ProfileSettings settings = ProfileSettings.DEFAULTS;
+		if (s.has("showDistance")) {
+			settings = settings.withShowDistance(s.bool("showDistance"));
+		}
+		if (s.has("cueDefault")) {
+			settings = settings.withCueDefault(s.bool("cueDefault"));
+		}
+		if (s.has("outlines")) {
+			String mode = s.choice("outlines", "outlines", "always", "editing", "never");
+			settings = settings.withOutlines(OutlineMode.valueOf(mode.toUpperCase(Locale.ROOT)));
+		}
+		if (s.has("edge")) {
+			Fields e = s.object("edge", s.where(), EDGE_FIELDS);
+			String mode = e.has("mode") ? e.choice("mode", "edge mode", "hard", "fade") : "hard";
+			double fade = e.has("fade") ? e.number("fade", ZoneEdge.MIN_FADE, ZoneEdge.MAX_FADE) : ZoneEdge.DEFAULT_FADE;
+			settings = settings.withDefaultEdge(mode.equals("fade") ? ZoneEdge.fade(fade) : ZoneEdge.hard());
+		}
+		return settings;
 	}
 
 	private static Rule readRule(Fields r) throws ProfileFormatException {
@@ -450,6 +491,16 @@ public final class ProfileCodec {
 				throw problem(field, describe(json.get(field)) + " is not text");
 			}
 			return p.getAsString();
+		}
+
+		/** A moment in ISO-8601 form, e.g. {@code 2026-11-09T13:37:46Z}. */
+		Instant instant(String field) throws ProfileFormatException {
+			String text = string(field);
+			try {
+				return Instant.parse(text);
+			} catch (DateTimeParseException e) {
+				throw problem(field, quote(text) + " is not a date and time like 2026-11-09T13:37:46Z");
+			}
 		}
 
 		boolean bool(String field) throws ProfileFormatException {

@@ -70,7 +70,9 @@ public final class ProfileOps {
 			return new Copy(target, rules, bubbles, fixedKept, "After copying this profile would have " + zones.size()
 					+ " zones; the maximum is " + Precedence.MAX_ZONES + ".");
 		}
-		Profile result = new Profile(target.name(), source.settings(), source.globalRules(), zones, colors);
+		// Last joined and the boost confirm describe this server and this player's choices, so they stay.
+		Profile result = new Profile(target.name(), source.settings(), source.globalRules(), zones, colors, target.lastJoined(),
+				target.boostConfirmed());
 		return new Copy(result, rules, bubbles, fixedKept, null);
 	}
 
@@ -99,9 +101,12 @@ public final class ProfileOps {
 		return profile.withName(name.strip());
 	}
 
-	/** Reset: back to empty defaults (no rules, no zones, default settings), keeping the display name. */
+	/**
+	 * Reset: back to empty defaults (no rules, no zones, default settings, boost dialog shown again), keeping the display
+	 * name and the last joined date, which is history rather than a setting.
+	 */
 	public static Profile reset(Profile profile) {
-		return Profile.empty(profile.name());
+		return Profile.empty(profile.name()).withLastJoined(profile.lastJoined());
 	}
 
 	/**
