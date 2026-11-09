@@ -1,6 +1,7 @@
 package audiozone.core.playing;
 
 import audiozone.core.boost.Gain;
+import audiozone.core.diag.MemoryEstimate;
 import audiozone.core.rules.RuleResolution;
 import audiozone.core.zones.Precedence;
 import audiozone.core.zones.SoundDecision;
@@ -260,6 +261,26 @@ public final class PlayingSounds {
 	/** Sounds tracked now. */
 	public int size() {
 		return size;
+	}
+
+	/**
+	 * Estimated bytes this table keeps, for the Diagnostics memory readout (PRD 9.1). The arrays have a fixed size;
+	 * it walks the tracked IDs, so call it on demand through {@code MemoryMeter}, not per tick. The resolutions it
+	 * points at belong to the rule lists' caches and are counted there.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(18 * MemoryEstimate.REFERENCE + 4 + 2 * 8 + 3 * 8 + 3)
+				+ MemoryEstimate.object(16 * MemoryEstimate.REFERENCE + 8 * 4)
+				+ MemoryEstimate.array(8, CAPACITY) + MemoryEstimate.array(MemoryEstimate.REFERENCE, CAPACITY)
+				+ 3 * MemoryEstimate.array(8, CAPACITY) + 2 * MemoryEstimate.array(4, CAPACITY)
+				+ 2 * MemoryEstimate.array(1, CAPACITY)
+				+ MemoryEstimate.array(MemoryEstimate.REFERENCE, CAPACITY)
+				+ CAPACITY * MemoryEstimate.array(MemoryEstimate.REFERENCE, Precedence.MAX_ZONES + 1)
+				+ MemoryEstimate.array(8, SLOTS) + MemoryEstimate.array(4, SLOTS);
+		for (int i = 0; i < size; i++) {
+			bytes += MemoryEstimate.string(soundIds[i]);
+		}
+		return bytes;
 	}
 
 	/** Sounds not tracked because the table was full (or a handle was started twice), for diagnostics. */

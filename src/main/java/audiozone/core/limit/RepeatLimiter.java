@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import audiozone.core.diag.MemoryEstimate;
 import audiozone.core.rules.Limit;
 
 /**
@@ -89,12 +90,31 @@ public final class RepeatLimiter {
 		return Set.copyOf(rules.keySet());
 	}
 
+	/**
+	 * Estimated bytes of all counters, for the Diagnostics memory readout (PRD 9.1). It walks every rule's counters,
+	 * so call it on demand through {@code MemoryMeter}, not per sound. Limits belong to the profile and are not counted.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(MemoryEstimate.REFERENCE) + MemoryEstimate.HASH_MAP
+				+ MemoryEstimate.hashTable(rules.size()) + rules.size() * MemoryEstimate.HASH_NODE;
+		for (Map.Entry<String, RuleCounters> entry : rules.entrySet()) {
+			RuleCounters c = entry.getValue();
+			bytes += MemoryEstimate.string(entry.getKey()) + RuleCounters.BYTES + c.shared.estimatedBytes();
+			if (c.sources != null) {
+				bytes += c.sources.estimatedBytes();
+			}
+		}
+		return bytes;
+	}
+
 	/** Forgets counters of rules that no longer exist, e.g. after the profile is saved. */
 	public void retain(Set<String> ruleIds) {
 		rules.keySet().retainAll(ruleIds);
 	}
 
 	private static final class RuleCounters {
+		static final long BYTES = MemoryEstimate.object(3 * MemoryEstimate.REFERENCE + 8);
+
 		Limit limit;
 		final SlidingWindow shared = new SlidingWindow();
 		SourceTable sources;

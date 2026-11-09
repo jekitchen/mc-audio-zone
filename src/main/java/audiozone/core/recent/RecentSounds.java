@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import audiozone.core.diag.MemoryEstimate;
+
 /**
  * The recently played sounds log behind the Recently Played tab (PRD FR-1.1 to FR-1.3).
  *
@@ -151,6 +153,31 @@ public final class RecentSounds {
 		return seenCategories.get(soundId);
 	}
 
+	/**
+	 * Estimated bytes this log keeps, with its session sets, for the Diagnostics memory readout (PRD 9.1). It walks
+	 * every entry, so call it on demand through {@code MemoryMeter}, not per sound. Category and zone names are
+	 * shared constants and not counted.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(3 * MemoryEstimate.REFERENCE)
+				+ MemoryEstimate.HASH_MAP + MemoryEstimate.hashTable(rows.size())
+				+ rows.size() * (MemoryEstimate.HASH_NODE + Row.BYTES)
+				+ MemoryEstimate.HASH_SET + MemoryEstimate.hashTable(seenExcluded.size())
+				+ seenExcluded.size() * MemoryEstimate.HASH_NODE
+				+ MemoryEstimate.HASH_MAP + MemoryEstimate.hashTable(seenCategories.size())
+				+ seenCategories.size() * MemoryEstimate.HASH_NODE;
+		for (Row row : rows.values()) {
+			bytes += MemoryEstimate.string(row.id);
+		}
+		for (String id : seenExcluded) {
+			bytes += MemoryEstimate.string(id);
+		}
+		for (String id : seenCategories.keySet()) {
+			bytes += MemoryEstimate.string(id);
+		}
+		return bytes;
+	}
+
 	/** Empties the list. Session memory for search is kept. */
 	public void clear() {
 		rows.clear();
@@ -158,6 +185,10 @@ public final class RecentSounds {
 
 	/** Mutable per-ID state. Counts live in a ring of one-second buckets covering the window. */
 	private static final class Row {
+		/** The row and its two bucket arrays, without the ID string. */
+		static final long BYTES = MemoryEstimate.object(7 * MemoryEstimate.REFERENCE + 8)
+				+ MemoryEstimate.array(4, BUCKETS) + MemoryEstimate.array(8, BUCKETS);
+
 		final String id;
 		final int[] counts = new int[BUCKETS];
 		final long[] seconds = new long[BUCKETS];

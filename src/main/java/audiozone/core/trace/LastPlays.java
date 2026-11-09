@@ -3,6 +3,8 @@ package audiozone.core.trace;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import audiozone.core.diag.MemoryEstimate;
+
 /**
  * The only thing the sound trace records on the hot path (PRD FR-14.6): the last play of each sound ID, in a table
  * of fixed size. The panel recomputes the full trace from this when it opens.
@@ -67,7 +69,23 @@ public final class LastPlays {
 		return entries.size();
 	}
 
+	/**
+	 * Estimated bytes this table keeps, for the Diagnostics memory readout (PRD 9.1). It walks the IDs, so call it on
+	 * demand through {@code MemoryMeter}, not per sound. World keys and dimensions are shared and not counted.
+	 */
+	public long estimatedBytes() {
+		long bytes = MemoryEstimate.object(MemoryEstimate.REFERENCE) + MemoryEstimate.LINKED_HASH_MAP
+				+ MemoryEstimate.array(MemoryEstimate.REFERENCE, Integer.highestOneBit(CAPACITY * 2 - 1) << 1)
+				+ entries.size() * (MemoryEstimate.LINKED_HASH_NODE + Slot.BYTES);
+		for (String id : entries.keySet()) {
+			bytes += MemoryEstimate.string(id);
+		}
+		return bytes;
+	}
+
 	private static final class Slot {
+		static final long BYTES = MemoryEstimate.object(2 * MemoryEstimate.REFERENCE + 6 * 8 + 4 + 3);
+
 		boolean positional;
 		String worldKey;
 		String dimension;

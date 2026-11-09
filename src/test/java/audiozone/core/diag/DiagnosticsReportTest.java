@@ -34,4 +34,20 @@ class DiagnosticsReportTest {
 		assertTrue(text.contains("Bypass: on"), text);
 		assertTrue(text.contains("Pattern cache hit rate: n/a"), text);
 	}
+
+	@Test
+	void memoryIsShownAgainstTheBudget() {
+		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.3", false, 0, 0, 0,
+				TimingWindow.Stats.EMPTY, 0, TimingWindow.Stats.EMPTY, TimingWindow.Stats.EMPTY, Double.NaN, 0,
+				3 * 512 * 1024);
+		assertTrue(DiagnosticsReport.format(data).contains("Memory (estimate): 1.5 MB of 8.0 MB"),
+				DiagnosticsReport.format(data));
+	}
+
+	@Test
+	void memoryIsNotApplicableWhenNotMeasured() {
+		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.3", false, 0, 0, 0,
+				TimingWindow.Stats.EMPTY, 0, TimingWindow.Stats.EMPTY, TimingWindow.Stats.EMPTY, Double.NaN, 0);
+		assertTrue(DiagnosticsReport.format(data).contains("Memory (estimate): n/a"), DiagnosticsReport.format(data));
+	}
 }

@@ -16,10 +16,19 @@ public final class DiagnosticsReport {
 	 * @param tick            per tick re-check of playing sounds
 	 * @param outlines        zone outline drawing per frame
 	 * @param cacheHitRate    0 to 1, or {@code NaN} when nothing has been looked up yet
+	 * @param memoryBytes     estimated bytes of Audio Zone's data ({@link MemoryMeter#totalBytes}), or -1 if not
+	 *                        measured
 	 */
 	public record Data(String modVersion, String minecraftVersion, boolean bypass, int globalRules, int zones,
 			int activeZonesHere, TimingWindow.Stats sounds, double peakSoundMicros, TimingWindow.Stats tick,
-			TimingWindow.Stats outlines, double cacheHitRate, long errors) {
+			TimingWindow.Stats outlines, double cacheHitRate, long errors, long memoryBytes) {
+		/** Without a memory figure; the report then says n/a. */
+		public Data(String modVersion, String minecraftVersion, boolean bypass, int globalRules, int zones,
+				int activeZonesHere, TimingWindow.Stats sounds, double peakSoundMicros, TimingWindow.Stats tick,
+				TimingWindow.Stats outlines, double cacheHitRate, long errors) {
+			this(modVersion, minecraftVersion, bypass, globalRules, zones, activeZonesHere, sounds, peakSoundMicros, tick,
+					outlines, cacheHitRate, errors, -1);
+		}
 	}
 
 	private DiagnosticsReport() {
@@ -40,6 +49,12 @@ public final class DiagnosticsReport {
 			line(out, "Pattern cache hit rate: n/a");
 		} else {
 			line(out, "Pattern cache hit rate: %.1f%%", d.cacheHitRate() * 100);
+		}
+		if (d.memoryBytes() < 0) {
+			line(out, "Memory (estimate): n/a");
+		} else {
+			line(out, "Memory (estimate): %s MB of %s MB", MemoryEstimate.megabytes(d.memoryBytes()),
+					MemoryEstimate.megabytes(MemoryEstimate.BUDGET_BYTES));
 		}
 		line(out, "Errors this session: %d", d.errors());
 		return out.toString();
