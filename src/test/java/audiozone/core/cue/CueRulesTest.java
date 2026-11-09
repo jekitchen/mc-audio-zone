@@ -66,4 +66,19 @@ class CueRulesTest {
 		assertEquals(false, DEFAULTS.cueSoundsWithoutSubtitles(), "FR-7.2: off by default");
 		assertEquals(true, DEFAULTS.newMuteRulesCueOn(), "FR-7.6: new mute rules have Cue on");
 	}
+	@Test
+	void shouldCueAgreesWithCueText() {
+		CueSettings[] all = {DEFAULTS, new CueSettings(true, true, true), new CueSettings(false, true, true)};
+		for (CueSettings settings : all) {
+			for (int bits = 0; bits < 32; bits++) {
+				float volume = (bits & 1) == 0 ? 0 : 40;
+				boolean byRule = (bits & 2) != 0;
+				boolean cueOn = (bits & 4) != 0;
+				boolean audible = (bits & 8) != 0;
+				String subtitle = (bits & 16) != 0 ? "Explosion" : null;
+				assertEquals(CueRules.cueText(ID, subtitle, volume, byRule, cueOn, audible, settings) != null,
+						CueRules.shouldCue(subtitle != null, volume, byRule, cueOn, audible, settings), settings + " bits " + bits);
+			}
+		}
+	}
 }
