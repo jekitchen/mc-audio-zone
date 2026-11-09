@@ -204,11 +204,15 @@ public final class AudioZoneScreen extends AzScreen {
 		return new AzList.Row(row.id(), columns, List.of(muteButton(row.id())));
 	}
 
-	/** Quick action Mute / Unmute: sets mute on the sound's exact-ID rule (FR-1.5). */
+	/**
+	 * Quick action Mute / Unmute: sets mute on the sound's exact-ID rule (FR-1.5). The icon shows the sound's current
+	 * state (crossed-out speaker when muted, speaker with waves when not); the label, tooltip and narration say what
+	 * pressing it does.
+	 */
 	private AzButton muteButton(String soundId) {
 		boolean muted = ProfileManager.profile().isExactMuted(soundId);
 		return AzButton.icon(
-				Identifier.fromNamespaceAndPath("audiozone", muted ? "icon/volume" : "icon/mute"),
+				Identifier.fromNamespaceAndPath("audiozone", muted ? "icon/mute" : "icon/volume"),
 				Component.translatable(muted ? "audiozone.recent.unmute" : "audiozone.recent.mute"),
 				() -> toggleMute(soundId));
 	}
