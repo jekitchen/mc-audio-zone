@@ -2,6 +2,8 @@ package audiozone.core.rules;
 
 import java.util.Locale;
 
+import audiozone.core.Glob;
+
 /**
  * A rule's target: a sound ID pattern (PRD FR-4.1, FR-4.2).
  *
@@ -85,31 +87,7 @@ public final class SoundPattern {
 
 	/** Whether this pattern matches the whole of {@code soundId} (e.g. {@code minecraft:entity.cow.ambient}). */
 	public boolean matches(String soundId) {
-		// Greedy glob match with backtracking to the last star. Linear in practice, no allocation.
-		int p = 0;
-		int s = 0;
-		int starP = -1;
-		int starS = 0;
-		int pLen = text.length();
-		int sLen = soundId.length();
-		while (s < sLen) {
-			if (p < pLen && text.charAt(p) == '*') {
-				starP = p++;
-				starS = s;
-			} else if (p < pLen && text.charAt(p) == soundId.charAt(s)) {
-				p++;
-				s++;
-			} else if (starP >= 0) {
-				p = starP + 1;
-				s = ++starS;
-			} else {
-				return false;
-			}
-		}
-		while (p < pLen && text.charAt(p) == '*') {
-			p++;
-		}
-		return p == pLen;
+		return Glob.matches(text, soundId);
 	}
 
 	/** The normalized pattern text, as saved in the profile. */
