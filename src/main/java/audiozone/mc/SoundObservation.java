@@ -1,5 +1,6 @@
 package audiozone.mc;
 
+import audiozone.core.recent.PlayStatus;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
 
@@ -9,6 +10,7 @@ import net.minecraft.sounds.SoundSource;
  */
 public final class SoundObservation {
 	Identifier id;
+	String idString;
 	SoundSource category;
 	double x;
 	double y;
@@ -18,9 +20,20 @@ public final class SoundObservation {
 	double distance;
 	boolean relative;
 	boolean audible;
+	PlayStatus status;
 
 	public Identifier id() {
 		return id;
+	}
+
+	/** The sound ID as text, e.g. "minecraft:entity.villager.ambient" (cached, not rebuilt per sound). */
+	public String idString() {
+		return idString;
+	}
+
+	/** What Audio Zone did with this play (Playing, or Muted by a rule). */
+	public PlayStatus status() {
+		return status;
 	}
 
 	public SoundSource category() {

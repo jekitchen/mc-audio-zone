@@ -1,12 +1,17 @@
 package audiozone;
 
 import audiozone.mc.AudioZoneScreen;
+import audiozone.mc.BypassLabel;
+import audiozone.mc.Notices;
+import audiozone.mc.ProfileManager;
 import audiozone.mc.RecentLog;
 import audiozone.mc.SoundLogger;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
@@ -24,20 +29,30 @@ public final class AudioZoneClient implements ClientModInitializer {
 	 */
 	public static final int DEFAULT_OPEN_KEY = InputConstants.KEY_SEMICOLON;
 
+	/** Default key for Bypass (FR-13.1); unused by vanilla and by the popular mods checked at M0. */
+	public static final int DEFAULT_BYPASS_KEY = InputConstants.KEY_F10;
+
 	public static final KeyMapping.Category KEY_CATEGORY =
 			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
 
 	public static KeyMapping openKey;
+	public static KeyMapping bypassKey;
 
 	@Override
 	public void onInitializeClient() {
 		// The (name, key, category) constructor exists in 26.2 and 26.3; InputConstants.Type was renamed in 26.3.
 		openKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.audiozone.open", DEFAULT_OPEN_KEY, KEY_CATEGORY));
+		bypassKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+				"key.audiozone.bypass", DEFAULT_BYPASS_KEY, KEY_CATEGORY));
 
+		Notices.register();
+		ProfileManager.init(FabricLoader.getInstance().getConfigDir());
 		ClientTickEvents.END_CLIENT_TICK.register(AudioZoneClient::onEndTick);
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ProfileManager.flushSaves());
 		SoundLogger.registerIfEnabled();
 		RecentLog.register();
+		BypassLabel.register();
 
 		LOGGER.info("Audio Zone initialized");
 	}
@@ -47,6 +62,9 @@ public final class AudioZoneClient implements ClientModInitializer {
 			if (minecraft.gui.screen() == null) {
 				minecraft.gui.setScreen(new AudioZoneScreen());
 			}
+		}
+		while (bypassKey.consumeClick()) {
+			ProfileManager.toggleBypass();
 		}
 	}
 }

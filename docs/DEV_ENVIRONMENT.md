@@ -58,7 +58,7 @@ Run from the repo root. On Windows use `gradlew` (cmd/PowerShell) or `./gradlew`
 | Generate Minecraft sources for browsing | `./gradlew genSources` |
 | Clean | `./gradlew clean` |
 
-Output jars go to `build/libs/` as `audiozone-<version>+<minecraft>.jar`. The dev client's game folder is `run/` (git-ignored); its log is `run/logs/latest.log`.
+Output jars go to `build/libs/` as `audiozone-<version>+<minecraft>.jar`. The mod's profile file is `config/audiozone/profiles/default.json` in the game folder (`run/` for the dev client); it is plain JSON and safe to inspect. The dev client's game folder is `run/` (git-ignored); its log is `run/logs/latest.log`.
 
 The first build downloads Minecraft and the dependencies (about 1–2 minutes). Later builds use the cache in `~/.gradle`.
 

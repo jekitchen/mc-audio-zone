@@ -25,8 +25,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
 
 /**
- * The main Audio Zone screen (FR-12.1). M3 has the Recently Played tab (FR-1, read-only) and a Settings tab with
- * "Show distance"; the other tabs arrive with their milestones. Lives in {@code audiozone.mc} because it uses
+ * The main Audio Zone screen (FR-12.1). Header: active profile and the Bypass toggle (FR-13.1). Tabs: Recently
+ * Played (FR-1, with the Mute quick action since M4) and Settings; the other tabs arrive with their milestones. Lives in {@code audiozone.mc} because it uses
  * Minecraft's sound manager and GUI classes.
  */
 public final class AudioZoneScreen extends AzScreen {
@@ -51,6 +51,7 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzToggle pauseToggle;
 	public AzDropdown<SortOrder> sortDropdown;
 	public AzTextField filterField;
+	public AzToggle bypassToggle;
 	public int refreshCount;
 	private int ticks;
 
@@ -72,6 +73,22 @@ public final class AudioZoneScreen extends AzScreen {
 				// FR-1.6: the Recently Played tab does not pause a singleplayer game, so sounds keep arriving.
 				new Tab(Component.translatable("audiozone.tab.recent"), false),
 				new Tab(Component.translatable("audiozone.tab.settings"), true));
+	}
+
+	@Override
+	protected Component headerSubtitle() {
+		return Component.translatable("audiozone.header.profile", ProfileManager.profile().name());
+	}
+
+	@Override
+	protected void addHeaderWidgets(List<AbstractWidget> header) {
+		bypassToggle = Tooltips.describe(new AzToggle(100, Component.translatable("audiozone.bypass"), ProfileManager.isBypassed(),
+				ProfileManager::setBypass), Component.translatable("audiozone.bypass.tip", bypassKeyName()));
+		header.add(bypassToggle);
+	}
+
+	private static Component bypassKeyName() {
+		return audiozone.AudioZoneClient.bypassKey.getTranslatedKeyMessage();
 	}
 
 	@Override
@@ -137,6 +154,10 @@ public final class AudioZoneScreen extends AzScreen {
 	@Override
 	public void tick() {
 		super.tick();
+		// Bypass can also change through the hotkey or the error budget; keep the header toggle in step.
+		if (bypassToggle != null && bypassToggle.value() != ProfileManager.isBypassed()) {
+			bypassToggle.setValue(ProfileManager.isBypassed());
+		}
 		ticks++;
 		if (currentTab() == TAB_RECENT && !paused && ticks % REFRESH_TICKS == 0) {
 			refresh();
@@ -166,7 +187,8 @@ public final class AudioZoneScreen extends AzScreen {
 	}
 
 	private AzList.Row toListRow(RecentRow row, String name, String category, long now) {
-		String status = Component.translatable("audiozone.recent.status_line",
+		// Status as text plus an icon character, never color alone (FR-1.2).
+		String status = Component.translatable("audiozone.recent.status_line." + row.status().name().toLowerCase(Locale.ROOT),
 				Component.translatable(row.status().translationKey())).getString();
 		String plays = Component.translatable("audiozone.recent.plays", row.count(), ago(now - row.lastPlayedMs())).getString();
 		List<AzList.Row.Column> columns = new ArrayList<>();
@@ -175,11 +197,25 @@ public final class AudioZoneScreen extends AzScreen {
 		columns.add(new AzList.Row.Column(row::id, 0, 1));
 		columns.add(new AzList.Row.Column(() -> category, CATEGORY_WIDTH, 1));
 		columns.add(new AzList.Row.Column(() -> plays, PLAYS_WIDTH, 1));
-		if (AudioZoneSettings.showDistance) {
+		if (AudioZoneSettings.showDistance()) {
 			String band = Component.translatable(row.band().translationKey()).getString();
 			columns.add(new AzList.Row.Column(() -> band, BAND_WIDTH, 1));
 		}
-		return new AzList.Row(row.id(), columns, List.of());
+		return new AzList.Row(row.id(), columns, List.of(muteButton(row.id())));
+	}
+
+	/** Quick action Mute / Unmute: sets mute on the sound's exact-ID rule (FR-1.5). */
+	private AzButton muteButton(String soundId) {
+		boolean muted = ProfileManager.profile().isExactMuted(soundId);
+		return AzButton.icon(
+				Identifier.fromNamespaceAndPath("audiozone", muted ? "icon/volume" : "icon/mute"),
+				Component.translatable(muted ? "audiozone.recent.unmute" : "audiozone.recent.mute"),
+				() -> toggleMute(soundId));
+	}
+
+	public void toggleMute(String soundId) {
+		ProfileManager.update(profile -> profile.isExactMuted(soundId) ? profile.unmuteExact(soundId) : profile.muteExact(soundId));
+		refresh();
 	}
 
 	private static String ago(long millis) {
@@ -204,16 +240,22 @@ public final class AudioZoneScreen extends AzScreen {
 
 	private void buildSettings(Body body) {
 		body.label(() -> Component.translatable("audiozone.settings.general"));
+		body.label(() -> Component.translatable("audiozone.settings.bypass_hint", bypassKeyName()));
 		body.row(Tooltips.describe(new AzToggle(160, Component.translatable("audiozone.settings.show_distance"),
-				AudioZoneSettings.showDistance, value -> AudioZoneSettings.showDistance = value),
+				AudioZoneSettings.showDistance(), AudioZoneSettings::setShowDistance),
 				Component.translatable("audiozone.settings.show_distance.tip")));
 	}
 
 	// ---- Keys ----
 
-	/** P toggles Pause while the list has focus (FR-1.3). */
+	/** P toggles Pause while the list has focus (FR-1.3); the Bypass hotkey works here too (FR-13.1). */
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (audiozone.AudioZoneClient.bypassKey.matches(event) && !hasOverlay() && !(getFocused() instanceof AzTextField)) {
+			ProfileManager.toggleBypass();
+			bypassToggle.setValue(ProfileManager.isBypassed());
+			return true;
+		}
 		if (event.key() == InputConstants.KEY_P && getFocused() == recentList && recentList != null && !hasOverlay()) {
 			setPaused(!paused);
 			return true;

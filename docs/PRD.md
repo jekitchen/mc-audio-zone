@@ -961,3 +961,7 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Read-only list rows (no buttons yet, M3) are still keyboard-reachable and narrated: the list gives each such row an invisible focus target | M3 |
 | 2026-11-09 | "Show distance" lives on a Settings tab and is kept in memory until the profile store (M4) saves settings | M3 |
 | 2026-11-09 | The recently played log is cleared when joining or leaving a world | M3 |
+| 2026-11-09 | Until per-server profiles (FR-11.1, M7), there is one profile: `config/audiozone/profiles/default.json`. Its format, atomic writes, `.bak` and `.broken` handling are already the FR-11.8 ones | M4 |
+| 2026-11-09 | A muted sound is stopped at the point where vanilla skips a sound whose volume is zero (no channel, `NOT_STARTED`), so subtitles behave exactly as with a zero volume slider | M4 |
+| 2026-11-09 | Mute quick actions edit one exact-ID rule per sound (rule ID `exact:<sound id>`); Unmute removes the rule if it sets nothing else | M4 |
+| 2026-11-09 | Bypass lasts for the session (not saved) and never changes a rule; turning it off gives the fail-open error budget a fresh start. Messages outside the Audio Zone screen (broken profile, too many errors) use game toasts | M4 |
