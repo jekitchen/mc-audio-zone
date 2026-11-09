@@ -33,6 +33,9 @@ Add a row whenever you add a Mixin, an access widener entry or a call into versi
 | M2 | Screen base and dialog (`AzScreen`, `AzDialog`) | `Screen.init()` then vanilla calls `setInitialFocus()` (overridden), `extractBackground`, `addRenderableWidget`, `rebuildWidgets`, `getNarrationMessage`, `Minecraft.gui.setScreen` | M2 game test |
 | M2 | Tooltip timing (`Tooltips`) | `AbstractWidget.setTooltipDelay`, `Minecraft.getLastInputType()`; relies on vanilla showing tooltips on hover or keyboard focus (`WidgetTooltipHolder`) | Manual: hover vs Tab |
 | M2 | Icons | GUI atlas sprites at `assets/audiozone/textures/gui/sprites/icon/*.png` (made by `tools/make_icons.py`) | M2 screenshots |
+| M2b | Scrolling list `AzList` | Extends `ContainerObjectSelectionList` (`replaceEntries`, `scrollAmount/setScrollAmount`, `scrollRate`, `scrollToEntry`, `getRowWidth`, `extractListBackground/Separators`, `nextFocusPath`, `narrateListElementPosition`); rows extend `ContainerObjectSelectionList.Entry` (`extractContent`, `children`, `narratables`, `getContentX/Y/Width/Height`); narration via `NarrationElementOutput.nest()` | M2b game test |
+| M2b | Overlays and toasts in `AzScreen` | `Screen.children()` (overridden to trap focus), `addRenderableOnly`, `removeWidget`, `changeFocus(ComponentPath)`, `mouseClicked(MouseButtonEvent, boolean)`, `tick`, `Util.getMillis` | M2b game test |
+| M2b | Dropdown, color picker, toast widgets | `AbstractButton` subclasses drawing through `Draw`; `GameNarrator.saySystemQueued` for the toast | M2b game test, screenshots |
 | M2 | Version-specific: `NarrationCompat`, `KeyEventCompat` | `ScreenNarrationCollector.update` (26.3 adds a `NarrationTrigger`); `KeyEvent(int, int, int)` (second field is a scancode in 26.2, a layout keycode in 26.3) | M2 game test |
 | M1 | Range formula (`audiozone.core.SoundRange`) | Must match vanilla: `max(volume, 1) × attenuation distance`, infinite if relative or `NONE`; audible when strictly closer (`Vec3.closerThan`, used by `SubtitleOverlay$Subtitle.isAudibleFrom`) | `SoundRangeTest`, M1 game test |
 
@@ -52,6 +55,8 @@ Found at M0 by comparing the two game jars. Code that touches any of these needs
 | Render pipelines | `com.mojang.blaze3d.pipeline.RenderPipeline` | moved to `com.mojang.renderpearl.api.pipeline.RenderPipeline`; 26.3 also tries OpenGL then Vulkan | Source is unchanged as long as code names `RenderPipelines.GUI_TEXTURED` and never the type |
 | Narration collector | `ScreenNarrationCollector.update(Consumer)` | `update(Consumer, NarrationTrigger)`; `NarrationElementOutput` gains `narrationTrigger()` | `NarrationCompat`; never implement `NarrationElementOutput` directly |
 | Vanilla tab bar | `TabButton` is abstract; only vanilla's menu tab bar has a concrete one | same | Audio Zone uses its own `AzTabButton` |
+| List narration | `ContainerObjectSelectionList` narrates the row under the mouse before the focused row | prefers the focused row when narration comes from the keyboard (`narrationTrigger()`) | `AzList` builds its own narration from the focused row, so both versions read the keyboard focus |
+| Fabric test input | `pressKey` sends `KeyEvent(key, 0, 0)` | sends the SDL keycode too; neither sends modifier bits | Tests send Shift/Ctrl combinations through `KeyEventCompat` |
 
 Unchanged between the two versions: `SoundEngine.play(SoundInstance)` and both `calculateVolume` overloads, `SoundSource` (categories), `ChannelAccess`, `SoundEngineExecutor`, `com.mojang.blaze3d.audio.Channel`/`Library`/`Listener`, `KeyMapping` signatures, `AbstractWidget`, `AbstractButton`, `AbstractSliderButton`, `EditBox`, `Tooltip`, and every `GuiGraphicsExtractor` method the drawing adapter uses (text, fill, outline, scissor, tooltip).
 
