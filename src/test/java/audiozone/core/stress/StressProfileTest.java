@@ -6,9 +6,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 
 import audiozone.core.rules.Rule;
+import audiozone.core.zones.Point;
 import audiozone.core.zones.Precedence;
 import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
+import audiozone.core.zones.ZoneEdge;
+import audiozone.core.zones.ZoneMode;
 
 import org.junit.jupiter.api.Test;
 
@@ -26,19 +29,26 @@ class StressProfileTest {
 	}
 
 	@Test
-	void hasTheMaximumSixtyFourZonesInBothShapes() {
+	void hasTheMaximumSixtyFourZonesOfEveryKind() {
+		// PRD 11.2: spheres, boxes, cylinders, some fade, some Outside; plus personal bubbles.
 		List<Zone> zones = StressProfile.zones(WORLD, OVERWORLD);
 		assertEquals(Precedence.MAX_ZONES, zones.size());
 		assertTrue(zones.stream().anyMatch(z -> z.shape() instanceof Shape.Sphere));
 		assertTrue(zones.stream().anyMatch(z -> z.shape() instanceof Shape.Box));
+		assertTrue(zones.stream().anyMatch(z -> z.shape() instanceof Shape.Cylinder));
+		assertTrue(zones.stream().anyMatch(z -> z.mode() == ZoneMode.OUTSIDE));
+		assertTrue(zones.stream().anyMatch(z -> z.edge().mode() == ZoneEdge.Mode.FADE));
+		assertTrue(zones.stream().anyMatch(Zone::isBubble));
 		assertTrue(zones.stream().allMatch(z -> !z.rules().isEmpty()));
 	}
 
 	@Test
-	void everyZoneOverlapsThePen() {
-		// The pen is 9 x 9 blocks around (0, 64, 0); each zone contains at least its centre.
+	void everyZoneAffectsThePenCentre() {
+		// The pen is 9 x 9 blocks around (0, 64, 0), with the player standing in it.
 		for (Zone z : StressProfile.zones(WORLD, OVERWORLD)) {
-			assertTrue(z.shape().contains(-z.anchor().x(), StressProfile.PEN_Y - z.anchor().y(), -z.anchor().z()), z.id());
+			Point a = z.isBubble() ? StressProfile.PLAYER : z.anchor();
+			double w = z.weight(-a.x(), StressProfile.PEN_Y - a.y(), -a.z(), ZoneEdge.hard());
+			assertTrue(w > 0, z.id() + " weight " + w);
 		}
 	}
 
