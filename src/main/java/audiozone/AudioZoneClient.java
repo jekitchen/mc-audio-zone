@@ -1,6 +1,7 @@
 package audiozone;
 
 import audiozone.mc.AudioZoneScreen;
+import audiozone.mc.RecentLog;
 import audiozone.mc.SoundLogger;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
@@ -36,6 +37,7 @@ public final class AudioZoneClient implements ClientModInitializer {
 
 		ClientTickEvents.END_CLIENT_TICK.register(AudioZoneClient::onEndTick);
 		SoundLogger.registerIfEnabled();
+		RecentLog.register();
 
 		LOGGER.info("Audio Zone initialized");
 	}

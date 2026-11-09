@@ -35,6 +35,7 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 	public static final int ROW_HEIGHT = 24;
 
 	private final Component label;
+	private Supplier<Component> emptyText;
 	private Object rememberedKey;
 	private int rememberedButton;
 	private int rowsDrawnThisFrame;
@@ -64,6 +65,11 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 			screen.focusPath(pathTo(match, focusedButton));
 			setScrollAmount(scroll);
 		}
+	}
+
+	/** Text shown in the middle of the list when it has no rows. */
+	public void setEmptyText(Supplier<Component> text) {
+		this.emptyText = text;
 	}
 
 	public Row findRow(Object key) {
@@ -115,6 +121,10 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 		rowsDrawnThisFrame = 0;
 		super.extractWidgetRenderState(g, mouseX, mouseY, partialTick);
 		rowsDrawnLastFrame = rowsDrawnThisFrame;
+		if (children().isEmpty() && emptyText != null) {
+			Font font = Minecraft.getInstance().font;
+			Draw.centeredText(g, font, emptyText.get(), getX() + getWidth() / 2, getY() + (getHeight() - font.lineHeight) / 2, Theme.TEXT_DIM);
+		}
 	}
 
 	// ---- Focus and keys ----
@@ -187,17 +197,25 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 	}
 
 	/**
-	 * A row: text columns (cut with "…" when too long, full text in a tooltip on hover) and inline icon buttons on
-	 * the right. Its buttons narrate the row's text before their own label.
+	 * A row: text columns on one or two lines (cut with "…" when too long, full text in a tooltip on hover) and inline
+	 * icon buttons on the right. Its buttons narrate the row's text before their own label. A row without buttons
+	 * (read-only) gets an invisible focus target instead, so it can still be reached with the keyboard and narrated.
 	 */
 	public static class Row extends ContainerObjectSelectionList.Entry<Row> {
-		/** A text column; {@code width} 0 means "take the remaining space" (at most one such column). */
-		public record Column(Supplier<String> text, int width) {
+		/**
+		 * A text column. {@code width} 0 means "take the remaining space" (at most one such column per line).
+		 * {@code line} 0 is the main line; line 1 is a second, dimmer line underneath.
+		 */
+		public record Column(Supplier<String> text, int width, int line) {
+			public Column(Supplier<String> text, int width) {
+				this(text, width, 0);
+			}
 		}
 
 		private final Object key;
 		private final List<Column> columns;
 		private final List<AzButton> buttons;
+		private final RowFocus focusTarget;
 
 		public Row(Object key, List<Column> columns, List<AzButton> buttons) {
 			this.key = key;
@@ -206,6 +224,7 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 			for (AzButton button : this.buttons) {
 				button.narrationContext(this::narrationText);
 			}
+			this.focusTarget = this.buttons.isEmpty() ? new RowFocus(this) : null;
 		}
 
 		public Object key() {
@@ -219,24 +238,36 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 		public Component narrationText() {
 			List<String> parts = new ArrayList<>();
 			for (Column column : columns) {
-				parts.add(column.text().get());
+				String text = column.text().get();
+				if (!text.isEmpty()) {
+					parts.add(text);
+				}
 			}
 			return Component.literal(String.join(", ", parts));
 		}
 
+		/** The visible text of every column, for tests and diagnostics. */
+		public List<String> columnTexts() {
+			List<String> texts = new ArrayList<>();
+			for (Column column : columns) {
+				texts.add(column.text().get());
+			}
+			return texts;
+		}
+
 		int focusedButtonIndex() {
 			GuiEventListener focused = getFocused();
-			return focused == null ? 0 : buttons.indexOf(focused);
+			return focused == null || focusTarget != null ? 0 : buttons.indexOf(focused);
 		}
 
 		@Override
 		public List<? extends GuiEventListener> children() {
-			return buttons;
+			return focusTarget != null ? List.of(focusTarget) : buttons;
 		}
 
 		@Override
 		public List<? extends NarratableEntry> narratables() {
-			return buttons;
+			return focusTarget != null ? List.of(focusTarget) : buttons;
 		}
 
 		@Override
@@ -266,29 +297,73 @@ public class AzList extends ContainerObjectSelectionList<AzList.Row> {
 				bx += button.getWidth() + Theme.GAP;
 			}
 
-			// Text columns.
+			if (focusTarget != null) {
+				focusTarget.setRectangle(getWidth(), getHeight(), getX(), getY());
+				focusTarget.extractRenderState(g, mouseX, mouseY, partialTick);
+			}
+
+			// Text columns, line by line.
 			Font font = Minecraft.getInstance().font;
 			int textRight = x + width - buttonsWidth - Theme.GAP;
-			int fixed = 0;
-			for (Column column : columns) {
-				fixed += column.width() + Theme.GAP;
-			}
-			int textY = y + (height - font.lineHeight) / 2 + 1;
-			int cx = x;
-			for (Column column : columns) {
-				int columnWidth = column.width() > 0 ? column.width() : Math.max(0, textRight - x - fixed);
-				columnWidth = Math.min(columnWidth, Math.max(0, textRight - cx));
-				String text = column.text().get();
-				boolean cut = Draw.truncatedText(g, font, text, cx, textY, columnWidth, Theme.TEXT);
-				if (cut && hovered && mouseX >= cx && mouseX < cx + columnWidth) {
-					Draw.tooltip(g, font, Component.literal(text), mouseX, mouseY);
+			boolean twoLines = columns.stream().anyMatch(column -> column.line() == 1);
+			for (int line = 0; line <= 1; line++) {
+				int fixed = 0;
+				for (Column column : columns) {
+					if (column.line() == line) {
+						fixed += column.width() + Theme.GAP;
+					}
 				}
-				cx += columnWidth + Theme.GAP;
+				int textY = twoLines
+						? y + 1 + line * (font.lineHeight + 2)
+						: y + (height - font.lineHeight) / 2 + 1;
+				int color = line == 0 ? Theme.TEXT : Theme.TEXT_DIM;
+				int cx = x;
+				for (Column column : columns) {
+					if (column.line() != line) {
+						continue;
+					}
+					int columnWidth = column.width() > 0 ? column.width() : Math.max(0, textRight - x - fixed);
+					columnWidth = Math.min(columnWidth, Math.max(0, textRight - cx));
+					String text = column.text().get();
+					boolean cut = Draw.truncatedText(g, font, text, cx, textY, columnWidth, color);
+					if (cut && hovered && mouseX >= cx && mouseX < cx + columnWidth
+							&& mouseY >= textY && mouseY < textY + font.lineHeight) {
+						Draw.tooltip(g, font, Component.literal(text), mouseX, mouseY);
+					}
+					cx += columnWidth + Theme.GAP;
+				}
 			}
 		}
 
 		/** The list this row is in (set when the row is added), for the drawn-rows counter. */
 		private AzList owner;
+	}
+
+	/** Invisible, focusable stand-in for a read-only row: shows the focus ring and narrates the row. */
+	private static final class RowFocus extends AbstractWidget {
+		private final Row row;
+
+		RowFocus(Row row) {
+			super(0, 0, 0, 0, Component.empty());
+			this.row = row;
+		}
+
+		@Override
+		public Component getMessage() {
+			return row.narrationText();
+		}
+
+		@Override
+		protected void extractWidgetRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+			if (isFocused()) {
+				Draw.outline(g, getX(), getY(), getWidth(), getHeight(), Theme.FOCUS);
+			}
+		}
+
+		@Override
+		protected void updateWidgetNarration(NarrationElementOutput output) {
+			output.add(NarratedElementType.TITLE, row.narrationText());
+		}
 	}
 
 	@Override
