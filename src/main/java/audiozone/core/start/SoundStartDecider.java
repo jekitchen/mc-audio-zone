@@ -112,6 +112,16 @@ public final class SoundStartDecider {
 		return limiter;
 	}
 
+	/**
+	 * Estimated bytes of the repeat-limit counters and the current profile's per-ID rule caches (global and every
+	 * zone), for the Diagnostics memory readout (PRD 9.1): {@code meter.add("Rules and limits", decider::estimatedBytes)}.
+	 * Walks them, so let {@code MemoryMeter} call it, not every sound.
+	 */
+	public long estimatedBytes() {
+		Precedence p = precedence;
+		return limiter.estimatedBytes() + (p == null ? 0 : p.estimatedBytes());
+	}
+
 	/** Decides {@code in} and writes what to do into {@code out}. */
 	public void start(SoundStart in, SoundStartResult out) {
 		out.reset();
