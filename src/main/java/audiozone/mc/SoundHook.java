@@ -2,8 +2,10 @@ package audiozone.mc;
 
 import audiozone.AudioZoneClient;
 import audiozone.core.diag.ErrorBudget;
+import audiozone.core.diag.TimingWindow;
 import audiozone.core.recent.PlayStatus;
 import audiozone.core.rules.RuleResolution;
+import audiozone.core.trace.LastPlays;
 import audiozone.core.SoundRange;
 import java.util.HashMap;
 import java.util.List;
@@ -25,7 +27,8 @@ import net.minecraft.world.phys.Vec3;
  *   <li>Range: computes the vanilla hearing range from the sound's own volume (M1).</li>
  *   <li>Decide: with Bypass on, everything plays as vanilla; otherwise the profile's global rules may mute it (M4)
  *   or set its volume (M5). Vanilla-covered sounds (Music, UI, Voice/Speech categories) are never changed.</li>
- *   <li>Report: observers (the recently played log, the dev log) see the sound with its status.</li>
+ *   <li>Report: observers (the recently played log, the dev log) see the sound with its status. The sound's last play
+ *   is kept for its trace (FR-14.6), and the time all this took feeds Diagnostics (FR-13.3).</li>
  * </ol>
  *
  * <p>Volume (FR-5.3): final loudness is vanilla loudness (including the Master and category sliders) times the rule
@@ -45,6 +48,9 @@ public final class SoundHook {
 	/** The volume factor decided by the last {@link #onSoundStart}, used once by {@link #applyStartVolume}. */
 	private static float startFactor = 1.0F;
 	private static float lastAppliedFactor = 1.0F;
+	private static float lastStartFactor = 1.0F;
+	private static final TimingWindow SOUND_TIMING = new TimingWindow();
+	private static final LastPlays LAST_PLAYS = new LastPlays();
 
 	private SoundHook() {
 	}
@@ -64,6 +70,7 @@ public final class SoundHook {
 	 * @return true if the sound must not start (muted)
 	 */
 	public static boolean onSoundStart(SoundInstance instance) {
+		long started = System.nanoTime();
 		startFactor = 1.0F;
 		try {
 			return handle(instance);
@@ -71,6 +78,8 @@ public final class SoundHook {
 			startFactor = 1.0F;
 			failOpen(e);
 			return false;
+		} finally {
+			SOUND_TIMING.add(System.nanoTime() - started, Util.getMillis());
 		}
 	}
 
@@ -102,6 +111,10 @@ public final class SoundHook {
 				startFactor = decision.effectiveVolumePercent() / 100.0F;
 			}
 		}
+		// Zones arrive in M7; until then the trace needs no world or dimension (and building their names here would
+		// allocate on every sound).
+		LAST_PLAYS.record(idString, !relative, "", "", instance.getX(), instance.getY(), instance.getZ(),
+				decision == null ? 100 : decision.effectiveVolumePercent(), false, false);
 
 		SoundObservation o = OBSERVATION;
 		o.id = id;
@@ -152,6 +165,7 @@ public final class SoundHook {
 		float factor = startFactor;
 		startFactor = 1.0F;
 		lastAppliedFactor = factor;
+		lastStartFactor = factor;
 		return vanillaVolume * factor;
 	}
 
@@ -169,6 +183,24 @@ public final class SoundHook {
 			failOpen(e);
 			return vanillaVolume;
 		}
+	}
+
+	/** Time spent per sound start, for Diagnostics (FR-13.3). Render thread only. */
+	public static TimingWindow soundTiming() {
+		return SOUND_TIMING;
+	}
+
+	/** Each sound's last play, for the "Why?" panel (FR-14.6). Render thread only. */
+	public static LastPlays lastPlays() {
+		return LAST_PLAYS;
+	}
+
+	/**
+	 * The factor applied to the most recent sound start (1 = unchanged), for tests. Unlike
+	 * {@link #lastAppliedFactor()}, per-tick recalculations of other playing sounds do not change it.
+	 */
+	public static float lastStartFactor() {
+		return lastStartFactor;
 	}
 
 	/** The factor most recently applied to a volume (1 = unchanged), for tests. */

@@ -1,5 +1,7 @@
 package audiozone.mc;
 
+import audiozone.core.diag.DiagnosticsReport;
+import audiozone.core.diag.TimingWindow;
 import audiozone.core.lists.RuleSummary;
 import audiozone.core.recent.RecentRow;
 import audiozone.core.recent.SortOrder;
@@ -53,11 +55,19 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final Identifier UP_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/up");
 	private static final Identifier DOWN_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/down");
 	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/delete");
+	private static final Identifier WHY_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/help");
+	private static final int PAGE_WIDTH = 160;
 	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
 
 	// Remembered while the game runs, like the last used tab.
 	private static SortOrder sort = SortOrder.MOST_RECENT;
 	private static boolean paused;
+	private static SettingsPage settingsPage = SettingsPage.GENERAL;
+
+	/** Settings pages (PRD 6.1); Zones and Accessibility arrive with their milestones. */
+	public enum SettingsPage {
+		GENERAL, DIAGNOSTICS
+	}
 	private static String filter = "";
 
 	public AzList recentList;
@@ -67,6 +77,9 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzToggle bypassToggle;
 	public AzList rulesList;
 	public AzButton addRuleButton;
+	public AzDropdown<SettingsPage> pageDropdown;
+	public AzButton copyReportButton;
+	private DiagnosticsReport.Data diagnostics;
 	public int refreshCount;
 	private int ticks;
 
@@ -177,6 +190,9 @@ public final class AudioZoneScreen extends AzScreen {
 			bypassToggle.setValue(ProfileManager.isBypassed());
 		}
 		ticks++;
+		if (currentTab() == TAB_SETTINGS && settingsPage == SettingsPage.DIAGNOSTICS) {
+			diagnostics = Diagnostics.data();
+		}
 		if (currentTab() == TAB_RECENT && !paused && ticks % REFRESH_TICKS == 0) {
 			refresh();
 		}
@@ -219,7 +235,7 @@ public final class AudioZoneScreen extends AzScreen {
 			String band = Component.translatable(row.band().translationKey()).getString();
 			columns.add(new AzList.Row.Column(() -> band, BAND_WIDTH, 1));
 		}
-		return new AzList.Row(row.id(), columns, List.of(muteButton(row.id()), editSoundButton(row.id())));
+		return new AzList.Row(row.id(), columns, List.of(muteButton(row.id()), editSoundButton(row.id()), whyButton(row.id())));
 	}
 
 	/**
@@ -239,6 +255,12 @@ public final class AudioZoneScreen extends AzScreen {
 	private AzButton editSoundButton(String soundId) {
 		return AzButton.icon(EDIT_ICON, Component.translatable("audiozone.recent.edit"),
 				() -> minecraft.gui.setScreen(RuleEditorScreen.forSound(this, soundId)));
+	}
+
+	/** Why?: the sound trace for this sound's most recent play (FR-14.1). */
+	private AzButton whyButton(String soundId) {
+		return AzButton.icon(WHY_ICON, Component.translatable("audiozone.recent.why"),
+				() -> minecraft.gui.setScreen(new TraceScreen(this, soundId)));
 	}
 
 	public void toggleMute(String soundId) {
@@ -344,11 +366,68 @@ public final class AudioZoneScreen extends AzScreen {
 	// ---- Settings ----
 
 	private void buildSettings(Body body) {
-		body.label(() -> Component.translatable("audiozone.settings.general"));
+		pageDropdown = Tooltips.describe(new AzDropdown<>(PAGE_WIDTH, Component.translatable("audiozone.settings.page"),
+				List.of(SettingsPage.values()),
+				page -> Component.translatable("audiozone.settings.page." + page.name().toLowerCase(Locale.ROOT)),
+				settingsPage, this::setSettingsPage), Component.translatable("audiozone.settings.page.tip"));
+		body.row(pageDropdown);
+		if (settingsPage == SettingsPage.DIAGNOSTICS) {
+			buildDiagnostics(body);
+			return;
+		}
 		body.label(() -> Component.translatable("audiozone.settings.bypass_hint", bypassKeyName()));
 		body.row(Tooltips.describe(new AzToggle(160, Component.translatable("audiozone.settings.show_distance"),
 				AudioZoneSettings.showDistance(), AudioZoneSettings::setShowDistance),
 				Component.translatable("audiozone.settings.show_distance.tip")));
+	}
+
+	public void setSettingsPage(SettingsPage page) {
+		if (page == settingsPage) {
+			return;
+		}
+		settingsPage = page;
+		rebuildWidgets();
+		setInitialFocus(pageDropdown);
+	}
+
+	public SettingsPage settingsPage() {
+		return settingsPage;
+	}
+
+	/** FR-13.3: live numbers, refreshed every tick, and Copy report. */
+	private void buildDiagnostics(Body body) {
+		diagnostics = Diagnostics.data();
+		body.label(() -> Component.translatable("audiozone.diag.sounds", diagnostics.sounds().count()));
+		body.label(() -> Component.translatable("audiozone.diag.per_sound", micros(diagnostics.sounds().averageMicros()),
+				micros(diagnostics.sounds().maxMicros()), micros(diagnostics.peakSoundMicros())));
+		body.label(() -> timing("audiozone.diag.tick", diagnostics.tick()));
+		body.label(() -> timing("audiozone.diag.outlines", diagnostics.outlines()));
+		body.label(() -> Component.translatable("audiozone.diag.active", diagnostics.globalRules(), diagnostics.zones()));
+		body.label(() -> Double.isNaN(diagnostics.cacheHitRate())
+				? Component.translatable("audiozone.diag.cache.none")
+				: Component.translatable("audiozone.diag.cache", String.format(Locale.ROOT, "%.1f", diagnostics.cacheHitRate() * 100)));
+		body.label(() -> Component.translatable("audiozone.diag.errors", diagnostics.errors()));
+		copyReportButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.diag.copy"), this::copyReport),
+				Component.translatable("audiozone.diag.copy.tip"));
+		body.row(copyReportButton);
+	}
+
+	private static Component timing(String key, TimingWindow.Stats stats) {
+		return Component.translatable(key, micros(stats.averageMicros()), micros(stats.maxMicros()));
+	}
+
+	private static String micros(double value) {
+		return String.format(Locale.ROOT, "%.1f", value);
+	}
+
+	/** The numbers on the Diagnostics page, as last refreshed. */
+	public DiagnosticsReport.Data diagnostics() {
+		return diagnostics;
+	}
+
+	public void copyReport() {
+		minecraft.keyboardHandler.setClipboard(Diagnostics.report());
+		showToast(Component.translatable("audiozone.diag.copied"), null);
 	}
 
 	// ---- Keys ----
