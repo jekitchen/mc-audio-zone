@@ -140,10 +140,10 @@ public final class SoundHook {
 			in.y = instance.getY();
 			in.z = instance.getZ();
 			if (minecraft.player != null) {
-				Vec3 eye = minecraft.player.getEyePosition();
-				in.px = eye.x;
-				in.py = eye.y;
-				in.pz = eye.z;
+				// Read the eye position without building a Vec3 per sound (PRD 7.4: no allocation on the hot path).
+				in.px = minecraft.player.getX();
+				in.py = minecraft.player.getEyeY();
+				in.pz = minecraft.player.getZ();
 			}
 			WeighedSoundEvents events = minecraft.getSoundManager().getSoundEvent(id);
 			in.hasSubtitle = events != null && events.getSubtitle() != null;
@@ -242,6 +242,11 @@ public final class SoundHook {
 			failOpen(e);
 			return vanillaVolume;
 		}
+	}
+
+	/** The repeat-limit counters, for the Diagnostics memory readout. */
+	public static audiozone.core.limit.RepeatLimiter limiter() {
+		return DECIDER.limiter();
 	}
 
 	/** Time spent per sound start, for Diagnostics (FR-13.3). Render thread only. */

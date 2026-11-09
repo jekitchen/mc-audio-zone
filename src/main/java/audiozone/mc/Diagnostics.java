@@ -1,6 +1,7 @@
 package audiozone.mc;
 
 import audiozone.core.diag.DiagnosticsReport;
+import audiozone.core.diag.MemoryMeter;
 import audiozone.core.diag.TimingWindow;
 import audiozone.core.rules.RuleResolver;
 import audiozone.core.zones.Zone;
@@ -17,7 +18,27 @@ public final class Diagnostics {
 	/** Zone outline drawing per frame (FR-10, M7). */
 	public static final TimingWindow OUTLINES = new TimingWindow();
 
+	/** Audio Zone's main data structures, against the 8 MB budget (PRD 9.1). */
+	private static final MemoryMeter MEMORY = new MemoryMeter();
+
+	static {
+		MEMORY.add("Recently played", () -> RecentLog.get().sounds().estimatedBytes());
+		MEMORY.add("Playing sounds", () -> PlayingChannels.get().estimatedBytes());
+		MEMORY.add("Last plays", () -> SoundHook.lastPlays().estimatedBytes());
+		MEMORY.add("Repeat limits", () -> SoundHook.limiter().estimatedBytes());
+		MEMORY.add("Rule caches", Diagnostics::ruleCacheBytes);
+	}
+
 	private Diagnostics() {
+	}
+
+	/** Estimated bytes of Audio Zone's data; recomputed at most once a second. Render thread only. */
+	public static long memoryBytes() {
+		return MEMORY.totalBytes(Util.getMillis());
+	}
+
+	private static long ruleCacheBytes() {
+		return ProfileManager.precedence().estimatedBytes();
 	}
 
 	public static DiagnosticsReport.Data data() {

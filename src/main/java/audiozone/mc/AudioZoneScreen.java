@@ -1,6 +1,7 @@
 package audiozone.mc;
 
 import audiozone.core.diag.DiagnosticsReport;
+import audiozone.core.diag.MemoryEstimate;
 import audiozone.core.diag.TimingWindow;
 import audiozone.core.outline.OutlineMode;
 import audiozone.core.recent.RecentRow;
@@ -508,6 +509,8 @@ public final class AudioZoneScreen extends AzScreen {
 				? Component.translatable("audiozone.diag.cache.none")
 				: Component.translatable("audiozone.diag.cache", String.format(Locale.ROOT, "%.1f", diagnostics.cacheHitRate() * 100)));
 		body.label(() -> Component.translatable("audiozone.diag.errors", diagnostics.errors()));
+		body.label(() -> Component.translatable("audiozone.diag.memory", MemoryEstimate.megabytes(Diagnostics.memoryBytes()),
+				MemoryEstimate.megabytes(MemoryEstimate.BUDGET_BYTES)));
 		copyReportButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.diag.copy"), this::copyReport),
 				Component.translatable("audiozone.diag.copy.tip"));
 		body.row(copyReportButton);

@@ -26,7 +26,7 @@ import audiozone.core.diag.MemoryEstimate;
  */
 public final class RuleResolver {
 	/** Cache size cap. Servers can send arbitrary sound IDs, so the cache must not grow without bound. */
-	static final int MAX_CACHED_IDS = 4096;
+	public static final int MAX_CACHED_IDS = 4096;
 	private static final long RESOLUTION_BYTES = MemoryEstimate.object(3 * MemoryEstimate.REFERENCE);
 
 	private static final Comparator<Rule> MOST_SPECIFIC_FIRST = Comparator

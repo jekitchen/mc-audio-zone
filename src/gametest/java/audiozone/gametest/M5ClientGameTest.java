@@ -33,6 +33,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 	private static final String WOOD_STEP = "minecraft:block.wood.step";
 	private static final String UI_CLICK = "minecraft:ui.button.click";
 	private static final int SETTLE = 8;
+	/** The start factor of the last sound {@link #play} started. */
+	private static volatile float lastStartFactor;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -99,7 +101,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> editor(mc).save());
 			context.waitForScreen(AudioZoneScreen.class);
 			check(play(context, VILLAGER_AMBIENT, SoundSource.NEUTRAL), "the exact rule should let villager ambient play");
-			check(context.computeOnClient(mc -> SoundHook.lastStartFactor()) == 1.0F, "at 100% the volume is unchanged");
+			check(lastStartFactor == 1.0F, "at 100% the volume is unchanged");
 			check(!play(context, VILLAGER_HURT, SoundSource.NEUTRAL), "other villager sounds stay muted");
 			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.edit(main(mc), ProfileManager.profile().rule(wildcardId))));
 			context.waitForScreen(RuleEditorScreen.class);
@@ -112,9 +114,9 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			// FR-4 AC 2 and FR-5 AC: *:block.*.step at 50% makes every footstep quieter, by the rule's factor.
 			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(Rule.of(p.newRuleId(), "*:block.*.step").withVolume(50))));
 			check(play(context, STONE_STEP, SoundSource.BLOCKS), "a 50% sound still plays");
-			check(context.computeOnClient(mc -> SoundHook.lastStartFactor()) == 0.5F, "stone steps should play at 50%");
+			check(lastStartFactor == 0.5F, "stone steps should play at 50%");
 			check(play(context, WOOD_STEP, SoundSource.BLOCKS), "a 50% sound still plays");
-			check(context.computeOnClient(mc -> SoundHook.lastStartFactor()) == 0.5F, "wood steps should play at 50%");
+			check(lastStartFactor == 0.5F, "wood steps should play at 50%");
 			// The volume is applied again whenever vanilla recalculates a playing sound's volume.
 			check(context.computeOnClient(mc -> SoundHook.applyVolume(instance(mc, STONE_STEP, SoundSource.BLOCKS), 0.8F)) == 0.4F,
 					"recalculated volumes get the rule factor too");
@@ -138,7 +140,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> editor(mc).save());
 			context.waitForScreen(AudioZoneScreen.class);
 			check(play(context, STONE_STEP, SoundSource.BLOCKS), "a 40% sound still plays");
-			check(context.computeOnClient(mc -> SoundHook.lastStartFactor()) == 0.4F, "stone steps should now play at 40%");
+			check(lastStartFactor == 0.4F, "stone steps should now play at 40%");
 
 			// FR-5.1: 0% (not muted) plays nothing, like a zero vanilla slider.
 			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(p.rule(stepId).withVolume(0))));
@@ -204,6 +206,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 		boolean started = context.computeOnClient(mc -> {
 			SoundInstance sound = instance(mc, id, source);
 			mc.getSoundManager().play(sound);
+			// Read the factor in the same step: an ambient world sound starting later would replace it.
+			lastStartFactor = SoundHook.lastStartFactor();
 			return mc.getSoundManager().isActive(sound);
 		});
 		context.waitTicks(SETTLE);

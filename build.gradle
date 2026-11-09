@@ -34,6 +34,17 @@ fabricApi {
 	}
 }
 
+// Game tests run like a release build: no per-sound log lines (M1's SoundLogger), so timings are not distorted.
+// -Psoak=<seconds> lengthens the stress test's soak phase (PRD 11.2 step 5: 1800 for the full 30 minutes).
+loom {
+	runs {
+		matching { it.name == 'clientGameTest' }.configureEach {
+			vmArg '-Daudiozone.logSounds=false'
+			vmArg "-Daudiozone.soakSeconds=${project.findProperty('soak') ?: '20'}"
+		}
+	}
+}
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
