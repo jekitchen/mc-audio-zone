@@ -30,7 +30,7 @@ public final class TraceEditor {
 			return refused(ctx, rules, invalid);
 		}
 		if (where.isGlobal()) {
-			int i = indexOfRule(rules.globalRules(), where.ruleId());
+			int i = ExactRules.indexOfRule(rules.globalRules(), where.ruleId());
 			if (i < 0) {
 				return refused(ctx, rules, TraceEditError.RULE_NOT_FOUND);
 			}
@@ -38,12 +38,12 @@ public final class TraceEditor {
 			EditableRules after = new EditableRules(replace(rules.globalRules(), i, changed), rules.zones());
 			return applied(ctx, rules, after, TOAST_CHANGED, changed.pattern().text());
 		}
-		int z = indexOfZone(rules.zones(), where.zoneId());
+		int z = ExactRules.indexOfZone(rules.zones(), where.zoneId());
 		if (z < 0) {
 			return refused(ctx, rules, TraceEditError.ZONE_NOT_FOUND);
 		}
 		Zone zone = rules.zones().get(z);
-		int i = indexOfRule(zone.rules(), where.ruleId());
+		int i = ExactRules.indexOfRule(zone.rules(), where.ruleId());
 		if (i < 0) {
 			return refused(ctx, rules, TraceEditError.RULE_NOT_FOUND);
 		}
@@ -55,7 +55,7 @@ public final class TraceEditor {
 
 	/** A zone line's enable/disable control. */
 	public static TraceEditResult setZoneEnabled(TraceEditContext ctx, EditableRules rules, String zoneId, boolean enabled) {
-		int z = indexOfZone(rules.zones(), zoneId);
+		int z = ExactRules.indexOfZone(rules.zones(), zoneId);
 		if (z < 0) {
 			return refused(ctx, rules, TraceEditError.ZONE_NOT_FOUND);
 		}
@@ -72,35 +72,12 @@ public final class TraceEditor {
 	 * reused, and turned on, instead of adding a second one.
 	 */
 	public static TraceEditResult addRuleForSound(TraceEditContext ctx, EditableRules rules, String zoneId, RuleEdit edit) {
-		TraceEditError invalid = edit.validate();
-		if (invalid != null) {
-			return refused(ctx, rules, invalid);
+		ExactRules.Change change = ExactRules.edit(rules, zoneId, ctx.soundId(), edit, false);
+		if (change.error() != null) {
+			return refused(ctx, rules, change.error());
 		}
-		int z = -1;
-		List<Rule> list = rules.globalRules();
-		if (zoneId != null) {
-			z = indexOfZone(rules.zones(), zoneId);
-			if (z < 0) {
-				return refused(ctx, rules, TraceEditError.ZONE_NOT_FOUND);
-			}
-			list = rules.zones().get(z).rules();
-		}
-		String soundId = ctx.soundId();
-		int existing = indexOfExact(list, soundId);
-		List<Rule> newList;
-		if (existing >= 0) {
-			newList = replace(list, existing, edit.apply(list.get(existing).withEnabled(true)));
-		} else {
-			if (ruleCount(rules) >= MAX_RULES) {
-				return refused(ctx, rules, TraceEditError.TOO_MANY_RULES);
-			}
-			newList = new ArrayList<>(list);
-			newList.add(edit.apply(Rule.of(freeId(rules, exactRuleId(zoneId, soundId)), soundId)));
-		}
-		EditableRules after = z < 0
-				? new EditableRules(newList, rules.zones())
-				: new EditableRules(rules.globalRules(), replace(rules.zones(), z, withRules(rules.zones().get(z), newList)));
-		return applied(ctx, rules, after, existing >= 0 ? TOAST_CHANGED : TOAST_ADDED, soundId);
+		String toastKey = change.outcome() == ExactRules.Outcome.ADDED ? TOAST_ADDED : TOAST_CHANGED;
+		return applied(ctx, rules, change.after(), toastKey, ctx.soundId());
 	}
 
 	/**
@@ -139,71 +116,14 @@ public final class TraceEditor {
 		return new TraceEditResult(null, before, after, ctx.trace(after), ctx.play() != null, toastKey, List.of(toastArg));
 	}
 
-	private static Zone withRules(Zone zone, List<Rule> rules) {
+	static Zone withRules(Zone zone, List<Rule> rules) {
 		return new Zone(zone.id(), zone.name(), zone.enabled(), zone.worldKey(), zone.dimension(), zone.anchor(), zone.shape(),
 				rules, zone.mode(), zone.edge(), zone.anchorType());
 	}
 
-	private static <T> List<T> replace(List<T> list, int i, T value) {
+	static <T> List<T> replace(List<T> list, int i, T value) {
 		List<T> copy = new ArrayList<>(list);
 		copy.set(i, value);
 		return copy;
-	}
-
-	private static int indexOfRule(List<Rule> rules, String id) {
-		for (int i = 0; i < rules.size(); i++) {
-			if (rules.get(i).id().equals(id)) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	private static int indexOfZone(List<Zone> zones, String id) {
-		for (int i = 0; i < zones.size(); i++) {
-			if (zones.get(i).id().equals(id)) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	private static int indexOfExact(List<Rule> rules, String soundId) {
-		for (int i = 0; i < rules.size(); i++) {
-			Rule rule = rules.get(i);
-			if (rule.pattern().isExact() && rule.pattern().text().equals(soundId)) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	private static int ruleCount(EditableRules rules) {
-		int count = rules.globalRules().size();
-		for (Zone zone : rules.zones()) {
-			count += zone.rules().size();
-		}
-		return count;
-	}
-
-	/** {@code id}, or {@code id#2}, {@code id#3}... if another rule already uses it. */
-	private static String freeId(EditableRules rules, String id) {
-		String candidate = id;
-		for (int n = 2; isTaken(rules, candidate); n++) {
-			candidate = id + "#" + n;
-		}
-		return candidate;
-	}
-
-	private static boolean isTaken(EditableRules rules, String id) {
-		if (indexOfRule(rules.globalRules(), id) >= 0) {
-			return true;
-		}
-		for (Zone zone : rules.zones()) {
-			if (indexOfRule(zone.rules(), id) >= 0) {
-				return true;
-			}
-		}
-		return false;
 	}
 }
