@@ -7,12 +7,14 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Slider (PRD 6.2) on top of vanilla's slider. Keyboard: Left/Right move by one step, Shift+Left/Right by the fine
- * step. Values above the warning threshold add the warning text to the label and the
- * narration and draw a warning outline. Typed values come in through {@link #setTypedValue}.
+ * step. Values above the warning threshold draw a warning outline, and the narrator adds the warning text after the
+ * value; the label itself shows only "Label: value" (the explanation belongs in the slider's tooltip). Typed values
+ * come in through {@link #setTypedValue}.
  */
 public class AzSlider extends AbstractSliderButton {
 	private final Component label;
@@ -23,8 +25,8 @@ public class AzSlider extends AbstractSliderButton {
 
 	/**
 	 * @param format      turns a value into display text, e.g. {@code v -> Component.literal((int) v + "%")}
-	 * @param warningText added to the label in the warning zone, e.g. "louder than vanilla"; may be null if the
-	 *                    model has no warning zone
+	 * @param warningText narrated after the value in the warning zone, e.g. "louder than vanilla"; may be null if
+	 *                    the model has no warning zone
 	 */
 	public AzSlider(int width, Component label, SliderModel model, DoubleFunction<Component> format,
 			Component warningText, DoubleConsumer onChange) {
@@ -76,11 +78,16 @@ public class AzSlider extends AbstractSliderButton {
 
 	@Override
 	protected void updateMessage() {
-		Component text = Component.translatable("audiozone.ui.slider", label, format.apply(model.value()));
-		if (model.isWarning() && warningText != null) {
-			text = Component.translatable("audiozone.ui.slider.warning", text, warningText);
-		}
-		setMessage(text);
+		setMessage(Component.translatable("audiozone.ui.slider", label, format.apply(model.value())));
+	}
+
+	/** The narrator still hears the warning; it is not on the visible label. */
+	@Override
+	protected MutableComponent createNarrationMessage() {
+		MutableComponent message = super.createNarrationMessage();
+		return model.isWarning() && warningText != null
+				? Component.translatable("audiozone.ui.slider.warning", message, warningText)
+				: message;
 	}
 
 	/** Mouse input: vanilla sets {@code value} to the pointer position; snap it to the step grid. */

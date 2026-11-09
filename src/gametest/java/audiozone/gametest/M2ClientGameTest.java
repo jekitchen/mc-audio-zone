@@ -127,6 +127,8 @@ public final class M2ClientGameTest implements FabricClientGameTest {
 		String narration = context.computeOnClient(mc -> narrationOf(demo(mc).volumeSlider));
 		check(narration.contains("105%") && narration.contains("louder than vanilla"),
 				"slider narration should read the value and the warning, was: " + narration);
+		String visible = context.computeOnClient(mc -> demo(mc).volumeSlider.getMessage().getString());
+		check(visible.equals("Volume: 105%"), "the visible label should be just 'Volume: 105%' (the tooltip explains), was: " + visible);
 		pressWithModifiers(context, InputConstants.KEY_LEFT, MOD_SHIFT);
 		checkVolume(context, 104, "Shift+Left");
 		pressWithModifiers(context, InputConstants.KEY_RIGHT, MOD_SHIFT);
