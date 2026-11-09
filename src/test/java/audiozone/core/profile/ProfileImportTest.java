@@ -100,7 +100,7 @@ class ProfileImportTest {
 	@Test
 	void newerSchemaUsesTheImportWording() {
 		assertEquals("This file was made with a newer Audio Zone. Update the mod to import it.",
-				problem("{\"schemaVersion\": 2}"));
+				problem("{\"schemaVersion\": 3}"));
 	}
 
 	@Test

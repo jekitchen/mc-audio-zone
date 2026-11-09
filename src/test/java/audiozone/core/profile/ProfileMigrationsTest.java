@@ -35,7 +35,7 @@ class ProfileMigrationsTest {
 	}
 
 	@Test
-	void currentSchemaHasNoStepsYet() {
+	void currentStepsReachTheCurrentSchema() {
 		assertEquals(Profile.SCHEMA_VERSION, ProfileMigrations.CURRENT.target());
 	}
 
