@@ -188,7 +188,7 @@ Browse every sound the game knows by name or ID.
 **Acceptance criteria**
 
 - [ ] Type `villager`: only villager-related sounds appear, with a count.
-- [ ] Type `villager|zombie`: both families appear; `villager zombie` returns none (no ID contains both).
+- [ ] Type `villager|zombie`: both families appear; `villager zombie` returns only sounds whose ID or subtitle has both words (the zombie villager family); `villager cow` returns none.
 - [ ] Type `villager -ambient`: no result contains "ambient".
 - [ ] Install a resource pack that adds a new sound in `sounds.json`, press F3+T, search its name: it appears.
 - [ ] (v1) Type `/entity\.(cow|pig)\..*/`: only cow and pig sounds; type `/(/`: a readable error appears and the game does not freeze.
@@ -974,3 +974,5 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | The "Why?" panel shows the same lines that Copy trace copies, one list row per line, so the two never disagree. Losing rules say "overridden by <rule>" in words rather than only being grayed out. Until zones (M7), every trace says "No zone affects this sound" | M5 |
 | 2026-11-09 | Settings pages are chosen with a "Page" dropdown at the top of the Settings tab (General, Diagnostics; Zones and Accessibility come with their milestones). Diagnostics refreshes every tick; the per-tick re-check and outline readouts stay at zero until M7 | M5 |
 | 2026-11-09 | Diagnostics' "time per sound" covers the whole sound-start hook, including observers. Development builds also log every sound (M1), which dominates that number there; the 5 µs budget is checked in a release build during the noisy-farm test (M8) | M5 |
+| 2026-11-09 | FR-3 AC 2 corrected: `villager zombie` cannot return none, because `minecraft:entity.zombie_villager.*` contains both words. The AND check is now "only sounds with both words", and `villager cow` is the query that returns none | M6 |
+| 2026-11-09 | The Search tab sits between Recently Played and Rules (FR-12.1 order). Its "?" button shows the syntax examples above the results; an empty search lists every known sound. Results have the Recently Played quick actions: Mute, Edit, Why? | M6 |

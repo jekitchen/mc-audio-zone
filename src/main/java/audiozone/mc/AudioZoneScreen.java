@@ -6,6 +6,9 @@ import audiozone.core.lists.RuleSummary;
 import audiozone.core.recent.RecentRow;
 import audiozone.core.recent.SortOrder;
 import audiozone.core.rules.Rule;
+import audiozone.core.search.SoundSearch;
+import audiozone.core.search.SoundEntry;
+import audiozone.core.search.SearchQuery;
 import audiozone.core.Translator;
 import audiozone.mc.ui.AzButton;
 import audiozone.mc.ui.AzDialog;
@@ -38,8 +41,11 @@ import net.minecraft.util.Util;
  */
 public final class AudioZoneScreen extends AzScreen {
 	public static final int TAB_RECENT = 0;
-	public static final int TAB_RULES = 1;
-	public static final int TAB_SETTINGS = 2;
+	public static final int TAB_SEARCH = 1;
+	public static final int TAB_RULES = 2;
+	public static final int TAB_SETTINGS = 3;
+	/** FR-3.4: results update 150 ms after the player stops typing. */
+	public static final long SEARCH_DELAY_MS = 150;
 	/** FR-1.6: the list refreshes at most 4 times per second (every 5 ticks). */
 	public static final int REFRESH_TICKS = 5;
 
@@ -57,6 +63,7 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/delete");
 	private static final Identifier WHY_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/help");
 	private static final int PAGE_WIDTH = 160;
+	private static final int SEEN_WIDTH = 150;
 	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
 
 	// Remembered while the game runs, like the last used tab.
@@ -69,6 +76,8 @@ public final class AudioZoneScreen extends AzScreen {
 		GENERAL, DIAGNOSTICS
 	}
 	private static String filter = "";
+	private static String searchText = "";
+	private static boolean searchHelp;
 
 	public AzList recentList;
 	public AzToggle pauseToggle;
@@ -76,6 +85,13 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzTextField filterField;
 	public AzToggle bypassToggle;
 	public AzList rulesList;
+	public AzTextField searchField;
+	public AzButton searchHelpButton;
+	public AzList searchList;
+	public int searchCount;
+	private boolean searchPending;
+	private long searchChangedAt;
+	private List<SoundEntry> searchEntries;
 	public AzButton addRuleButton;
 	public AzDropdown<SettingsPage> pageDropdown;
 	public AzButton copyReportButton;
@@ -100,6 +116,7 @@ public final class AudioZoneScreen extends AzScreen {
 		return List.of(
 				// FR-1.6: the Recently Played tab does not pause a singleplayer game, so sounds keep arriving.
 				new Tab(Component.translatable("audiozone.tab.recent"), false),
+				new Tab(Component.translatable("audiozone.tab.search"), true),
 				new Tab(Component.translatable("audiozone.tab.rules"), true),
 				new Tab(Component.translatable("audiozone.tab.settings"), true));
 	}
@@ -133,6 +150,8 @@ public final class AudioZoneScreen extends AzScreen {
 	protected void buildTab(int index, Body body) {
 		if (index == TAB_RECENT) {
 			buildRecent(body);
+		} else if (index == TAB_SEARCH) {
+			buildSearch(body);
 		} else if (index == TAB_RULES) {
 			buildRules(body);
 		} else {
@@ -190,6 +209,9 @@ public final class AudioZoneScreen extends AzScreen {
 			bypassToggle.setValue(ProfileManager.isBypassed());
 		}
 		ticks++;
+		if (currentTab() == TAB_SEARCH && searchPending && Util.getMillis() - searchChangedAt >= SEARCH_DELAY_MS) {
+			runSearch();
+		}
 		if (currentTab() == TAB_SETTINGS && settingsPage == SettingsPage.DIAGNOSTICS) {
 			diagnostics = Diagnostics.data();
 		}
@@ -266,6 +288,9 @@ public final class AudioZoneScreen extends AzScreen {
 	public void toggleMute(String soundId) {
 		ProfileManager.update(profile -> profile.isExactMuted(soundId) ? profile.unmuteExact(soundId) : profile.muteExact(soundId));
 		refresh();
+		if (currentTab() == TAB_SEARCH) {
+			runSearch();
+		}
 	}
 
 	private static String ago(long millis) {
@@ -284,6 +309,84 @@ public final class AudioZoneScreen extends AzScreen {
 		WeighedSoundEvents events = minecraft.getSoundManager().getSoundEvent(id);
 		Component subtitle = events == null ? null : events.getSubtitle();
 		return subtitle == null ? null : subtitle.getString();
+	}
+
+	// ---- Search (FR-3) ----
+
+	private void buildSearch(Body body) {
+		searchField = new AzTextField(font, body.width() - Theme.ICON_BUTTON_SIZE - Theme.GAP, Component.translatable("audiozone.search.field"))
+				.placeholder(Component.translatable("audiozone.search.hint"));
+		searchField.setMaxLength(200);
+		searchField.setValue(searchText);
+		searchField.onChange(text -> {
+			searchText = text;
+			searchPending = true;
+			searchChangedAt = Util.getMillis();
+		});
+		searchHelpButton = AzButton.icon(WHY_ICON,
+				Component.translatable(searchHelp ? "audiozone.search.help.hide" : "audiozone.search.help.show"), this::toggleSearchHelp);
+		body.row(searchField, searchHelpButton);
+		if (searchHelp) {
+			for (int i = 1; i <= SEARCH_HELP_LINES; i++) {
+				String key = "audiozone.search.help." + i;
+				body.label(() -> Component.translatable(key));
+			}
+		}
+		body.label(() -> Component.translatable(searchCount == 1 ? "audiozone.search.count.one" : "audiozone.search.count", searchCount));
+		searchList = new AzList(body.width(), 100, Component.translatable("audiozone.search.list"));
+		searchList.setEmptyText(() -> Component.translatable("audiozone.search.empty"));
+		body.fill(searchList);
+		searchEntries = null;
+		runSearch();
+	}
+
+	private static final int SEARCH_HELP_LINES = 7;
+
+	/** The "?" button shows or hides the syntax examples (FR-3.5). */
+	public void toggleSearchHelp() {
+		searchHelp = !searchHelp;
+		rebuildWidgets();
+		setInitialFocus(searchHelpButton);
+	}
+
+	public boolean isSearchHelpShown() {
+		return searchHelp;
+	}
+
+	/** Runs the query now (normally 150 ms after the last keystroke). */
+	public void runSearch() {
+		searchPending = false;
+		if (searchList == null || currentTab() != TAB_SEARCH) {
+			return;
+		}
+		if (searchEntries == null) {
+			// Built when the tab opens, so subtitles are in the current language and new resource packs are included.
+			List<String> ids = KnownSounds.ids();
+			searchEntries = new ArrayList<>(ids.size());
+			for (String id : ids) {
+				searchEntries.add(new SoundEntry(id, subtitle(id)));
+			}
+		}
+		List<SoundEntry> found = SoundSearch.search(searchEntries, SearchQuery.parse(searchText), KnownSounds.seenExcluded());
+		List<AzList.Row> rows = new ArrayList<>(found.size());
+		for (SoundEntry entry : found) {
+			String id = entry.id();
+			String name = entry.subtitle() == null ? id : entry.subtitle();
+			String category = RecentLog.get().sounds().seenCategory(id);
+			String seen = category == null ? "" : Component.translatable("audiozone.search.seen_as",
+					Component.translatable("soundCategory." + category)).getString();
+			List<AzList.Row.Column> columns = List.of(
+					new AzList.Row.Column(() -> name, 0, 0),
+					new AzList.Row.Column(() -> seen, SEEN_WIDTH, 0),
+					new AzList.Row.Column(() -> id, 0, 1));
+			rows.add(new AzList.Row(id, columns, List.of(muteButton(id), editSoundButton(id), whyButton(id))));
+		}
+		searchCount = found.size();
+		searchList.setRows(rows);
+	}
+
+	public String searchText() {
+		return searchText;
 	}
 
 	// ---- Rules (PRD 6.1, FR-4) ----
