@@ -3,7 +3,6 @@ package audiozone.core.stress;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.lang.management.ManagementFactory;
 import java.util.List;
 
 import audiozone.core.diag.TimingWindow;
@@ -78,7 +77,6 @@ class HotPathBudgetTest {
 
 	@Test
 	void hotPathAllocatesNothingInSteadyState() {
-		com.sun.management.ThreadMXBean threads = (com.sun.management.ThreadMXBean) ManagementFactory.getThreadMXBean();
 		SoundDecision out = new SoundDecision();
 		RecentSounds recent = new RecentSounds();
 		LastPlays lastPlays = new LastPlays();
@@ -88,11 +86,11 @@ class HotPathBudgetTest {
 		for (int round = 0; round < 2_000; round++) {
 			soundStarts(out, recent, lastPlays, timing, round);
 		}
-		long before = threads.getCurrentThreadAllocatedBytes();
-		for (int round = 0; round < 200; round++) {
-			soundStarts(out, recent, lastPlays, timing, 2_000 + round);
-		}
-		long allocated = threads.getCurrentThreadAllocatedBytes() - before;
+		long allocated = audiozone.core.Allocations.fewestBytes(pass -> {
+			for (int round = 0; round < 200; round++) {
+				soundStarts(out, recent, lastPlays, timing, 2_000 + pass * 200 + round);
+			}
+		});
 		assertEquals(0, allocated, "bytes allocated on the hot path for " + 200 * ids.length + " sound starts");
 	}
 

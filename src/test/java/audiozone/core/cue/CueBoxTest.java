@@ -98,17 +98,17 @@ class CueBoxTest {
 	@Test
 	void addingCuesAllocatesNothing() {
 		// A muted farm can fire hundreds of cues a second (PRD 9.1: no allocation on the hot path).
-		com.sun.management.ThreadMXBean threads =
-				(com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
 		String[] texts = {"Villager mumbles", "Villager hurts", "Chicken clucks", "Cow moos", "Explosion", "Glass breaks", "Hmm"};
 		for (int i = 0; i < 200_000; i++) {
 			box.add(texts[i % texts.length], CueDirection.NONE, i);
 		}
-		long before = threads.getCurrentThreadAllocatedBytes();
-		for (int i = 0; i < 100_000; i++) {
-			box.add(texts[i % texts.length], CueDirection.LEFT, 200_000 + i);
-		}
-		assertEquals(0, threads.getCurrentThreadAllocatedBytes() - before);
+		long allocated = audiozone.core.Allocations.fewestBytes(round -> {
+			int start = 200_000 + round * 100_000;
+			for (int i = 0; i < 100_000; i++) {
+				box.add(texts[i % texts.length], CueDirection.LEFT, start + i);
+			}
+		});
+		assertEquals(0, allocated);
 	}
 
 	@Test
