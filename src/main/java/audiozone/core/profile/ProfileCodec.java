@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,8 +50,8 @@ public final class ProfileCodec {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
-	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "settings", "globalRules", "zones",
-			"lastJoined", "boostConfirmed");
+	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "worldKey", "settings", "globalRules",
+			"zones", "lastJoined", "boostConfirmed");
 	private static final Set<String> SETTINGS_FIELDS = Set.of("showDistance", "cueDefault", "outlines", "edge");
 	private static final Set<String> RULE_FIELDS = Set.of("id", "enabled", "pattern", "mute", "volume", "cue", "limit");
 	private static final Set<String> LIMIT_FIELDS = Set.of("count", "windowMs", "perSource");
@@ -74,9 +75,22 @@ public final class ProfileCodec {
 	}
 
 	public static String toJson(Profile profile) {
+		return toJson(profile, null);
+	}
+
+	/**
+	 * The profile file's text, recording its world key (FR-11.3): file names are made safe for the file system, so the
+	 * key cannot be read back from the name. The key is not part of {@link Profile}; it is ignored when reading.
+	 *
+	 * @param worldKey the key to record, or null for none (exports and older callers)
+	 */
+	public static String toJson(Profile profile, String worldKey) {
 		JsonObject root = new JsonObject();
 		root.addProperty("schemaVersion", Profile.SCHEMA_VERSION);
 		root.addProperty("name", profile.name());
+		if (worldKey != null) {
+			root.addProperty("worldKey", worldKey);
+		}
 		if (profile.lastJoined() != null) {
 			root.addProperty("lastJoined", profile.lastJoined().toString());
 		}
@@ -193,6 +207,22 @@ public final class ProfileCodec {
 		json.add("edge", edge);
 		json.add("rules", rulesToJson(zone.rules()));
 		return json;
+	}
+
+	/**
+	 * The world key recorded in a profile file's text, without reading the rest. Empty if the file does not record one
+	 * (files saved before keys were recorded) or cannot be parsed.
+	 */
+	public static Optional<String> worldKeyOf(String text) {
+		try {
+			JsonElement key = parse(text).get("worldKey");
+			if (key != null && key.isJsonPrimitive() && key.getAsJsonPrimitive().isString() && !key.getAsString().isEmpty()) {
+				return Optional.of(key.getAsString());
+			}
+		} catch (ProfileFormatException e) {
+			// Unreadable: the Profiles tab shows the file without a key.
+		}
+		return Optional.empty();
 	}
 
 	/** @throws ProfileFormatException if the text is not a valid profile of a known schema version */

@@ -43,6 +43,11 @@ public record Zone(String id, String name, boolean enabled, String worldKey, Str
 		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, rules, mode, value, anchorType);
 	}
 
+	/** The same zone in another world (used when a copied world gets its own profile, FR-11.1). */
+	public Zone withWorldKey(String value) {
+		return new Zone(id, name, enabled, value, dimension, anchor, shape, rules, mode, edge, anchorType);
+	}
+
 	/** The same zone as a personal bubble that follows the local player. */
 	public Zone asBubble() {
 		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, rules, mode, edge, AnchorType.BUBBLE);
