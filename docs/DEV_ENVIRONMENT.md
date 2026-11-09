@@ -52,6 +52,8 @@ Run from the repo root. On Windows use `gradlew` (cmd/PowerShell) or `./gradlew`
 | Unit tests only | `./gradlew test` |
 | Launch the game with the mod (dev client) | `./gradlew runClient` |
 | Run the in-game milestone tests (opens a game window, needs a display) | `./gradlew runClientGameTest` (add the `-P` flags above for 26.2) |
+| Same, on a machine without an audio device | Set the environment variable `ALSOFT_DRIVERS=null` first (OpenAL Soft's silent output), as CI does |
+| Turn the dev client's per-sound log off/on | JVM property `-Daudiozone.logSounds=false` / `true` (on by default in the dev client, off in release jars) |
 | Generate Minecraft sources for browsing | `./gradlew genSources` |
 | Clean | `./gradlew clean` |
 

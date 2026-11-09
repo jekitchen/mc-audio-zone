@@ -63,6 +63,10 @@ jobs:
       - name: make gradle wrapper executable
         run: chmod +x ./gradlew
       - name: run client game tests
+        # Runners have no audio device; OpenAL Soft's silent "null" output keeps the sound engine running
+        # so the sound tests (M1 onward) can observe sounds.
+        env:
+          ALSOFT_DRIVERS: 'null'
         run: ./gradlew runClientGameTest -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }}
       - name: capture screenshots and logs
         if: always()

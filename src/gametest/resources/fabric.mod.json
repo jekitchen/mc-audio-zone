@@ -6,7 +6,8 @@
 	"environment": "client",
 	"entrypoints": {
 		"fabric-client-gametest": [
-			"audiozone.gametest.M0ClientGameTest"
+			"audiozone.gametest.M0ClientGameTest",
+			"audiozone.gametest.M1ClientGameTest"
 		]
 	},
 	"depends": {
