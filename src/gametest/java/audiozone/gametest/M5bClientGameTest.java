@@ -110,11 +110,13 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 				main(mc).selectTab(AudioZoneScreen.TAB_SETTINGS);
 				main(mc).setSettingsPage(AudioZoneScreen.SettingsPage.DIAGNOSTICS);
 			});
-			for (int i = 0; i < 30; i++) {
+			// The readout covers the last complete second, so keep sounds coming until one has been measured (slow CI
+			// machines can take well over a second for a fixed number of ticks).
+			DiagnosticsReport.Data data = null;
+			for (int i = 0; i < 200 && (data == null || data.sounds().count() == 0); i++) {
 				play(context, AMBIENT, false, 1);
+				data = context.computeOnClient(mc -> main(mc).diagnostics());
 			}
-			context.waitTicks(25);
-			DiagnosticsReport.Data data = context.computeOnClient(mc -> main(mc).diagnostics());
 			check(data.sounds().count() > 0 && data.sounds().averageMicros() > 0, "Diagnostics should show sounds per second and time per sound, was " + data);
 			check(data.globalRules() == 2 && !Double.isNaN(data.cacheHitRate()), "Diagnostics should count the rules and the cache, was " + data);
 			context.takeScreenshot("m5b-diagnostics");
