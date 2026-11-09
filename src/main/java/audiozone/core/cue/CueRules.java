@@ -16,12 +16,23 @@ public final class CueRules {
 	 */
 	public static String cueText(String soundId, String subtitle, float finalVolume, boolean byRule, boolean ruleCueOn,
 			boolean audible, CueSettings settings) {
-		if (!settings.showCues() || finalVolume > 0 || !byRule || !ruleCueOn || !audible) {
+		if (!shouldCue(subtitle != null, finalVolume, byRule, ruleCueOn, audible, settings)) {
 			return null;
 		}
-		if (subtitle != null) {
-			return subtitle;
+		return subtitle != null ? subtitle : soundId;
+	}
+
+	/**
+	 * Whether a cue is shown, without building its text: for the sound hook, which only fetches the subtitle when a
+	 * cue is due. When true, the text is the subtitle if there is one, otherwise the sound ID.
+	 *
+	 * @param hasSubtitle whether the sound has a vanilla subtitle
+	 */
+	public static boolean shouldCue(boolean hasSubtitle, float finalVolume, boolean byRule, boolean ruleCueOn,
+			boolean audible, CueSettings settings) {
+		if (!settings.showCues() || finalVolume > 0 || !byRule || !ruleCueOn || !audible) {
+			return false;
 		}
-		return settings.cueSoundsWithoutSubtitles() ? soundId : null;
+		return hasSubtitle || settings.cueSoundsWithoutSubtitles();
 	}
 }

@@ -211,6 +211,28 @@ public final class Precedence {
 		}
 	}
 
+	/**
+	 * Whether any zone could set this sound's loudness while it plays (FR-8.8): an enabled zone with a rule that sets
+	 * mute or volume for {@code soundId}, that is either a personal bubble or a fixed zone in this world and dimension.
+	 * A sound muted at start must still get a channel if so, so the per-tick loop can make it audible when the source
+	 * or the player moves (matrix case P12). Allocates nothing once each sound ID has been seen.
+	 */
+	public boolean anyZoneCouldSetLoudness(String soundId, String worldKey, String dimension) {
+		for (int i = 0; i < zones.length; i++) {
+			Zone zone = zones[i];
+			if (!zone.enabled()) {
+				continue;
+			}
+			if (!zone.isBubble() && (!worldKey.equals(zone.worldKey()) || !dimension.equals(zone.dimension()))) {
+				continue;
+			}
+			if (zoneRules[i].resolve(soundId).loudness() != null) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	/** Cache hits across the global list and every zone's list (FR-13.3). */
 	public long cacheHits() {
 		long total = global.cacheHits();
