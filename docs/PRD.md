@@ -526,7 +526,7 @@ Every screen is built only from these components. Version-specific drawing calls
 - **A-2 Six core tasks keyboard-only:** mute a recently played sound; edit a rule's volume; create a sphere zone at your position; change a zone's color; copy settings from another server; turn on Bypass.
 - **A-3 Readable text.** Text uses the vanilla font, never scaled below the GUI scale, with a contrast ratio of at least 4.5:1 against its background. Layouts pass at GUI scales 1 to 4 and Auto at 854 × 480 and 1920 × 1080.
 - **A-4 Narrator.** Where vanilla narration works (screens and widgets), every Audio Zone widget provides narration text: label, value, state, and errors.
-- **A-5 Color.** Default zone colors are the Okabe–Ito palette. No information relies on color alone: statuses have text and icons, zone modes use line style, cues use a "(muted)" prefix.
+- **A-5 Color.** Default zone colors are the Okabe–Ito palette. No information relies on color alone: statuses have text and icons, zone modes use line style, cues use a "(muted)" prefix. **Exception:** a slider's warning zone (e.g. volume above 100%) is shown on screen by its warning outline only; the slider's value is always shown as text, the tooltip explains the zone, and the narrator reads the warning.
 - **A-6 Motion.** A "Reduced motion" setting disables list animations and toast slide-ins.
 - **A-7 Cue readability.** Cue text scale (100% to 200%) and color are adjustable.
 
@@ -952,4 +952,4 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Code whose source must differ per Minecraft version goes in `src/main/versions/<version>/java` (same class name and API in each); everything else stays shared. 26.3 switched keyboard input from GLFW to SDL3 codes, so code always uses `InputConstants` names, never numbers | M2 |
 | 2026-11-09 | Sliders have no Home/End jump to the ends; arrows (±step) and Shift+arrows (fine step) plus the typed value are enough | maxismagical, M2 review |
 | 2026-11-09 | A text field shows its validation error only after the player edits it (or presses Save), so new empty fields do not start out red; invalid fields still block Save | maxismagical, M2 review |
-| 2026-11-09 | A slider's warning (e.g. "louder than vanilla") is not repeated on its label: the tooltip explains it and the narrator still reads it in the warning zone; on screen the zone is marked by the warning outline | maxismagical, M2 review |
+| 2026-11-09 | A slider's warning (e.g. "louder than vanilla") is not repeated on its label: the tooltip explains it and the narrator still reads it in the warning zone; on screen the zone is marked by the warning outline only, recorded as an exception to A-5 | maxismagical, M2 review |
