@@ -141,13 +141,43 @@ public final class Precedence {
 
 	/** Whether zone {@code i} at {@code dist} beats the current best zone (FR-9 steps 4 and 5). */
 	private boolean beats(int i, double dist, int best, double bestDist) {
-		if (best < 0) {
-			return true;
-		}
-		if (Math.abs(dist - bestDist) <= TIE_DISTANCE) {
-			// Zones are visited in list order, so on equal volume the earlier (higher) zone keeps the win.
-			return volumes[i] < volumes[best];
+		return best < 0 || beats(dist, volumes[i], bestDist, volumes[best]);
+	}
+
+	/**
+	 * The FR-9 tie-break between two zones that both set a property, for a zone visited after the current best:
+	 * the closer anchor wins; anchors within 0.01 blocks tie, and then the smaller shape wins. On a full tie the
+	 * earlier zone (higher in the list) keeps the win, so this returns false.
+	 */
+	public static boolean beats(double dist, double volume, double bestDist, double bestVolume) {
+		if (isDistanceTie(dist, bestDist)) {
+			return volume < bestVolume;
 		}
 		return dist < bestDist;
+	}
+
+	/** Whether two anchor distances count as equal (FR-9 step 5). */
+	public static boolean isDistanceTie(double a, double b) {
+		return Math.abs(a - b) <= TIE_DISTANCE;
+	}
+
+	/** The global list's resolver, for the sound trace (FR-14). */
+	public RuleResolver globalRules() {
+		return global;
+	}
+
+	/** Zones in list order, for the sound trace. */
+	public List<Zone> zones() {
+		return List.of(zones);
+	}
+
+	/** Resolver for zone {@code i}'s own rule list. */
+	public RuleResolver zoneRules(int i) {
+		return zoneRules[i];
+	}
+
+	/** Shape volume of zone {@code i}, as used for tie-breaks. */
+	public double zoneVolume(int i) {
+		return volumes[i];
 	}
 }

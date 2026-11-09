@@ -86,6 +86,11 @@ public final class RuleResolver {
 		return new RuleResolution(loudness, limit, cue);
 	}
 
+	/** Enabled rules, most specific first: the order winners are picked in. For the sound trace (FR-14). */
+	public List<Rule> rulesInOrder() {
+		return List.of(ordered);
+	}
+
 	/**
 	 * Rules that take over at least one of {@code rule}'s properties for at least one of {@code knownIds}, for the
 	 * rule editor's "Partly overridden by" line (FR-4.6). Not for the hot path.
