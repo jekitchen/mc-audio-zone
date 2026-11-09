@@ -136,6 +136,7 @@
 	"audiozone.settings.show_distance": "Show distance",
 	"audiozone.settings.show_distance.tip": "Show how far away each recently played sound was (Close, Near, Far). Turn off for servers that object to distance hints.",
 	"key.audiozone.bypass": "Bypass Audio Zone",
+	"key.audiozone.outlines": "Show zone outlines (cycle)",
 	"audiozone.header.profile": "Profile: %s",
 	"audiozone.bypass": "Bypass",
 	"audiozone.bypass.tip": "Turn every Audio Zone effect off at once (vanilla sound) without changing any rule. Hotkey: %s (on laptops you may need Fn+F10).",
@@ -287,6 +288,7 @@
 	"audiozone.settings.page": "Page",
 	"audiozone.settings.page.tip": "Choose a settings page",
 	"audiozone.settings.page.general": "General",
+	"audiozone.settings.page.zones": "Zones",
 	"audiozone.settings.page.diagnostics": "Diagnostics",
 	"audiozone.recent.why": "Why does it sound like this?",
 	"audiozone.diag.sounds": "Sounds per second: %s",
@@ -392,5 +394,13 @@
 	"audiozone.zone_editor.depth.hint": "depth",
 	"audiozone.dimension.minecraft.overworld": "the Overworld",
 	"audiozone.dimension.minecraft.the_nether": "the Nether",
-	"audiozone.dimension.minecraft.the_end": "the End"
+	"audiozone.dimension.minecraft.the_end": "the End",
+	"audiozone.settings.outlines": "Show zone outlines",
+	"audiozone.settings.outlines.always": "Always",
+	"audiozone.settings.outlines.editing": "Only while editing",
+	"audiozone.settings.outlines.never": "Never",
+	"audiozone.settings.outlines.tip": "Draw zones in the world: always, only the zone open in the zone editor, or never. Hotkey: %s.",
+	"audiozone.settings.outlines.key_unbound": "not set (Options → Controls)",
+	"audiozone.settings.through_blocks": "Outlines visible through blocks",
+	"audiozone.settings.through_blocks.tip": "Draw outlines and names on top of blocks, so you can see zones behind walls. They are your own zones, so this shows nothing about the world."
 }
