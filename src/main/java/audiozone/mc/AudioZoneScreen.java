@@ -2,16 +2,14 @@ package audiozone.mc;
 
 import audiozone.core.diag.DiagnosticsReport;
 import audiozone.core.diag.TimingWindow;
-import audiozone.core.lists.RuleSummary;
 import audiozone.core.recent.RecentRow;
 import audiozone.core.recent.SortOrder;
+import audiozone.core.profile.RuleTarget;
 import audiozone.core.rules.Rule;
 import audiozone.core.search.SoundSearch;
 import audiozone.core.search.SoundEntry;
 import audiozone.core.search.SearchQuery;
-import audiozone.core.Translator;
 import audiozone.mc.ui.AzButton;
-import audiozone.mc.ui.AzDialog;
 import audiozone.mc.ui.AzDropdown;
 import audiozone.mc.ui.AzList;
 import audiozone.mc.ui.AzScreen;
@@ -43,7 +41,8 @@ public final class AudioZoneScreen extends AzScreen {
 	public static final int TAB_RECENT = 0;
 	public static final int TAB_SEARCH = 1;
 	public static final int TAB_RULES = 2;
-	public static final int TAB_SETTINGS = 3;
+	public static final int TAB_ZONES = 3;
+	public static final int TAB_SETTINGS = 4;
 	/** FR-3.4: results update 150 ms after the player stops typing. */
 	public static final long SEARCH_DELAY_MS = 150;
 	/** FR-1.6: the list refreshes at most 4 times per second (every 5 ticks). */
@@ -55,17 +54,11 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final int CATEGORY_WIDTH = 95;
 	private static final int PLAYS_WIDTH = 75;
 	private static final int BAND_WIDTH = 60;
-	private static final int SUMMARY_WIDTH = 150;
 	private static final int ZONE_WIDTH = 110;
-	private static final int ON_OFF_WIDTH = 30;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/edit");
-	private static final Identifier UP_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/up");
-	private static final Identifier DOWN_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/down");
-	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/delete");
 	private static final Identifier WHY_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/help");
 	private static final int PAGE_WIDTH = 160;
 	private static final int SEEN_WIDTH = 150;
-	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
 
 	// Remembered while the game runs, like the last used tab.
 	private static SortOrder sort = SortOrder.MOST_RECENT;
@@ -86,6 +79,8 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzTextField filterField;
 	public AzToggle bypassToggle;
 	public AzList rulesList;
+	private RuleListPanel rulesPanel;
+	private ZoneListPanel zonesPanel;
 	public AzTextField searchField;
 	public AzButton searchHelpButton;
 	public AzList searchList;
@@ -119,6 +114,7 @@ public final class AudioZoneScreen extends AzScreen {
 				new Tab(Component.translatable("audiozone.tab.recent"), false),
 				new Tab(Component.translatable("audiozone.tab.search"), true),
 				new Tab(Component.translatable("audiozone.tab.rules"), true),
+				new Tab(Component.translatable("audiozone.tab.zones"), true),
 				new Tab(Component.translatable("audiozone.tab.settings"), true));
 	}
 
@@ -155,6 +151,8 @@ public final class AudioZoneScreen extends AzScreen {
 			buildSearch(body);
 		} else if (index == TAB_RULES) {
 			buildRules(body);
+		} else if (index == TAB_ZONES) {
+			buildZones(body);
 		} else {
 			buildSettings(body);
 		}
@@ -398,78 +396,44 @@ public final class AudioZoneScreen extends AzScreen {
 	// ---- Rules (PRD 6.1, FR-4) ----
 
 	private void buildRules(Body body) {
-		addRuleButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.rules.add"),
-				() -> minecraft.gui.setScreen(RuleEditorScreen.create(this))), Component.translatable("audiozone.rules.add.tip"));
-		body.row(addRuleButton);
-		body.label(() -> Component.translatable("audiozone.rules.hint"));
-		rulesList = new AzList(body.width(), 100, Component.translatable("audiozone.rules.list"));
-		rulesList.setEmptyText(() -> Component.translatable("audiozone.rules.empty"));
-		body.fill(rulesList);
-		refreshRules();
+		rulesPanel = new RuleListPanel(this, RuleTarget.GLOBAL);
+		rulesPanel.build(body);
+		addRuleButton = rulesPanel.addButton;
+		rulesList = rulesPanel.list;
 	}
 
 	/** Rebuilds the rule rows from the profile. The list keeps the focused row and button. */
 	public void refreshRules() {
-		if (rulesList == null || currentTab() != TAB_RULES) {
-			return;
+		if (rulesPanel != null && currentTab() == TAB_RULES) {
+			rulesPanel.refresh();
 		}
-		List<String> known = KnownSounds.ids();
-		List<Rule> rules = ProfileManager.profile().globalRules();
-		List<AzList.Row> rows = new ArrayList<>(rules.size());
-		for (int i = 0; i < rules.size(); i++) {
-			Rule rule = rules.get(i);
-			String pattern = rule.pattern().text();
-			String summary = RuleSummary.text(rule, TRANSLATOR);
-			String matches = RuleSummary.matchesPart(RuleSummary.matchCount(rule, known)).text(TRANSLATOR);
-			List<AzList.Row.Column> columns = List.of(
-					new AzList.Row.Column(() -> pattern, 0, 0),
-					new AzList.Row.Column(() -> summary, SUMMARY_WIDTH, 0),
-					new AzList.Row.Column(() -> matches, 0, 1));
-			List<AzButton> buttons = new ArrayList<>();
-			buttons.add(Tooltips.describe(AzButton.text(AzToggle.stateText(rule.enabled()), ON_OFF_WIDTH, () -> setRuleEnabled(rule.id(), !rule.enabled()))
-					.narrationContext(() -> Component.translatable("audiozone.rules.enabled")),
-					Component.translatable(rule.enabled() ? "audiozone.rules.turn_off" : "audiozone.rules.turn_on")));
-			buttons.add(AzButton.icon(EDIT_ICON, Component.translatable("audiozone.rules.edit"),
-					() -> minecraft.gui.setScreen(RuleEditorScreen.edit(this, rule))));
-			AzButton up = AzButton.icon(UP_ICON, Component.translatable("audiozone.rules.move_up"), () -> moveRule(rule.id(), -1));
-			up.active = i > 0;
-			buttons.add(up);
-			AzButton down = AzButton.icon(DOWN_ICON, Component.translatable("audiozone.rules.move_down"), () -> moveRule(rule.id(), 1));
-			down.active = i < rules.size() - 1;
-			buttons.add(down);
-			buttons.add(AzButton.icon(DELETE_ICON, Component.translatable("audiozone.rules.delete"), () -> confirmDelete(rule)));
-			rows.add(new AzList.Row(rule.id(), columns, buttons));
-		}
-		rulesList.setRows(rows);
 	}
 
-	/** FR-4.7: a rule can be turned off without deleting it; the effect stops at once. */
 	public void setRuleEnabled(String ruleId, boolean enabled) {
-		ProfileManager.update(profile -> {
-			Rule rule = profile.rule(ruleId);
-			return rule == null ? profile : profile.putRule(rule.withEnabled(enabled));
-		});
-		refreshRules();
+		rulesPanel.setEnabled(ruleId, enabled);
 	}
 
-	/** Moves a rule up or down; list order is the last tie-break between rules (FR-4.5 step 4). */
 	public void moveRule(String ruleId, int delta) {
-		ProfileManager.update(profile -> profile.moveRule(ruleId, delta));
-		refreshRules();
+		rulesPanel.move(ruleId, delta);
 	}
 
 	public void confirmDelete(Rule rule) {
-		minecraft.gui.setScreen(new AzDialog(this,
-				Component.translatable("audiozone.rules.delete.title"),
-				Component.translatable("audiozone.rules.delete.message", rule.pattern().text()),
-				List.of(new AzDialog.Choice(Component.translatable("audiozone.rules.delete.confirm"), () -> deleteRule(rule.id())),
-						new AzDialog.Choice(Component.translatable("audiozone.ui.cancel"), () -> { })),
-				1, 1));
+		rulesPanel.confirmDelete(rule);
 	}
 
 	public void deleteRule(String ruleId) {
-		ProfileManager.update(profile -> profile.removeRule(ruleId));
-		refreshRules();
+		rulesPanel.delete(ruleId);
+	}
+
+	// ---- Zones (PRD 6.1, FR-8) ----
+
+	private void buildZones(Body body) {
+		zonesPanel = new ZoneListPanel(this);
+		zonesPanel.build(body);
+	}
+
+	public ZoneListPanel zonesPanel() {
+		return zonesPanel;
 	}
 
 	// ---- Settings ----

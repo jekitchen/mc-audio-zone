@@ -5,9 +5,11 @@ import audiozone.core.editor.PatternPreview;
 import audiozone.core.editor.RuleDraft;
 import audiozone.core.editor.RuleDraft.Field;
 import audiozone.core.profile.Profile;
+import audiozone.core.profile.RuleTarget;
 import audiozone.core.rules.Rule;
 import audiozone.core.rules.RuleResolver;
 import audiozone.core.ui.SliderModel;
+import audiozone.core.zones.Zone;
 import audiozone.mc.ui.AzButton;
 import audiozone.mc.ui.AzDropdown;
 import audiozone.mc.ui.AzList;
@@ -55,6 +57,8 @@ public final class RuleEditorScreen extends AzScreen {
 	}
 
 	private final RuleDraft draft;
+	/** The global list, or one zone's list. */
+	private final RuleTarget target;
 	private PatternPreview preview;
 	private Component overridden = Component.empty();
 
@@ -66,20 +70,31 @@ public final class RuleEditorScreen extends AzScreen {
 	public AzList matchList;
 	public AzButton saveButton;
 
-	private RuleEditorScreen(Screen parent, RuleDraft draft, boolean isNew) {
+	private RuleEditorScreen(Screen parent, RuleTarget target, RuleDraft draft, boolean isNew) {
 		super(Component.translatable(isNew ? "audiozone.rule_editor.title.new" : "audiozone.rule_editor.title.edit"), parent);
+		this.target = target;
 		this.draft = draft;
 		updatePreview();
 	}
 
 	/** Opens the editor for a new rule. */
 	public static RuleEditorScreen create(Screen parent) {
-		return new RuleEditorScreen(parent, RuleDraft.blank(ProfileManager.profile().newRuleId(), false), true);
+		return create(parent, RuleTarget.GLOBAL);
+	}
+
+	/** Opens the editor for a new rule in a zone's list or the global list (FR-8.6). */
+	public static RuleEditorScreen create(Screen parent, RuleTarget target) {
+		return new RuleEditorScreen(parent, target, RuleDraft.blank(target.newRuleId(ProfileManager.profile()), false), true);
 	}
 
 	/** Opens the editor for an existing rule. */
 	public static RuleEditorScreen edit(Screen parent, Rule rule) {
-		return new RuleEditorScreen(parent, RuleDraft.of(rule, false), false);
+		return edit(parent, RuleTarget.GLOBAL, rule);
+	}
+
+	/** Opens the editor for an existing rule of a zone's list or the global list. */
+	public static RuleEditorScreen edit(Screen parent, RuleTarget target, Rule rule) {
+		return new RuleEditorScreen(parent, target, RuleDraft.of(rule, false), false);
 	}
 
 	/** Opens the editor on a sound's exact-ID rule, or a new exact-ID rule for it. */
@@ -114,6 +129,11 @@ public final class RuleEditorScreen extends AzScreen {
 
 	@Override
 	protected Component headerSubtitle() {
+		if (!target.isGlobal()) {
+			Zone zone = ProfileManager.profile().zone(target.zoneId());
+			String name = zone == null || zone.name() == null || zone.name().isBlank() ? target.zoneId() : zone.name();
+			return Component.translatable("audiozone.rule_editor.zone", name);
+		}
 		return Component.translatable("audiozone.header.profile", ProfileManager.profile().name());
 	}
 
@@ -262,8 +282,8 @@ public final class RuleEditorScreen extends AzScreen {
 			return;
 		}
 		Rule candidate = draft.build();
-		Profile withCandidate = ProfileManager.profile().putRule(candidate);
-		Set<Rule> winners = new RuleResolver(withCandidate.globalRules()).overriddenBy(candidate, preview.matches());
+		Profile withCandidate = target.put(ProfileManager.profile(), candidate);
+		Set<Rule> winners = new RuleResolver(target.rules(withCandidate)).overriddenBy(candidate, preview.matches());
 		if (!winners.isEmpty()) {
 			List<String> patterns = new ArrayList<>();
 			for (Rule winner : winners) {
@@ -302,7 +322,7 @@ public final class RuleEditorScreen extends AzScreen {
 			return false;
 		}
 		Rule rule = draft.build();
-		ProfileManager.update(profile -> profile.putRule(rule));
+		ProfileManager.update(profile -> target.put(profile, rule));
 		return true;
 	}
 }

@@ -43,6 +43,16 @@ public record Zone(String id, String name, boolean enabled, String worldKey, Str
 		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, rules, mode, value, anchorType);
 	}
 
+	/** The same zone with another rule list (FR-8.6). */
+	public Zone withRules(List<Rule> value) {
+		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, value, mode, edge, anchorType);
+	}
+
+	/** The same zone turned on or off. */
+	public Zone withEnabled(boolean value) {
+		return new Zone(id, name, value, worldKey, dimension, anchor, shape, rules, mode, edge, anchorType);
+	}
+
 	/** The same zone in another world (used when a copied world gets its own profile, FR-11.1). */
 	public Zone withWorldKey(String value) {
 		return new Zone(id, name, enabled, value, dimension, anchor, shape, rules, mode, edge, anchorType);
