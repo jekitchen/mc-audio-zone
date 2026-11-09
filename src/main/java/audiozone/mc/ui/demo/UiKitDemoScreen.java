@@ -265,9 +265,10 @@ public final class UiKitDemoScreen extends AzScreen {
 	}
 
 	@Override
-	protected void saveChanges() {
+	protected boolean saveChanges() {
 		lastAction = "Saved";
 		pretendUnsaved = false;
+		return true;
 	}
 
 	@Override

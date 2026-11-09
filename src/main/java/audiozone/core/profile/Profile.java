@@ -135,6 +135,63 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		return replace(existing, cleared);
 	}
 
+	/** The global rule with this ID, or null. */
+	public Rule rule(String id) {
+		for (Rule rule : globalRules) {
+			if (rule.id().equals(id)) {
+				return rule;
+			}
+		}
+		return null;
+	}
+
+	/** Saves a rule from the editor: replaces the rule with the same ID in place, or adds it at the end. */
+	public Profile putRule(Rule rule) {
+		Rule existing = rule(rule.id());
+		return existing == null ? withRules(append(rule)) : replace(existing, rule);
+	}
+
+	/** Deletes the rule with this ID; returns this profile if there is none. */
+	public Profile removeRule(String id) {
+		Rule existing = rule(id);
+		if (existing == null) {
+			return this;
+		}
+		List<Rule> rules = new ArrayList<>(globalRules);
+		rules.remove(existing);
+		return withRules(rules);
+	}
+
+	/**
+	 * Moves a rule up ({@code delta < 0}) or down the list. List order is the last tie-break between rules (FR-4.5
+	 * step 4). Returns this profile if the rule is missing or already at that end.
+	 */
+	public Profile moveRule(String id, int delta) {
+		Rule existing = rule(id);
+		if (existing == null) {
+			return this;
+		}
+		int from = globalRules.indexOf(existing);
+		int to = Math.max(0, Math.min(globalRules.size() - 1, from + delta));
+		if (to == from) {
+			return this;
+		}
+		List<Rule> rules = new ArrayList<>(globalRules);
+		rules.remove(from);
+		rules.add(to, existing);
+		return withRules(rules);
+	}
+
+	/** An ID for a new rule from the editor: {@code r1}, {@code r2}, … the first one not in use. */
+	public String newRuleId() {
+		for (int n = 1; ; n++) {
+			String id = "r" + n;
+			if (rule(id) == null) {
+				return id;
+			}
+		}
+	}
+
 	/** Stable ID for a quick-action rule, so muting the same sound twice cannot create two rules. */
 	static String exactRuleId(String soundId) {
 		return "exact:" + soundId;
