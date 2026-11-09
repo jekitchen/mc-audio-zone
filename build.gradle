@@ -15,6 +15,14 @@ repositories {
 	// Add mod repositories here when needed (e.g. Mod Menu at M8: https://maven.terraformersmc.com/).
 }
 
+// Version-specific source: src/main/versions/<minecraft_version>/java holds the few classes whose code differs
+// between Minecraft versions (each version keeps the same class names and public API). See docs/PORTING.md.
+def versionSources = file("src/main/versions/${project.minecraft_version}/java")
+if (!versionSources.isDirectory()) {
+	throw new GradleException("No version-specific sources for Minecraft ${project.minecraft_version}: expected ${versionSources}")
+}
+sourceSets.main.java.srcDir versionSources
+
 // Client game tests (src/gametest): launch the real game and drive it. Run with ./gradlew runClientGameTest
 fabricApi {
 	configureTests {
