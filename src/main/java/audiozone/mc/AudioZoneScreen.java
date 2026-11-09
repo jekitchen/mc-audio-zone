@@ -2,6 +2,7 @@ package audiozone.mc;
 
 import audiozone.core.diag.DiagnosticsReport;
 import audiozone.core.diag.TimingWindow;
+import audiozone.core.outline.OutlineMode;
 import audiozone.core.recent.RecentRow;
 import audiozone.core.recent.SortOrder;
 import audiozone.core.profile.RuleTarget;
@@ -58,6 +59,7 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/edit");
 	private static final Identifier WHY_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/help");
 	private static final int PAGE_WIDTH = 160;
+	private static final int OUTLINE_MODE_WIDTH = 240;
 	private static final int SEEN_WIDTH = 150;
 
 	// Remembered while the game runs, like the last used tab.
@@ -67,7 +69,7 @@ public final class AudioZoneScreen extends AzScreen {
 
 	/** Settings pages (PRD 6.1); Zones and Accessibility arrive with their milestones. */
 	public enum SettingsPage {
-		GENERAL, DIAGNOSTICS
+		GENERAL, ZONES, DIAGNOSTICS
 	}
 	private static String filter = "";
 	private static String searchText = "";
@@ -91,6 +93,8 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzButton addRuleButton;
 	public AzDropdown<SettingsPage> pageDropdown;
 	public AzButton copyReportButton;
+	public AzDropdown<OutlineMode> outlineModeDropdown;
+	public AzToggle throughBlocksToggle;
 	private DiagnosticsReport.Data diagnostics;
 	public int refreshCount;
 	private int ticks;
@@ -448,6 +452,10 @@ public final class AudioZoneScreen extends AzScreen {
 			buildDiagnostics(body);
 			return;
 		}
+		if (settingsPage == SettingsPage.ZONES) {
+			buildZoneSettings(body);
+			return;
+		}
 		body.label(() -> Component.translatable("audiozone.settings.bypass_hint", bypassKeyName()));
 		body.row(Tooltips.describe(new AzToggle(160, Component.translatable("audiozone.settings.show_distance"),
 				AudioZoneSettings.showDistance(), AudioZoneSettings::setShowDistance),
@@ -465,6 +473,26 @@ public final class AudioZoneScreen extends AzScreen {
 
 	public SettingsPage settingsPage() {
 		return settingsPage;
+	}
+
+	/** Settings → Zones (PRD 6.1): FR-10.1 "Show zone outlines" and FR-10.5 "Outlines visible through blocks". */
+	private void buildZoneSettings(Body body) {
+		outlineModeDropdown = Tooltips.describe(new AzDropdown<>(OUTLINE_MODE_WIDTH, Component.translatable("audiozone.settings.outlines"),
+				List.of(OutlineMode.values()),
+				mode -> Component.translatable("audiozone.settings.outlines." + mode.name().toLowerCase(Locale.ROOT)),
+				AudioZoneSettings.outlineMode(), AudioZoneSettings::setOutlineMode),
+				Component.translatable("audiozone.settings.outlines.tip", outlinesKeyName()));
+		body.row(outlineModeDropdown);
+		throughBlocksToggle = Tooltips.describe(new AzToggle(OUTLINE_MODE_WIDTH, Component.translatable("audiozone.settings.through_blocks"),
+				AudioZoneSettings.outlinesThroughBlocks(), AudioZoneSettings::setOutlinesThroughBlocks),
+				Component.translatable("audiozone.settings.through_blocks.tip"));
+		body.row(throughBlocksToggle);
+	}
+
+	private static Component outlinesKeyName() {
+		return audiozone.AudioZoneClient.outlinesKey.isUnbound()
+				? Component.translatable("audiozone.settings.outlines.key_unbound")
+				: audiozone.AudioZoneClient.outlinesKey.getTranslatedKeyMessage();
 	}
 
 	/** FR-13.3: live numbers, refreshed every tick, and Copy report. */

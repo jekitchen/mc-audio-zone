@@ -95,6 +95,25 @@ public final class ZoneEditorScreen extends AzScreen {
 		return new ZoneEditorScreen(parent, ZoneDraft.of(zone, color, color), zone.id(), false);
 	}
 
+	/**
+	 * The zone open in the zone editor, as currently edited (FR-10.1 "Only while editing"; outlines follow the editor
+	 * live). Its saved version while the editor's values are invalid; {@code null} when no zone editor is open.
+	 */
+	public static Zone editingZone(Minecraft minecraft) {
+		if (!(minecraft.gui.screen() instanceof ZoneEditorScreen editor)) {
+			return null;
+		}
+		return editor.draft.canSave() ? editor.draft.build() : ProfileManager.profile().zone(editor.zoneId);
+	}
+
+	/** The color chosen in the open zone editor, as {@code 0xRRGGBB}. */
+	public static int editingColor(Minecraft minecraft) {
+		if (minecraft.gui.screen() instanceof ZoneEditorScreen editor && editor.draft.error(Field.COLOR) == null) {
+			return editor.draft.color();
+		}
+		return ZoneColors.next(List.of());
+	}
+
 	public ZoneDraft draft() {
 		return draft;
 	}
@@ -199,6 +218,7 @@ public final class ZoneEditorScreen extends AzScreen {
 		text.placeholder(Component.translatable("audiozone.zone_editor." + key + ".hint"));
 		text.setMaxLength(16);
 		text.setValue(draft.text(field));
+		text.moveCursorToStart(false); // a long number shows its start, not its last digits
 		text.validator(value -> {
 			if (!value.equals(draft.text(field))) {
 				draft.set(field, value);
@@ -264,6 +284,9 @@ public final class ZoneEditorScreen extends AzScreen {
 		xField.setValue(draft.text(Field.X));
 		yField.setValue(draft.text(Field.Y));
 		zField.setValue(draft.text(Field.Z));
+		for (AzTextField field : List.of(xField, yField, zField)) {
+			field.moveCursorToStart(false);
+		}
 		changed();
 	}
 
