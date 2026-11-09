@@ -4,7 +4,10 @@ import audiozone.AudioZoneClient;
 import audiozone.core.diag.ErrorBudget;
 import audiozone.core.diag.TimingWindow;
 import audiozone.core.recent.PlayStatus;
-import audiozone.core.rules.RuleResolution;
+import audiozone.core.start.SoundStart;
+import audiozone.core.start.SoundStartDecider;
+import audiozone.core.start.SoundStartResult;
+import audiozone.core.zones.Precedence;
 import audiozone.core.trace.LastPlays;
 import audiozone.core.SoundRange;
 import java.util.HashMap;
@@ -14,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.Sound;
 import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.sounds.SoundSource;
@@ -47,10 +51,20 @@ public final class SoundHook {
 	private static final Map<Identifier, String> ID_STRINGS = new HashMap<>();
 	/** The volume factor decided by the last {@link #onSoundStart}, used once by {@link #applyStartVolume}. */
 	private static float startFactor = 1.0F;
+	/** The sound {@link #onSoundStart} just decided, until {@link #applyStartVolume} tracks it. */
+	private static SoundInstance pendingInstance;
+	private static String pendingId;
+	private static boolean pendingTracked;
+	/** Start volume factor of a sound that a zone mutes but may unmute while it plays: inaudible, but not zero. */
+	static final float SILENT = 1.0E-6F;
+	private static final SoundStart START = new SoundStart();
+	private static final SoundStartResult RESULT = new SoundStartResult();
+	private static Precedence deciderProfile;
 	private static float lastAppliedFactor = 1.0F;
 	private static float lastStartFactor = 1.0F;
 	private static final TimingWindow SOUND_TIMING = new TimingWindow();
 	private static final LastPlays LAST_PLAYS = new LastPlays();
+	private static final SoundStartDecider DECIDER = new SoundStartDecider(LAST_PLAYS);
 
 	private SoundHook() {
 	}
@@ -72,10 +86,12 @@ public final class SoundHook {
 	public static boolean onSoundStart(SoundInstance instance) {
 		long started = System.nanoTime();
 		startFactor = 1.0F;
+		pendingInstance = null;
 		try {
 			return handle(instance);
 		} catch (RuntimeException | LinkageError e) {
 			startFactor = 1.0F;
+			pendingInstance = null;
 			failOpen(e);
 			return false;
 		} finally {
@@ -84,6 +100,7 @@ public final class SoundHook {
 	}
 
 	private static boolean handle(SoundInstance instance) {
+		Minecraft minecraft = Minecraft.getInstance();
 		Sound sound = instance.getSound();
 		boolean relative = instance.isRelative();
 		boolean noAttenuation = instance.getAttenuation() == SoundInstance.Attenuation.NONE;
@@ -92,7 +109,7 @@ public final class SoundHook {
 
 		double distanceSq = 0.0;
 		if (!relative) {
-			Vec3 listener = Minecraft.getInstance().getSoundManager().getListenerTransform().position();
+			Vec3 listener = minecraft.getSoundManager().getListenerTransform().position();
 			double dx = instance.getX() - listener.x();
 			double dy = instance.getY() - listener.y();
 			double dz = instance.getZ() - listener.z();
@@ -102,19 +119,50 @@ public final class SoundHook {
 		Identifier id = instance.getIdentifier();
 		String idString = idString(id);
 
-		PlayStatus status = PlayStatus.PLAYING;
-		RuleResolution decision = decide(instance.getSource(), idString);
-		if (decision != null) {
-			if (decision.muted()) {
-				status = PlayStatus.MUTED;
-			} else {
-				startFactor = decision.effectiveVolumePercent() / 100.0F;
+		// Decide: global rules, zones and precedence (core SoundStartDecider). Outside a world nothing is decided.
+		SoundStartResult result = null;
+		if (ProfileManager.isLoaded()) {
+			Precedence precedence = ProfileManager.precedence();
+			if (precedence != deciderProfile) {
+				DECIDER.setProfile(precedence);
+				deciderProfile = precedence;
 			}
+			SoundStart in = START;
+			in.reset();
+			in.soundId = idString;
+			in.vanillaCovered = isVanillaCovered(instance.getSource());
+			in.positional = !relative;
+			in.range = range;
+			in.distanceSq = distanceSq;
+			in.worldKey = ProfileManager.key();
+			in.dimension = WorldSession.dimension(minecraft);
+			in.x = instance.getX();
+			in.y = instance.getY();
+			in.z = instance.getZ();
+			if (minecraft.player != null) {
+				Vec3 eye = minecraft.player.getEyePosition();
+				in.px = eye.x;
+				in.py = eye.y;
+				in.pz = eye.z;
+			}
+			WeighedSoundEvents events = minecraft.getSoundManager().getSoundEvent(id);
+			in.hasSubtitle = events != null && events.getSubtitle() != null;
+			in.bypass = ProfileManager.isBypassed();
+			in.nowMs = Util.getMillis();
+			result = RESULT;
+			DECIDER.start(in, result);
 		}
-		// Zones arrive in M7; until then the trace needs no world or dimension (and building their names here would
-		// allocate on every sound).
-		LAST_PLAYS.record(idString, !relative, "", "", instance.getX(), instance.getY(), instance.getZ(),
-				decision == null ? 100 : decision.effectiveVolumePercent(), false, false);
+
+		PlayStatus status = result == null ? PlayStatus.PLAYING : result.status();
+		boolean handled = result != null && result.handled();
+		if (handled && !result.cancel()) {
+			// A sound muted by a zone starts silently, so the per-tick check can bring it back (FR-8.8). Vanilla skips
+			// a sound whose volume is exactly 0, so it starts at an inaudible volume instead.
+			startFactor = result.factor() > 0 ? result.factor() : SILENT;
+			pendingInstance = instance;
+			pendingId = idString;
+			pendingTracked = !relative;
+		}
 
 		SoundObservation o = OBSERVATION;
 		o.id = id;
@@ -129,18 +177,11 @@ public final class SoundHook {
 		o.distance = Math.sqrt(distanceSq);
 		o.audible = SoundRange.isAudible(range, distanceSq);
 		o.status = status;
+		o.zoneName = handled ? result.zoneName() : null;
 		for (SoundObserver observer : OBSERVERS) {
 			observer.onSound(o);
 		}
-		return status == PlayStatus.MUTED;
-	}
-
-	/** The global rules' decision for this sound, or null when Audio Zone leaves it alone (Bypass, vanilla-covered). */
-	private static RuleResolution decide(SoundSource source, String idString) {
-		if (ProfileManager.isBypassed() || isVanillaCovered(source)) {
-			return null;
-		}
-		return ProfileManager.rules().resolve(idString);
+		return handled && result.cancel();
 	}
 
 	/** Sounds with their own vanilla slider: Audio Zone never changes them (PRD section 5, Q8). */
@@ -163,10 +204,20 @@ public final class SoundHook {
 	 */
 	public static float applyStartVolume(float vanillaVolume) {
 		float factor = startFactor;
+		SoundInstance instance = pendingInstance;
 		startFactor = 1.0F;
+		pendingInstance = null;
 		lastAppliedFactor = factor;
 		lastStartFactor = factor;
-		return vanillaVolume * factor;
+		float gain = vanillaVolume * factor;
+		if (instance != null && pendingTracked && gain > 0) {
+			try {
+				PlayingChannels.get().start(instance, pendingId, vanillaVolume, gain);
+			} catch (RuntimeException | LinkageError e) {
+				failOpen(e);
+			}
+		}
+		return gain;
 	}
 
 	/**
@@ -175,8 +226,16 @@ public final class SoundHook {
 	 */
 	public static float applyVolume(SoundInstance instance, float vanillaVolume) {
 		try {
-			RuleResolution decision = decide(instance.getSource(), idString(instance.getIdentifier()));
-			float factor = decision == null ? 1.0F : decision.effectiveVolumePercent() / 100.0F;
+			float tracked = PlayingChannels.get().recalculated(instance, vanillaVolume);
+			if (!Float.isNaN(tracked)) {
+				lastAppliedFactor = vanillaVolume == 0 ? 1.0F : tracked / vanillaVolume;
+				return tracked;
+			}
+			float factor = 1.0F;
+			if (ProfileManager.isLoaded() && !ProfileManager.isBypassed() && !isVanillaCovered(instance.getSource())) {
+				// Not tracked (non-positional, or the table was full): only global rules apply.
+				factor = Math.min(ProfileManager.rules().resolve(idString(instance.getIdentifier())).effectiveVolumePercent(), 100) / 100.0F;
+			}
 			lastAppliedFactor = factor;
 			return vanillaVolume * factor;
 		} catch (RuntimeException | LinkageError e) {

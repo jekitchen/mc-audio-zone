@@ -3,7 +3,9 @@
 	"package": "audiozone.mc.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
-		"SoundEngineMixin"
+		"SoundEngineAccessor",
+		"SoundEngineMixin",
+		"SoundManagerAccessor"
 	],
 	"injectors": {
 		"defaultRequire": 1

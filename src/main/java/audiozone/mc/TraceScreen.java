@@ -19,7 +19,7 @@ import net.minecraft.network.chat.Component;
 /**
  * The "Why does this sound like this?" panel (PRD FR-14, read-only MVP). Built when it opens from the sound's last
  * play (FR-14.6); the lines on screen are the same text "Copy trace" puts on the clipboard (FR-14.5), so the two
- * never disagree. Zones join the trace in M7.
+ * never disagree. Zones are included since M7.
  */
 public final class TraceScreen extends AzScreen {
 	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
@@ -33,7 +33,7 @@ public final class TraceScreen extends AzScreen {
 	public TraceScreen(Screen parent, String soundId) {
 		super(Component.translatable("audiozone.trace.title"), parent);
 		this.soundId = soundId;
-		Precedence precedence = new Precedence(ProfileManager.profile().globalRules(), List.of());
+		Precedence precedence = ProfileManager.precedence();
 		this.trace = SoundTracer.trace(precedence, soundId, SoundHook.lastPlays().get(soundId), ProfileManager.isBypassed(),
 				SoundSearch.isVanillaCovered(soundId) || KnownSounds.seenExcluded().contains(soundId));
 		this.text = TraceText.of(trace, TRANSLATOR);

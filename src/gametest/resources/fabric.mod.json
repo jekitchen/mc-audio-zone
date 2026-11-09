@@ -13,7 +13,11 @@
 			"audiozone.gametest.M3ClientGameTest",
 			"audiozone.gametest.M4ClientGameTest",
 			"audiozone.gametest.M5ClientGameTest",
-			"audiozone.gametest.M5bClientGameTest"
+			"audiozone.gametest.M5bClientGameTest",
+			"audiozone.gametest.M6ClientGameTest",
+			"audiozone.gametest.M7ClientGameTest",
+			"audiozone.gametest.M7bClientGameTest",
+			"audiozone.gametest.M7cClientGameTest"
 		]
 	},
 	"depends": {

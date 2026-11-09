@@ -188,7 +188,7 @@ Browse every sound the game knows by name or ID.
 **Acceptance criteria**
 
 - [ ] Type `villager`: only villager-related sounds appear, with a count.
-- [ ] Type `villager|zombie`: both families appear; `villager zombie` returns none (no ID contains both).
+- [ ] Type `villager|zombie`: both families appear; `villager zombie` returns only sounds whose ID or subtitle has both words (the zombie villager family); `villager cow` returns none.
 - [ ] Type `villager -ambient`: no result contains "ambient".
 - [ ] Install a resource pack that adds a new sound in `sounds.json`, press F3+T, search its name: it appears.
 - [ ] (v1) Type `/entity\.(cow|pig)\..*/`: only cow and pig sounds; type `/(/`: a readable error appears and the game does not freeze.
@@ -974,3 +974,15 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | The "Why?" panel shows the same lines that Copy trace copies, one list row per line, so the two never disagree. Losing rules say "overridden by <rule>" in words rather than only being grayed out. Until zones (M7), every trace says "No zone affects this sound" | M5 |
 | 2026-11-09 | Settings pages are chosen with a "Page" dropdown at the top of the Settings tab (General, Diagnostics; Zones and Accessibility come with their milestones). Diagnostics refreshes every tick; the per-tick re-check and outline readouts stay at zero until M7 | M5 |
 | 2026-11-09 | Diagnostics' "time per sound" covers the whole sound-start hook, including observers. Development builds also log every sound (M1), which dominates that number there; the 5 µs budget is checked in a release build during the noisy-farm test (M8) | M5 |
+| 2026-11-09 | FR-3 AC 2 corrected: `villager zombie` cannot return none, because `minecraft:entity.zombie_villager.*` contains both words. The AND check is now "only sounds with both words", and `villager cow` is the query that returns none | M6 |
+| 2026-11-09 | The Search tab sits between Recently Played and Rules (FR-12.1 order). Its "?" button shows the syntax examples above the results; an empty search lists every known sound. Results have the Recently Played quick actions: Mute, Edit, Why? | M6 |
+| 2026-11-09 | M7 is built in three parts: M7a = profile per server/world (FR-11.1) and the zone engine (zones in precedence, per-tick re-check, "Zone: name" in Recently Played, zones in the trace); M7b = Zones tab and zone editor; M7c = outlines | M7 |
+| 2026-11-09 | Outside a world no profile is loaded and every sound plays as in vanilla. The M4 single profile (`default.json`) is no longer read | M7 |
+| 2026-11-09 | A Realm uses its server address as its world key, because the client does not know the Realm ID (`realms:<id>` in FR-11.1 is not available) | M7 |
+| 2026-11-09 | A sound that a zone mutes, or that a zone could unmute while it plays, starts at an inaudible volume (gain 0.000001) instead of 0, because vanilla never starts a sound whose volume is exactly 0; the per-tick check then sets its real volume (FR-8.8) | M7 |
+| 2026-11-09 | A zone's own rules are edited on a "Zone rules" screen (same list and editor as the global Rules tab), opened from the zone row or the editor's footer. Opening it from the editor saves the zone first, because a zone must exist to hold rules | M7 |
+| 2026-11-09 | The MVP zone editor offers sphere and box only; Outside mode, fade edges, cylinders and personal bubbles arrive with M13, and a zone's existing settings for them are kept. Zones have Move up/down buttons, because list order is the last tie-break (FR-9 step 5) | M7 |
+| 2026-11-09 | A zone's color shows as a square at the start of its row in the zone list; the row's text still says everything (A-5) | M7 |
+| 2026-11-09 | Outlines use vanilla's gizmo lines and billboard labels (the same API in 26.2 and 26.3), emitted at the end of level extraction; "through blocks" uses the gizmos' always-on-top mode. Labels are white for contrast (A-3); the zone's color is on its lines | M7 |
+| 2026-11-09 | "Show zone outlines" (a profile setting) and "Outlines visible through blocks" (app-wide, in `config/audiozone/settings.json`) are on a new Settings → Zones page. The optional outlines hotkey (unbound) cycles Always, Only while editing, Never | M7 |
+| 2026-11-09 | The zone open in the zone editor is outlined from the editor's current values, so size and shape changes show before Save | M7 |

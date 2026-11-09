@@ -1,11 +1,16 @@
 package audiozone;
 
+import audiozone.mc.AppSettingsManager;
 import audiozone.mc.AudioZoneScreen;
+import audiozone.mc.AudioZoneSettings;
 import audiozone.mc.BypassLabel;
 import audiozone.mc.Notices;
+import audiozone.mc.PlayingChannels;
 import audiozone.mc.ProfileManager;
 import audiozone.mc.RecentLog;
 import audiozone.mc.SoundLogger;
+import audiozone.mc.WorldSession;
+import audiozone.mc.ZoneOutlines;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -37,6 +42,8 @@ public final class AudioZoneClient implements ClientModInitializer {
 
 	public static KeyMapping openKey;
 	public static KeyMapping bypassKey;
+	/** FR-10.1: optional hotkey for "Show zone outlines", unbound by default. */
+	public static KeyMapping outlinesKey;
 
 	@Override
 	public void onInitializeClient() {
@@ -45,11 +52,19 @@ public final class AudioZoneClient implements ClientModInitializer {
 				"key.audiozone.open", DEFAULT_OPEN_KEY, KEY_CATEGORY));
 		bypassKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.audiozone.bypass", DEFAULT_BYPASS_KEY, KEY_CATEGORY));
+		outlinesKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+				"key.audiozone.outlines", InputConstants.UNKNOWN.getValue(), KEY_CATEGORY));
 
 		Notices.register();
+		AppSettingsManager.init(FabricLoader.getInstance().getConfigDir());
 		ProfileManager.init(FabricLoader.getInstance().getConfigDir());
+		WorldSession.register();
+		ZoneOutlines.register();
 		ClientTickEvents.END_CLIENT_TICK.register(AudioZoneClient::onEndTick);
-		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ProfileManager.flushSaves());
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+			ProfileManager.flushSaves();
+			AppSettingsManager.flushSaves();
+		});
 		SoundLogger.registerIfEnabled();
 		RecentLog.register();
 		BypassLabel.register();
@@ -66,5 +81,10 @@ public final class AudioZoneClient implements ClientModInitializer {
 		while (bypassKey.consumeClick()) {
 			ProfileManager.toggleBypass();
 		}
+		while (outlinesKey.consumeClick()) {
+			AudioZoneSettings.cycleOutlineMode();
+		}
+		// FR-8.8: re-decide playing sounds every tick (zones, moving sources, Bypass).
+		PlayingChannels.get().tick(minecraft);
 	}
 }

@@ -102,7 +102,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 
 			// The mute survives a restart: it is in the file, and re-reading the file brings it back.
 			context.runOnClient(mc -> ProfileManager.flushSaves());
-			Path file = context.computeOnClient(mc -> ProfileManager.store().fileFor(ProfileManager.DEFAULT_KEY));
+			Path file = context.computeOnClient(mc -> ProfileManager.store().fileFor(ProfileManager.key()));
 			String json = read(file);
 			check(json.contains("\"schemaVersion\": " + Profile.SCHEMA_VERSION) && json.contains(VILLAGER) && json.contains("\"mute\": true"),
 					"the profile file should hold the mute rule, was:\n" + json);
