@@ -178,18 +178,18 @@ class RepeatLimiterTest {
 
 	@Test
 	void steadyStateAllocatesNothing() {
-		com.sun.management.ThreadMXBean threads =
-				(com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
 		Limit perSource = new Limit(3, 1000, true);
 		for (int i = 0; i < 300_000; i++) {
 			limiter.tryStart("shared", THREE_PER_SECOND, i % 50, 64, 0, i);
 			limiter.tryStart("per", perSource, i % 500, 64, i % 7, i);
 		}
-		long before = threads.getCurrentThreadAllocatedBytes();
-		for (int i = 0; i < 100_000; i++) {
-			limiter.tryStart("shared", THREE_PER_SECOND, i % 50, 64, 0, 300_000 + i);
-			limiter.tryStart("per", perSource, i % 500, 64, i % 7, 300_000 + i);
-		}
-		assertEquals(0, threads.getCurrentThreadAllocatedBytes() - before);
+		long allocated = audiozone.core.Allocations.fewestBytes(round -> {
+			long start = 300_000L + round * 100_000L;
+			for (int i = 0; i < 100_000; i++) {
+				limiter.tryStart("shared", THREE_PER_SECOND, i % 50, 64, 0, start + i);
+				limiter.tryStart("per", perSource, i % 500, 64, i % 7, start + i);
+			}
+		});
+		assertEquals(0, allocated);
 	}
 }

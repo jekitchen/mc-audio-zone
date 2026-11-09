@@ -77,8 +77,36 @@ public final class Precedence {
 	 */
 	public void decide(String soundId, boolean positional, String worldKey, String dimension, double x, double y, double z,
 			double px, double py, double pz, SoundDecision out) {
+		decide(soundId, null, positional, worldKey, dimension, x, y, z, px, py, pz, out);
+	}
+
+	/**
+	 * Fills {@code out} with what each rule list resolves {@code soundId} to: index 0 is the global list, index
+	 * {@code i + 1} is zone {@code i}. For callers that decide the same sound again and again, such as the per-tick
+	 * re-evaluation of playing sounds (FR-8.8): resolve once per profile snapshot, then use {@link #decideResolved}.
+	 *
+	 * @param out at least {@link #zoneCount()} + 1 long
+	 */
+	public void resolve(String soundId, RuleResolution[] out) {
+		out[0] = global.resolve(soundId);
+		for (int i = 0; i < zones.length; i++) {
+			out[i + 1] = zoneRules[i].resolve(soundId);
+		}
+	}
+
+	/**
+	 * The same decision as {@link #decide(String, boolean, String, String, double, double, double, double, double,
+	 * double, SoundDecision)}, from resolutions {@link #resolve} filled for this snapshot. Skips the per-ID lookups.
+	 */
+	public void decideResolved(RuleResolution[] resolved, boolean positional, String worldKey, String dimension,
+			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
+		decide(null, resolved, positional, worldKey, dimension, x, y, z, px, py, pz, out);
+	}
+
+	private void decide(String soundId, RuleResolution[] resolved, boolean positional, String worldKey, String dimension,
+			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
 		out.reset();
-		RuleResolution g = global.resolve(soundId);
+		RuleResolution g = resolved != null ? resolved[0] : global.resolve(soundId);
 
 		int loudIdx = -1;
 		int limitIdx = -1;
@@ -98,6 +126,9 @@ public final class Precedence {
 				Zone zone = zones[i];
 				if (!zone.enabled()) {
 					continue;
+				}
+				if (resolved != null && resolved[i + 1] == RuleResolution.NONE) {
+					continue; // nothing in this zone matches the sound: skip the geometry (same result, it is skipped below)
 				}
 				double ax;
 				double ay;
@@ -125,7 +156,7 @@ public final class Precedence {
 				if (w <= 0) {
 					continue;
 				}
-				RuleResolution r = zoneRules[i].resolve(soundId);
+				RuleResolution r = resolved != null ? resolved[i + 1] : zoneRules[i].resolve(soundId);
 				if (r == RuleResolution.NONE) {
 					continue;
 				}
