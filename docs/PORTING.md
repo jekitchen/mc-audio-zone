@@ -18,6 +18,9 @@ Add a row whenever you add a Mixin, an access widener entry or a call into versi
 | M0 | Open-screen key (`AudioZoneClient`) | `KeyMapping(String, int, KeyMapping.Category)`, `KeyMapping.Category.register(Identifier)`, Fabric `KeyMappingHelper`, `InputConstants.KEY_*` | M0 game test |
 | M0 | Opening a screen (`AudioZoneClient.onEndTick`) | `Minecraft.gui.screen()`, `Minecraft.gui.setScreen(Screen)` | M0 game test |
 | M0 | Main screen (`audiozone.mc.AudioZoneScreen`) | `Screen.extractRenderState(GuiGraphicsExtractor, …)`, `GuiGraphicsExtractor.centeredText` | M0 game test (screenshot) |
+| M1 | **Mixin** `SoundEngineMixin`: sound start | `@Inject` into `SoundEngine.play(SoundInstance)` before its call to `calculateVolume(float, SoundSource)` | M1 game test; log has no Mixin errors |
+| M1 | Sound data (`audiozone.mc.SoundHook`) | `SoundInstance.getSound/getVolume/getAttenuation/isRelative/getIdentifier/getSource/getX/Y/Z`, `Sound.getAttenuationDistance()`, `SoundManager.getListenerTransform().position()` | M1 game test |
+| M1 | Range formula (`audiozone.core.SoundRange`) | Must match vanilla: `max(volume, 1) × attenuation distance`, infinite if relative or `NONE`; audible when strictly closer (`Vec3.closerThan`, used by `SubtitleOverlay$Subtitle.isAudibleFrom`) | `SoundRangeTest`, M1 game test |
 
 ## Known differences between 26.2 and 26.3
 
@@ -25,7 +28,7 @@ Found at M0 by comparing the two game jars. Code that touches any of these needs
 
 | Area | 26.2 | 26.3 | Affects |
 | --- | --- | --- | --- |
-| Hearing range | Computed inline in `SoundEngine.play`: `max(volume, 1) × Sound.getAttenuationDistance()`, infinite if relative or attenuation `NONE` | Same formula, moved into `private static float SoundEngine.getRange(boolean, Attenuation, float)` | M1 range gate, Mixin targets in `play` |
+| Hearing range | Computed inline in `SoundEngine.play`: `max(volume, 1) × Sound.getAttenuationDistance()`, infinite if relative or attenuation `NONE` | Same formula, split into `Sound.getAttenuationDistance(float)` and `private static float SoundEngine.getRange(boolean, Attenuation, float)` | Audio Zone recomputes the range itself (`SoundRange`), so it does not depend on either |
 | Subtitle listeners | Notified inline in `play` | Moved into `SoundEngine.notifyListeners(SoundInstance, WeighedSoundEvents, float)` | M1 log/range consistency, M9 cues |
 | Resolving a sound | `SoundInstance.resolve(SoundManager)` | Renamed `getOrResolve(SoundManager)`; new `getSoundEvent()` | Anything reading the resolved sound |
 | Key types | `InputConstants.Type.KEYSYM`, `SCANCODE`, `MOUSE` | `KEYBOARD`, `MOUSE` (`SCANCODE` removed) | Use `KeyMapping(String, int, Category)` and `InputConstants.getKey(String)`, which exist in both |
