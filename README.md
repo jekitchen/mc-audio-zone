@@ -23,13 +23,17 @@ Audio Zone only changes how loud sounds are on the player's own computer. It nev
 
 **How it is checked.** These limits have automated tests that run on every build, for example that a 200% boost is silent at exactly the distance vanilla is. Before each release they are also tested in game, as described in the [PRD](docs/PRD.md) (section 11).
 
-**Status.** Audio Zone is in development and not yet released. The mute, volume and zone features are planned for the first alpha. Boost, cues, repeat limits and the inspector follow in 1.0.
+**Status.** The first alpha, 0.1.0-alpha, has mute, volume (0 to 100%), rules, zones with outlines, the recently played list and search. Boost, cues, repeat limits and the inspector, listed above with their safeguards, follow in 1.0. See the [changelog](CHANGELOG.md).
 
 **Questions or concerns.** If you think any feature gives more information than vanilla, please [open an issue](https://github.com/jekitchen/mc-audio-zone/issues) and mention "fair play" in the title. We aim to look at these within 7 days.
 
 ## Specification
 
 The [Product Requirements Document](docs/PRD.md) is the source of truth for the project's specifications. Changes to requirements are made there, through pull requests.
+
+## Releasing
+
+[docs/RELEASING.md](docs/RELEASING.md) has the release steps, and [docs/MOD_PAGE.md](docs/MOD_PAGE.md) the Modrinth and CurseForge description.
 
 ## Building
 
