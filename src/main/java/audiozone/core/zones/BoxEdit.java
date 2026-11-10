@@ -43,6 +43,19 @@ public final class BoxEdit {
 	}
 
 	/**
+	 * The box moved so every edge lies on a block boundary (M8 review: zones line up with the block grid). Sizes are
+	 * whole numbers; the center moves by less than half a block on each axis.
+	 */
+	public static Placed snap(Point center, Shape.Box box) {
+		return new Placed(new Point(snapAxis(center.x(), box.width()), snapAxis(center.y(), box.height()),
+				snapAxis(center.z(), box.depth())), box);
+	}
+
+	private static double snapAxis(double center, double size) {
+		return Math.round(center - size / 2) + size / 2;
+	}
+
+	/**
 	 * Moves one side out ({@code blocks > 0}) or in ({@code blocks < 0}); the opposite side stays where it is. The size
 	 * stays within the box limits (1 to 512); a change that would leave them is cut short.
 	 */

@@ -42,6 +42,18 @@ class BoxEditTest {
 	}
 
 	@Test
+	void snapPutsEveryEdgeOnABlockBoundary() {
+		// "My position" at x 3.7: a 10-wide box from -1.3 to 8.7 becomes -1 to 9.
+		BoxEdit.Placed p = BoxEdit.snap(new Point(3.7, -59.4, 0.5), new Shape.Box(10, 3, 5));
+		assertEquals(new Point(4, -59.5, 0.5), p.center());
+		for (double edge : new double[] {p.center().x() - 5, p.center().y() - 1.5, p.center().z() - 2.5}) {
+			assertEquals(Math.rint(edge), edge, 1e-9, "edge " + edge + " should be on a block boundary");
+		}
+		BoxEdit.Placed aligned = BoxEdit.fromCorners(0, 64, 0, 2, 64, 0);
+		assertEquals(aligned, BoxEdit.snap(aligned.center(), aligned.box()), "a marked box is already aligned");
+	}
+
+	@Test
 	void sizeStaysWithinTheLimits() {
 		Shape.Box box = new Shape.Box(2, 2, 2);
 		BoxEdit.Placed shrunk = BoxEdit.moveSide(new Point(0, 0, 0), box, BoxEdit.Side.WEST, -5);

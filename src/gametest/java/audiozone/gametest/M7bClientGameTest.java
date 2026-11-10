@@ -132,6 +132,7 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((AzDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(AudioZoneScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().zones().isEmpty()), "Delete should remove the zone");
+			check(context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow(zoneId) == null), "the deleted zone's row should be gone at once");
 
 			context.runOnClient(mc -> {
 				ProfileManager.update(p -> Profile.empty(p.name()));

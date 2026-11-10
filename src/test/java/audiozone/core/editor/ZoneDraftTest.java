@@ -78,8 +78,11 @@ class ZoneDraftTest {
 		assertEquals(new FieldError(FieldError.OUT_OF_RANGE, List.of("1", "512")), d.error(Field.WIDTH));
 		d.set(Field.WIDTH, "big");
 		assertEquals(FieldError.NOT_A_NUMBER, d.error(Field.WIDTH).translationKey());
+		// Boxes are whole blocks (M8 review).
 		d.set(Field.WIDTH, "2.5");
-		assertEquals(new Shape.Box(2.5, 8, 10), d.build().shape());
+		assertEquals(FieldError.NOT_WHOLE_NUMBER, d.error(Field.WIDTH).translationKey());
+		d.set(Field.WIDTH, "3");
+		assertEquals(new Shape.Box(3, 8, 10), d.build().shape());
 	}
 
 	@Test
