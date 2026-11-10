@@ -423,10 +423,10 @@
 	"audiozone.no_world": "Join a world or server to see and change its sounds. Each one keeps its own rules and zones.",
 	"audiozone.header.no_world": "No world loaded",
 	"audiozone.settings.no_world": "The other settings belong to a world or server; join one to change them.",
-	"audiozone.marking.first": "Marking zone corners: look at a block (or stand in it) and press %1$s for the first corner · %2$s cancels",
-	"audiozone.marking.second": "Press %1$s for the second corner (%2$s) · %3$s cancels",
+	"audiozone.marking.first": "Marking zone corners: first corner",
+	"audiozone.marking.second": "Second corner · %s blocks",
 	"audiozone.zone_editor.mark_corners": "Mark corners",
-	"audiozone.zone_editor.mark_corners.tip": "Close this editor, then look at a block (or stand where a corner should be) and press %s for each of the two corners. The box between them becomes the zone.",
+	"audiozone.zone_editor.mark_corners.tip": "Close this editor, then left-click a block (or press %s) for each of the two corners; looking at nothing marks the block you stand in. The box between them becomes the zone.",
 	"audiozone.zone_editor.side": "Side",
 	"audiozone.zone_editor.side.tip": "The side Grow and Shrink move; the opposite side stays where it is",
 	"audiozone.zone_editor.side.north": "North (−z)",
@@ -440,7 +440,6 @@
 	"audiozone.zone_editor.grow": "Grow",
 	"audiozone.zone_editor.grow.tip": "Move the chosen side out by 1 block (Shift: 5 blocks)",
 	"audiozone.outline.size": "%1$s × %2$s × %3$s",
-	"audiozone.outline.size.inside": "%s blocks · You are inside",
-	"audiozone.outline.size.outside": "%s blocks · You are outside",
-	"audiozone.zone_editor.size_label": "Size in blocks: width (x), height (y), depth (z)"
+	"audiozone.zone_editor.size_label": "Size in blocks: width (x), height (y), depth (z)",
+	"audiozone.marking.controls": "Left-click a block (or press %1$s) to mark it · %2$s cancels"
 }

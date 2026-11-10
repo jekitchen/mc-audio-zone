@@ -10,7 +10,6 @@ import audiozone.mc.AudioZoneSettings;
 import audiozone.mc.ProfileManager;
 import audiozone.mc.ZoneEditorScreen;
 import audiozone.mc.ZoneMarking;
-import audiozone.mc.ZoneOutlines;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -20,7 +19,7 @@ import net.minecraft.core.BlockPos;
 
 /**
  * The zone drawing tools (M8 review): new zones are boxes; "Mark corners" sets the box from two blocks marked in the
- * world with the Audio Zone key, with a live outline and size label; the cancel key returns unchanged; Grow and Shrink
+ * world with left-click (which then breaks nothing) or the Audio Zone key, with the size in the on-screen hint; the cancel key returns unchanged; Grow and Shrink
  * move one side and keep the opposite side.
  */
 public final class ZoneToolsClientGameTest implements FabricClientGameTest {
@@ -45,13 +44,18 @@ public final class ZoneToolsClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).markCorners());
 			context.waitTicks(2);
 			check(context.computeOnClient(mc -> ZoneMarking.isActive() && mc.gui.screen() == null), "marking closes the editor");
-			BlockPos first = moveTo(context, world, 0, 0);
-			context.getInput().pressKey(InputConstants.KEY_SEMICOLON);
-			context.waitTicks(2);
-			BlockPos second = moveTo(context, world, 4, 6);
+			// Corner 1: look straight down and left-click the ground. In Creative a left-click would break the block; while
+			// marking it only marks it.
+			moveTo(context, world, 0, 0, 90);
+			BlockPos first = context.computeOnClient(mc -> ((net.minecraft.world.phys.BlockHitResult) mc.hitResult).getBlockPos());
+			context.getInput().pressKey(options -> options.keyAttack);
 			context.waitTicks(3);
-			String label = context.computeOnClient(mc -> ZoneOutlines.lastSizeLabel());
-			check(label.equals("5 × 1 × 7 blocks · You are inside"), "the box being marked should show its size, was " + label);
+			check(context.computeOnClient(mc -> !mc.level.getBlockState(first).isAir()), "left-click while marking must not break the block");
+			// Corner 2: walk away, look level (no block under the crosshair: the block the player stands in), press ;.
+			BlockPos second = moveTo(context, world, 4, 6, 0);
+			String hint = context.computeOnClient(mc -> ZoneMarking.hintText());
+			check(hint.startsWith("Second corner · 5 × 2 × 7 blocks\n") && hint.contains("Left-click a block"),
+					"the hint should show the box's size, then the controls, was " + hint);
 			context.takeScreenshot("zone-tools-marking");
 			context.getInput().pressKey(InputConstants.KEY_SEMICOLON);
 			context.waitForScreen(ZoneEditorScreen.class);
@@ -60,7 +64,7 @@ public final class ZoneToolsClientGameTest implements FabricClientGameTest {
 			Zone marked = context.computeOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).draft().build());
 			check(marked.shape().equals(expected.box()) && marked.anchor().equals(expected.center()),
 					"the editor should hold the marked box " + expected + ", was " + marked.anchor() + " " + marked.shape());
-			check(marked.shape().equals(new Shape.Box(5, 1, 7)), "corners 4 and 6 blocks apart give a 5 × 1 × 7 box");
+			check(marked.shape().equals(new Shape.Box(5, 2, 7)), "the ground block and a block 4 and 6 away give a 5 × 2 × 7 box");
 
 			// The cancel key returns to the editor without changing the box.
 			context.runOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).markCorners());
@@ -68,7 +72,7 @@ public final class ZoneToolsClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(InputConstants.KEY_SEMICOLON);
 			context.getInput().pressKey(InputConstants.KEY_BACKSPACE);
 			context.waitForScreen(ZoneEditorScreen.class);
-			check(context.computeOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).draft().build().shape()).equals(new Shape.Box(5, 1, 7)),
+			check(context.computeOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).draft().build().shape()).equals(new Shape.Box(5, 2, 7)),
 					"cancel keeps the box");
 
 			// Grow and Shrink: Grow east adds width and keeps the west face; Shrink up stops at the 1-block minimum.
@@ -78,15 +82,16 @@ public final class ZoneToolsClientGameTest implements FabricClientGameTest {
 				e.moveSide(1);
 			});
 			Zone grown = context.computeOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).draft().build());
-			check(grown.shape().equals(new Shape.Box(6, 1, 7)), "Grow east adds a block of width, was " + grown.shape());
+			check(grown.shape().equals(new Shape.Box(6, 2, 7)), "Grow east adds a block of width, was " + grown.shape());
 			check(Math.abs((grown.anchor().x() - 3) - (marked.anchor().x() - 2.5)) < 1e-9, "the west face stays where it was");
 			context.runOnClient(mc -> {
 				ZoneEditorScreen e = (ZoneEditorScreen) mc.gui.screen();
 				e.selectSide(BoxEdit.Side.UP);
 				e.moveSide(-1);
+				e.moveSide(-1);
 			});
 			check(context.computeOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).draft().build().shape()).equals(new Shape.Box(6, 1, 7)),
-					"a box cannot shrink below 1 block");
+					"Shrink up stops at 1 block high");
 			context.takeScreenshot("zone-tools-editor");
 
 			// Save: the zone is stored as the marked and adjusted box.
@@ -102,9 +107,12 @@ public final class ZoneToolsClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	/** Teleports the player {@code dx}, {@code dz} blocks from where the world started, facing level; returns their block. */
-	private static BlockPos moveTo(ClientGameTestContext context, TestSingleplayerContext world, int dx, int dz) {
-		world.getServer().runCommand("tp @a " + (0.5 + dx) + " -60 " + (0.5 + dz) + " 0 0");
+	/**
+	 * Teleports the player {@code dx}, {@code dz} blocks from where the world started, looking {@code pitch} degrees down;
+	 * returns the block they stand in.
+	 */
+	private static BlockPos moveTo(ClientGameTestContext context, TestSingleplayerContext world, int dx, int dz, int pitch) {
+		world.getServer().runCommand("tp @a " + (0.5 + dx) + " -60 " + (0.5 + dz) + " 0 " + pitch);
 		context.waitTicks(3);
 		return context.computeOnClient(mc -> mc.player.blockPosition());
 	}

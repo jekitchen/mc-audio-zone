@@ -104,7 +104,6 @@ public final class ZoneOutlines {
 						: null;
 				int color = marking != null ? ZoneMarking.color(minecraft) : ZoneEditorScreen.editingColor(minecraft);
 				drawZone(editing, OutlineGeometry.of(editing, edge, anchor), color, onTop, camera);
-				drawSizeLabel(minecraft, editing, onTop);
 			}
 		} catch (RuntimeException | LinkageError e) {
 			// Never break world rendering: stop drawing outlines for the rest of the session.
@@ -138,27 +137,6 @@ public final class ZoneOutlines {
 		}
 	}
 
-	/**
-	 * While editing or marking (M8 review): the box's size above it, and whether the player is inside, so its extent is
-	 * clear without reading the numbers.
-	 */
-	private static void drawSizeLabel(Minecraft minecraft, Zone zone, boolean onTop) {
-		if (!(zone.shape() instanceof Shape.Box box)) {
-			return;
-		}
-		boolean inside = minecraft.player != null && box.contains(minecraft.player.getX() - zone.anchor().x(),
-				minecraft.player.getY() - zone.anchor().y(), minecraft.player.getZ() - zone.anchor().z());
-		String text = Component.translatable(inside ? "audiozone.outline.size.inside" : "audiozone.outline.size.outside", size(box))
-				.getString();
-		Vec3 at = new Vec3(zone.anchor().x(), zone.anchor().y() + box.height() / 2 + 0.6, zone.anchor().z());
-		GizmoProperties label = Gizmos.billboardText(text, at, TextGizmo.Style.whiteAndCentered().withScale(LABEL_SCALE));
-		if (onTop) {
-			label.setAlwaysOnTop();
-		}
-		lastSizeLabel = text;
-		labelsLastFrame++;
-	}
-
 	/** "10 × 4 × 12": width (x) × height (y) × depth (z) in blocks. */
 	static String size(Shape.Box box) {
 		return Component.translatable("audiozone.outline.size", plain(box.width()), plain(box.height()), plain(box.depth())).getString();
@@ -167,13 +145,6 @@ public final class ZoneOutlines {
 	private static String plain(double value) {
 		return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
 	}
-
-	/** The size label drawn last (for tests). */
-	public static String lastSizeLabel() {
-		return lastSizeLabel;
-	}
-
-	private static String lastSizeLabel = "";
 
 	private static void drawOutline(Outline outline, int argb, boolean onTop) {
 		for (int i = 0; i < outline.segmentCount(); i++) {

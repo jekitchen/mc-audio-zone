@@ -14,13 +14,15 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
 /**
- * "Mark corners" (M8 review): the zone editor closes so the player can walk or fly around and press the Audio Zone
- * key (;) twice, once for each corner of the box. Each corner is the block under the crosshair, or the block the player
+ * "Mark corners" (M8 review): the zone editor closes so the player can walk or fly around and left-click (or press the
+ * Audio Zone key, ;) twice, once for each corner of the box; while marking, left-click never attacks or breaks anything. Each corner is the block under the crosshair, or the block the player
  * stands in if the crosshair is not on a block, so only blocks the player can see or reach count (fair play). The box
- * from the first corner to the current target is outlined live with its size; after the second corner the editor comes
+ * from the first corner to the current target is outlined live, its size in the on-screen hint; after the second corner the editor comes
  * back with the box filled in. "Cancel zone marking" (Backspace by default, rebindable) returns to the editor unchanged.
  */
 public final class ZoneMarking {
+	/** Top of the hint, below the Bypass label's row. */
+	private static final int HINT_TOP = 18;
 	private static ZoneEditorScreen editor;
 	private static BlockPos firstCorner;
 
@@ -33,10 +35,20 @@ public final class ZoneMarking {
 			if (!isActive() || minecraft.gui.screen() != null) {
 				return;
 			}
-			Component hint = hint();
-			int x = (minecraft.getWindow().getGuiScaledWidth() - minecraft.font.width(hint)) / 2;
-			audiozone.mc.ui.Draw.fill(graphics, x - 4, 20, minecraft.font.width(hint) + 8, minecraft.font.lineHeight + 6, audiozone.mc.ui.Theme.PANEL);
-			audiozone.mc.ui.Draw.text(graphics, minecraft.font, hint, x, 23, audiozone.mc.ui.Theme.TEXT);
+			// Two short centered lines (status, then controls), so the hint fits a small window.
+			List<Component> lines = hint();
+			int lineHeight = minecraft.font.lineHeight + 2;
+			int width = 0;
+			for (Component line : lines) {
+				width = Math.max(width, minecraft.font.width(line));
+			}
+			int center = minecraft.getWindow().getGuiScaledWidth() / 2;
+			audiozone.mc.ui.Draw.fill(graphics, center - width / 2 - 4, HINT_TOP - 3, width + 8, lines.size() * lineHeight + 4,
+					audiozone.mc.ui.Theme.PANEL);
+			for (int i = 0; i < lines.size(); i++) {
+				audiozone.mc.ui.Draw.centeredText(graphics, minecraft.font, lines.get(i), center, HINT_TOP + i * lineHeight,
+						i == 0 ? audiozone.mc.ui.Theme.TEXT : audiozone.mc.ui.Theme.TEXT_DIM);
+			}
 		});
 	}
 
@@ -128,14 +140,30 @@ public final class ZoneMarking {
 		return minecraft.player == null ? null : minecraft.player.blockPosition();
 	}
 
-	private static Component hint() {
+	/** The on-screen hint: which corner is next with the box's size so far, then the keys. */
+	private static List<Component> hint() {
 		Component key = AudioZoneClient.openKey.getTranslatedKeyMessage();
 		Component cancel = AudioZoneClient.cancelMarkingKey.getTranslatedKeyMessage();
+		Component status;
 		if (firstCorner == null) {
-			return Component.translatable("audiozone.marking.first", key, cancel);
+			status = Component.translatable("audiozone.marking.first");
+		} else {
+			Zone preview = preview(Minecraft.getInstance());
+			Shape.Box box = preview == null ? null : (Shape.Box) preview.shape();
+			status = Component.translatable("audiozone.marking.second", box == null ? "" : ZoneOutlines.size(box));
 		}
-		Zone preview = preview(Minecraft.getInstance());
-		Shape.Box box = preview == null ? null : (Shape.Box) preview.shape();
-		return Component.translatable("audiozone.marking.second", key, box == null ? "" : ZoneOutlines.size(box), cancel);
+		return List.of(status, Component.translatable("audiozone.marking.controls", key, cancel));
+	}
+
+	/** The hint's text, for tests. */
+	public static String hintText() {
+		if (!isActive()) {
+			return "";
+		}
+		StringBuilder text = new StringBuilder();
+		for (Component line : hint()) {
+			text.append(text.isEmpty() ? "" : "\n").append(line.getString());
+		}
+		return text.toString();
 	}
 }
