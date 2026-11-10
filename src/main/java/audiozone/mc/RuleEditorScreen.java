@@ -61,6 +61,14 @@ public final class RuleEditorScreen extends AzScreen {
 	private final RuleTarget target;
 	private PatternPreview preview;
 	private Component overridden = Component.empty();
+	/**
+	 * What the sound gets when this rule leaves volume or mute unset (M8 review: show the current value instead of
+	 * "Not set"). For an exact sound ID, the other rules of the same list decide; otherwise 100% and not muted.
+	 */
+	private int inheritedVolume = 100;
+	private boolean inheritedMuted;
+	/** True while the slider is moved to show the unchanged value, so that move does not set a volume. */
+	private boolean showingInherited;
 
 	public AzTextField patternField;
 	public AzToggle enabledToggle;
@@ -177,26 +185,27 @@ public final class RuleEditorScreen extends AzScreen {
 				}), Component.translatable("audiozone.rule_editor.enabled.tip"));
 		muteDropdown = Tooltips.describe(new AzDropdown<>(MUTE_WIDTH, Component.translatable("audiozone.rule_editor.mute"),
 				List.of(MuteChoice.values()),
-				choice -> Component.translatable("audiozone.rule_editor.mute." + choice.name().toLowerCase(Locale.ROOT)),
+				this::muteChoiceName,
 				MuteChoice.of(draft.mute()), this::setMute), Component.translatable("audiozone.rule_editor.mute.tip"));
 		body.row(enabledToggle, muteDropdown, resetButton(Field.MUTE, () -> muteDropdown.setValue(MuteChoice.of(draft.mute()))));
 
 		String volumeText = draft.text(Field.VOLUME);
-		double initialVolume = draft.error(Field.VOLUME) == null && !volumeText.isBlank() ? Double.parseDouble(volumeText.trim()) : 100;
+		double initialVolume = draft.error(Field.VOLUME) == null && !volumeText.isBlank() ? Double.parseDouble(volumeText.trim()) : inheritedVolume;
 		volumeSlider = Tooltips.describe(new AzSlider(SLIDER_WIDTH, Component.translatable("audiozone.rule_editor.volume"),
 				new SliderModel(Rule.MIN_VOLUME, 100, 5, 1, 100, initialVolume),
 				value -> draft.text(Field.VOLUME).isBlank()
-						? Component.translatable("audiozone.rule_editor.volume.not_set")
+						? Component.translatable("audiozone.rule_editor.volume.not_set", inheritedText())
 						: Component.literal((int) value + "%"),
 				null,
 				value -> {
-					if (volumeField != null && !volumeField.isFocused()) {
+					// Only the player's slider moves set a volume; showing the unchanged value must not.
+					if (volumeField != null && !volumeField.isFocused() && !showingInherited) {
 						volumeField.setValue(Integer.toString((int) value));
 					}
 				}), Component.translatable("audiozone.rule_editor.volume.tip"));
 		volumeField = Tooltips.describe(new AzTextField(font, VOLUME_FIELD_WIDTH, Component.translatable("audiozone.rule_editor.volume_typed")),
 				Component.translatable("audiozone.rule_editor.volume_typed.tip"));
-		volumeField.placeholder(Component.translatable("audiozone.rule_editor.volume.not_set_short"));
+		volumeField.placeholder(Component.literal(Integer.toString(inheritedVolume)));
 		volumeField.setMaxLength(3);
 		volumeField.setValue(volumeText);
 		volumeField.validator(text -> {
@@ -205,7 +214,11 @@ public final class RuleEditorScreen extends AzScreen {
 		});
 		volumeField.onChange(text -> {
 			if (draft.error(Field.VOLUME) == null) {
-				volumeSlider.setTypedValue(text.isBlank() ? 100 : Double.parseDouble(text.trim()));
+				if (text.isBlank()) {
+					showInheritedOnSlider();
+				} else {
+					volumeSlider.setTypedValue(Double.parseDouble(text.trim()));
+				}
 			}
 			changed();
 		});
@@ -256,7 +269,22 @@ public final class RuleEditorScreen extends AzScreen {
 		if (preview.error() != null) {
 			return Component.empty();
 		}
-		return Component.translatable("audiozone.rule_editor.preview", preview.count());
+		return Component.translatable(preview.count() == 1 ? "audiozone.rule_editor.preview.one" : "audiozone.rule_editor.preview", preview.count());
+	}
+
+	private Component muteChoiceName(MuteChoice choice) {
+		if (choice == MuteChoice.NOT_SET) {
+			return Component.translatable("audiozone.rule_editor.mute.not_set",
+					Component.translatable(inheritedMuted ? "audiozone.rule_editor.inherited.muted" : "audiozone.rule_editor.inherited.not_muted"));
+		}
+		return Component.translatable("audiozone.rule_editor.mute." + choice.name().toLowerCase(Locale.ROOT));
+	}
+
+	/** "100%" or "muted": what the sound gets now where this rule leaves loudness unset. */
+	private Component inheritedText() {
+		return inheritedMuted
+				? Component.translatable("audiozone.rule_editor.inherited.muted")
+				: Component.literal(inheritedVolume + "%");
 	}
 
 	private static Component message(FieldError error) {
@@ -273,11 +301,22 @@ public final class RuleEditorScreen extends AzScreen {
 		if (saveButton != null) {
 			saveButton.active = draft.canSave();
 		}
+		// The "unchanged" values follow the pattern (an exact ID can inherit from other rules).
+		if (muteDropdown != null) {
+			muteDropdown.setValue(muteDropdown.value());
+		}
+		if (volumeField != null) {
+			volumeField.placeholder(Component.literal(Integer.toString(inheritedVolume)));
+			if (draft.text(Field.VOLUME).isBlank()) {
+				showInheritedOnSlider();
+			}
+		}
 	}
 
 	private void updatePreview() {
 		preview = PatternPreview.of(draft.text(Field.PATTERN), KnownSounds.ids(), KnownSounds.seenExcluded());
 		overridden = Component.empty();
+		updateInherited();
 		if (!draft.canSave()) {
 			return;
 		}
@@ -291,6 +330,35 @@ public final class RuleEditorScreen extends AzScreen {
 			}
 			overridden = Component.translatable("audiozone.rule_editor.overridden", String.join(", ", patterns));
 		}
+	}
+
+	private void showInheritedOnSlider() {
+		showingInherited = true;
+		try {
+			volumeSlider.setTypedValue(inheritedVolume);
+		} finally {
+			showingInherited = false;
+		}
+	}
+
+	/** For an exact sound ID: what the list's other rules give it; for a wildcard, 100% and not muted. */
+	private void updateInherited() {
+		inheritedVolume = 100;
+		inheritedMuted = false;
+		String pattern = preview.normalizedPattern();
+		if (pattern == null || pattern.contains("*")) {
+			return;
+		}
+		String id = draft.id();
+		List<Rule> others = new ArrayList<>();
+		for (Rule rule : target.rules(ProfileManager.profile())) {
+			if (!rule.id().equals(id)) {
+				others.add(rule);
+			}
+		}
+		audiozone.core.rules.RuleResolution resolution = new RuleResolver(others).resolve(pattern);
+		inheritedMuted = resolution.muted();
+		inheritedVolume = resolution.volumePercent();
 	}
 
 	private void fillMatches() {

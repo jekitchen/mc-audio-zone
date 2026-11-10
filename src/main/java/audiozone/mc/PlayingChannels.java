@@ -100,6 +100,11 @@ public final class PlayingChannels {
 		return playing.size();
 	}
 
+	/** Estimated bytes of the tracking tables, for the Diagnostics memory readout. */
+	public long estimatedBytes() {
+		return playing.estimatedBytes();
+	}
+
 	/** Called at the end of every client tick. */
 	public void tick(Minecraft minecraft) {
 		if (playing.size() == 0) {

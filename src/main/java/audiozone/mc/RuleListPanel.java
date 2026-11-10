@@ -2,6 +2,7 @@ package audiozone.mc;
 
 import audiozone.core.Translator;
 import audiozone.core.lists.RuleSummary;
+import audiozone.core.lists.SummaryPart;
 import audiozone.core.profile.RuleTarget;
 import audiozone.core.rules.Rule;
 import audiozone.mc.ui.AzButton;
@@ -22,7 +23,7 @@ import net.minecraft.resources.Identifier;
  * list (FR-8.6).
  */
 public final class RuleListPanel {
-	private static final int SUMMARY_WIDTH = 150;
+	private static final int STATUS_WIDTH = 110;
 	private static final int ON_OFF_WIDTH = 30;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/edit");
 	private static final Identifier UP_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/up");
@@ -67,12 +68,12 @@ public final class RuleListPanel {
 		for (int i = 0; i < rules.size(); i++) {
 			Rule rule = rules.get(i);
 			String pattern = rule.pattern().text();
-			String summary = RuleSummary.text(rule, TRANSLATOR);
-			String matches = RuleSummary.matchesPart(RuleSummary.matchCount(rule, known)).text(TRANSLATOR);
+			String status = status(rule);
+			String details = details(rule, known);
 			List<AzList.Row.Column> columns = List.of(
 					new AzList.Row.Column(() -> pattern, 0, 0),
-					new AzList.Row.Column(() -> summary, SUMMARY_WIDTH, 0),
-					new AzList.Row.Column(() -> matches, 0, 1));
+					new AzList.Row.Column(() -> status, STATUS_WIDTH, 0),
+					new AzList.Row.Column(() -> details, 0, 1));
 			List<AzButton> buttons = new ArrayList<>();
 			buttons.add(Tooltips.describe(AzButton.text(AzToggle.stateText(rule.enabled()), ON_OFF_WIDTH, () -> setEnabled(rule.id(), !rule.enabled()))
 					.narrationContext(() -> Component.translatable("audiozone.rules.enabled")),
@@ -90,6 +91,50 @@ public final class RuleListPanel {
 		}
 		list.setRows(rows);
 	}
+
+	/**
+	 * What the rule does to loudness, in the same style as the Recently Played status (M8 review): "✖ Muted",
+	 * "▶ Volume 30%", "▶ Not muted", or "○ Off" for a rule that is turned off. Empty if it does not set loudness.
+	 */
+	static String status(Rule rule) {
+		if (!rule.enabled()) {
+			return Component.translatable("audiozone.rules.status.off").getString();
+		}
+		if (Boolean.TRUE.equals(rule.mute())) {
+			return Component.translatable("audiozone.rules.status.muted").getString();
+		}
+		if (rule.volume() != null) {
+			return Component.translatable("audiozone.rules.status.volume", rule.volume()).getString();
+		}
+		if (Boolean.FALSE.equals(rule.mute())) {
+			return Component.translatable("audiozone.rules.status.not_muted").getString();
+		}
+		return "";
+	}
+
+	/**
+	 * The second line: the rule's other settings (limit, cue, or "Sets nothing yet"), then for a wildcard pattern how
+	 * many known sounds it matches, so a typo shows up as "No known sound matches" (FR-4.3). An exact-ID rule always
+	 * matches its one sound, so it has no count.
+	 */
+	static String details(Rule rule, List<String> known) {
+		List<SummaryPart> parts = new ArrayList<>();
+		for (SummaryPart part : RuleSummary.parts(rule)) {
+			if (!LOUDNESS_PARTS.contains(part.key())) {
+				parts.add(part);
+			}
+		}
+		if (!rule.pattern().isExact()) {
+			int count = RuleSummary.matchCount(rule, known);
+			parts.add(SummaryPart.of(count == 0 ? "audiozone.rules.matches.none"
+					: count == 1 ? "audiozone.rules.matches.one" : "audiozone.rules.matches", Integer.toString(count)));
+		}
+		return RuleSummary.join(parts, TRANSLATOR);
+	}
+
+	/** Summary chips the status column already shows. */
+	private static final java.util.Set<String> LOUDNESS_PARTS = java.util.Set.of(RuleSummary.DISABLED, RuleSummary.MUTED,
+			RuleSummary.NOT_MUTED, RuleSummary.VOLUME);
 
 	/** FR-4.7: a rule can be turned off without deleting it; the effect stops at once. */
 	public void setEnabled(String ruleId, boolean enabled) {

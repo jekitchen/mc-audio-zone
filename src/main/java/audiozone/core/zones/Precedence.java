@@ -1,6 +1,8 @@
 package audiozone.core.zones;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import audiozone.core.diag.MemoryEstimate;
 import audiozone.core.rules.CacheBudget;
@@ -34,6 +36,11 @@ public final class Precedence {
 	 * could each cache 4,096 IDs, about 32 MB. Past the cap a zone answers the same, just by matching patterns again.
 	 */
 	public static final int ZONE_CACHE_IDS = 8192;
+	/**
+	 * Sound IDs whose resolutions in every list are kept together in one row (see {@code rows}): at most about 0.3 MB
+	 * with 64 zones. A real session hears a few hundred IDs; past the cap a sound is resolved list by list, as before.
+	 */
+	public static final int ROW_CACHE_IDS = 1024;
 
 	private static final double TIE_DISTANCE = 0.01;
 	private static final float DISCRETE_WEIGHT = 0.5F;
@@ -43,6 +50,34 @@ public final class Precedence {
 	private final RuleResolver[] zoneRules;
 	private final double[] volumes;
 	private final ZoneEdge profileEdge;
+	/**
+	 * Per zone, in flat arrays so the per-sound loop reads them together instead of following references (zone,
+	 * anchor, shape): on/off, bubble, Inside mode, the fixed anchor and the shape's half-size on each axis. An Inside
+	 * zone has weight 0 outside its shape, so a sound beyond the half-size on any axis is rejected without the exact
+	 * test (PRD 7.4: "a cheap axis-aligned bounding-box test before the exact sphere or cylinder test").
+	 */
+	private final boolean[] enabled;
+	private final boolean[] bubble;
+	private final boolean[] inside;
+	private final double[] ax;
+	private final double[] ay;
+	private final double[] az;
+	private final double[] hx;
+	private final double[] hy;
+	private final double[] hz;
+
+	/**
+	 * Per sound ID, what every rule list resolves it to (global first, then each zone): one lookup per sound instead of
+	 * one per list. Measured in game, the per-list lookups were most of a sound start's cost with 64 zones (M8). Capped
+	 * like the resolvers' own caches, because servers can send arbitrary IDs.
+	 */
+	private final Map<String, RuleResolution[]> rows = new ConcurrentHashMap<>();
+	/** Which zones are fixed in the last world and dimension decided (bubbles are always "here"). */
+	private String hereWorldKey;
+	private String hereDimension;
+	private boolean[] here = new boolean[0];
+	/** Sounds decided from {@link #rows}; each answers every list from the cache. Plain field: one thread. */
+	private long rowHits;
 
 	/** A profile whose default edge is hard (PRD 7.5). */
 	public Precedence(List<Rule> globalRules, List<Zone> zones) {
@@ -60,11 +95,45 @@ public final class Precedence {
 		this.global = new RuleResolver(globalRules);
 		this.zones = zones.toArray(new Zone[0]);
 		this.zoneRules = new RuleResolver[this.zones.length];
-		this.volumes = new double[this.zones.length];
+		int n = this.zones.length;
+		this.volumes = new double[n];
+		this.enabled = new boolean[n];
+		this.bubble = new boolean[n];
+		this.inside = new boolean[n];
+		this.ax = new double[n];
+		this.ay = new double[n];
+		this.az = new double[n];
+		this.hx = new double[n];
+		this.hy = new double[n];
+		this.hz = new double[n];
 		CacheBudget zoneCaches = new CacheBudget(ZONE_CACHE_IDS);
-		for (int i = 0; i < this.zones.length; i++) {
-			zoneRules[i] = new RuleResolver(this.zones[i].rules(), zoneCaches);
-			volumes[i] = this.zones[i].shape().volume();
+		for (int i = 0; i < n; i++) {
+			Zone zone = this.zones[i];
+			zoneRules[i] = new RuleResolver(zone.rules(), zoneCaches);
+			volumes[i] = zone.shape().volume();
+			enabled[i] = zone.enabled();
+			bubble[i] = zone.isBubble();
+			inside[i] = zone.mode() == ZoneMode.INSIDE;
+			ax[i] = zone.anchor().x();
+			ay[i] = zone.anchor().y();
+			az[i] = zone.anchor().z();
+			switch (zone.shape()) {
+				case Shape.Sphere sphere -> {
+					hx[i] = sphere.radius();
+					hy[i] = sphere.radius();
+					hz[i] = sphere.radius();
+				}
+				case Shape.Box box -> {
+					hx[i] = box.width() / 2;
+					hy[i] = box.height() / 2;
+					hz[i] = box.depth() / 2;
+				}
+				case Shape.Cylinder cylinder -> {
+					hx[i] = cylinder.radius();
+					hy[i] = cylinder.height() / 2;
+					hz[i] = cylinder.radius();
+				}
+			}
 		}
 	}
 
@@ -86,6 +155,38 @@ public final class Precedence {
 	public void decide(String soundId, boolean positional, String worldKey, String dimension, double x, double y, double z,
 			double px, double py, double pz, SoundDecision out) {
 		decide(soundId, null, positional, worldKey, dimension, x, y, z, px, py, pz, out);
+	}
+
+	/** The cached resolutions of every list for this sound ID; computed on first sight. */
+	private RuleResolution[] row(String soundId) {
+		RuleResolution[] row = rows.get(soundId);
+		if (row != null) {
+			rowHits++;
+		} else {
+			row = new RuleResolution[zones.length + 1];
+			resolve(soundId, row);
+			if (rows.size() < ROW_CACHE_IDS) {
+				rows.put(soundId, row);
+			}
+		}
+		return row;
+	}
+
+	/**
+	 * Which zones are fixed in this world and dimension. Recomputed only when they change, so the per-sound loop does
+	 * not compare strings for every zone. Not thread-safe beyond the game thread, like the rest of the hot path.
+	 */
+	private boolean[] here(String worldKey, String dimension) {
+		if (!worldKey.equals(hereWorldKey) || !dimension.equals(hereDimension)) {
+			boolean[] flags = new boolean[zones.length];
+			for (int i = 0; i < zones.length; i++) {
+				flags[i] = worldKey.equals(zones[i].worldKey()) && dimension.equals(zones[i].dimension());
+			}
+			here = flags;
+			hereWorldKey = worldKey;
+			hereDimension = dimension;
+		}
+		return here;
 	}
 
 	/**
@@ -114,7 +215,11 @@ public final class Precedence {
 	private void decide(String soundId, RuleResolution[] resolved, boolean positional, String worldKey, String dimension,
 			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
 		out.reset();
-		RuleResolution g = resolved != null ? resolved[0] : global.resolve(soundId);
+		if (resolved == null) {
+			resolved = row(soundId);
+		}
+		RuleResolution g = resolved[0];
+		boolean[] inThisWorld = positional ? here(worldKey, dimension) : null;
 
 		int loudIdx = -1;
 		int limitIdx = -1;
@@ -131,43 +236,38 @@ public final class Precedence {
 
 		if (positional) {
 			for (int i = 0; i < zones.length; i++) {
-				Zone zone = zones[i];
-				if (!zone.enabled()) {
+				if (!enabled[i]) {
 					continue;
 				}
-				if (resolved != null && resolved[i + 1] == RuleResolution.NONE) {
+				if (resolved[i + 1] == RuleResolution.NONE) {
 					continue; // nothing in this zone matches the sound: skip the geometry (same result, it is skipped below)
 				}
-				double ax;
-				double ay;
-				double az;
-				if (zone.isBubble()) {
+				double dx;
+				double dy;
+				double dz;
+				if (bubble[i]) {
 					if (Double.isNaN(px)) {
 						continue;
 					}
-					ax = px;
-					ay = py;
-					az = pz;
+					dx = x - px;
+					dy = y - py;
+					dz = z - pz;
 				} else {
-					if (!worldKey.equals(zone.worldKey()) || !dimension.equals(zone.dimension())) {
+					if (!inThisWorld[i]) {
 						continue;
 					}
-					Point a = zone.anchor();
-					ax = a.x();
-					ay = a.y();
-					az = a.z();
+					dx = x - ax[i];
+					dy = y - ay[i];
+					dz = z - az[i];
 				}
-				double dx = x - ax;
-				double dy = y - ay;
-				double dz = z - az;
-				double w = zone.weight(dx, dy, dz, profileEdge);
+				if (inside[i] && (Math.abs(dx) > hx[i] || Math.abs(dy) > hy[i] || Math.abs(dz) > hz[i])) {
+					continue; // outside the shape's bounding box: an Inside zone's weight is 0 there
+				}
+				double w = zones[i].weight(dx, dy, dz, profileEdge);
 				if (w <= 0) {
 					continue;
 				}
-				RuleResolution r = resolved != null ? resolved[i + 1] : zoneRules[i].resolve(soundId);
-				if (r == RuleResolution.NONE) {
-					continue;
-				}
+				RuleResolution r = resolved[i + 1];
 				double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				if (r.loudness() != null && beats(i, dist, loudIdx, loudDist)) {
 					loudIdx = i;
@@ -243,7 +343,8 @@ public final class Precedence {
 
 	/** Cache hits across the global list and every zone's list (FR-13.3). */
 	public long cacheHits() {
-		long total = global.cacheHits();
+		// A row hit answers the global list and every zone's list at once.
+		long total = global.cacheHits() + rowHits * (zones.length + 1);
 		for (RuleResolver r : zoneRules) {
 			total += r.cacheHits();
 		}
@@ -260,13 +361,17 @@ public final class Precedence {
 	}
 
 	/**
-	 * Estimated bytes of the global list's and every zone's per-ID caches, for the Diagnostics memory readout (PRD 9.1).
+	 * Estimated bytes of the global list's and every zone's per-ID caches, the per-ID rows and the flat zone arrays, for
+	 * the Diagnostics memory readout (PRD 9.1).
 	 * The rules and zones belong to the profile and are not counted. Walks the caches: call it through
 	 * {@code MemoryMeter}, not per sound.
 	 */
 	public long estimatedBytes() {
 		long bytes = MemoryEstimate.object(5 * MemoryEstimate.REFERENCE)
 				+ MemoryEstimate.array(MemoryEstimate.REFERENCE, zoneRules.length) + MemoryEstimate.array(8, volumes.length)
+				+ 6 * MemoryEstimate.array(8, ax.length) + 4 * MemoryEstimate.array(1, enabled.length)
+				+ MemoryEstimate.CONCURRENT_HASH_MAP + MemoryEstimate.hashTable(rows.size())
+				+ rows.size() * (MemoryEstimate.HASH_NODE + MemoryEstimate.array(MemoryEstimate.REFERENCE, zones.length + 1))
 				+ global.estimatedBytes();
 		for (RuleResolver r : zoneRules) {
 			bytes += r.estimatedBytes();

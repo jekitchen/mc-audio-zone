@@ -91,6 +91,11 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 		return new RuleDraft(rule.id(), boostAvailable, values, defaults);
 	}
 
+	/** The ID the rule is saved under. */
+	public String id() {
+		return id;
+	}
+
 	public boolean enabled() {
 		return Boolean.parseBoolean(text(Field.ENABLED));
 	}

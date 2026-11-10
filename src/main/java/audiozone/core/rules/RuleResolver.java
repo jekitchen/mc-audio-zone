@@ -27,7 +27,7 @@ import audiozone.core.diag.MemoryEstimate;
  */
 public final class RuleResolver {
 	/** Cache size cap. Servers can send arbitrary sound IDs, so the cache must not grow without bound. */
-	static final int MAX_CACHED_IDS = 4096;
+	public static final int MAX_CACHED_IDS = 4096;
 	/**
 	 * Distinct results (combinations of winning rules) kept per list. Every cached ID points at one of these, so a
 	 * lookup the cache cannot hold allocates nothing once its combination has been seen. Past this cap, a result is
