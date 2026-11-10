@@ -3,16 +3,18 @@
 	"id": "audiozone",
 	"version": "${version}",
 	"name": "Audio Zone",
-	"description": "Mute, turn down, boost or rate-limit any sound, everywhere or only inside areas you choose, without ever hearing more than vanilla allows.",
+	"description": "Mute or turn down any sound, everywhere or only inside zones you draw, without ever hearing more than vanilla allows. Client-only: nothing is sent to servers.",
 	"authors": [
 		"maxismagical",
 		"Sciencode"
 	],
 	"contact": {
+		"homepage": "https://github.com/jekitchen/mc-audio-zone",
 		"sources": "https://github.com/jekitchen/mc-audio-zone",
 		"issues": "https://github.com/jekitchen/mc-audio-zone/issues"
 	},
 	"license": "MIT",
+	"icon": "assets/audiozone/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [

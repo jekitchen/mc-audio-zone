@@ -1,0 +1,82 @@
+# Builds one jar per supported Minecraft version when a version tag (v0.1.0-alpha, ...) is pushed, and creates a DRAFT
+# GitHub release with the jars and the CHANGELOG.md entry. Nothing is published until a maintainer publishes the draft.
+# Uploading to Modrinth and CurseForge stays manual: see docs/RELEASING.md.
+name: release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - minecraft: '26.2'
+            fabric_api: '0.161.0+26.2'
+          - minecraft: '26.3'
+            fabric_api: '0.165.2+26.3'
+    name: build (Minecraft ${{ matrix.minecraft }})
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: validate gradle wrapper
+        uses: gradle/actions/wrapper-validation@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: make gradle wrapper executable
+        run: chmod +x ./gradlew
+      - name: check the tag matches mod_version
+        run: |
+          version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match mod_version=${version} in gradle.properties" >&2
+            exit 1
+          fi
+      - name: build and test
+        run: ./gradlew build -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }}
+      - name: keep the release jar
+        uses: actions/upload-artifact@v7
+        with:
+          name: jar-mc${{ matrix.minecraft }}
+          # The mod jar only, not the -sources jar.
+          path: build/libs/audiozone-*+${{ matrix.minecraft }}.jar
+
+  draft-release:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: collect the jars
+        uses: actions/download-artifact@v8
+        with:
+          path: jars
+          merge-multiple: true
+      - name: take the changelog entry
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          # The lines after "## <version>" up to the next "## " heading.
+          awk -v v="$version" '
+            $0 ~ "^## " v "( |$)" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "CHANGELOG.md has no entry for ${version}" >&2
+            exit 1
+          fi
+      - name: create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prerelease=""
+          case "${GITHUB_REF_NAME}" in *-alpha*|*-beta*) prerelease="--prerelease" ;; esac
+          gh release create "${GITHUB_REF_NAME}" jars/*.jar --draft ${prerelease} \
+            --title "Audio Zone ${GITHUB_REF_NAME#v}" --notes-file notes.md
