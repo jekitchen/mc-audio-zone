@@ -22,7 +22,7 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
-		try (TestSingleplayerContext world = context.worldBuilder().create()) {
+		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
 					.putRule(Rule.of("r1", "minecraft:entity.villager.*").withMute(true))
