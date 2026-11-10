@@ -2,6 +2,11 @@ package audiozone.mc;
 
 import audiozone.core.editor.FieldError;
 import audiozone.core.editor.PatternPreview;
+import audiozone.core.editor.PatternSuggestions;
+import audiozone.core.rules.SoundPattern;
+import audiozone.core.search.SearchQuery;
+import audiozone.core.search.SoundEntry;
+import audiozone.core.search.SoundSearch;
 import audiozone.core.editor.RuleDraft;
 import audiozone.core.editor.RuleDraft.Field;
 import audiozone.core.profile.Profile;
@@ -40,6 +45,7 @@ public final class RuleEditorScreen extends AzScreen {
 	private static final int MUTE_WIDTH = 170;
 	private static final int SLIDER_WIDTH = 200;
 	private static final int VOLUME_FIELD_WIDTH = 50;
+	private static final int PICK_WIDTH = 70;
 
 	/** Mute is "not set" unless the rule sets it, so a rule can also say "do not mute" over a broader one. */
 	public enum MuteChoice {
@@ -164,7 +170,8 @@ public final class RuleEditorScreen extends AzScreen {
 		patternField.setValue(draft.text(Field.PATTERN));
 		patternField.validator(text -> {
 			setText(Field.PATTERN, text);
-			return message(draft.error(Field.PATTERN));
+			// Plain words search for sounds (FR-4.8); they are not a pattern, so they show no pattern error.
+			return isSearch(text) ? null : message(draft.error(Field.PATTERN));
 		});
 		patternField.onChange(text -> {
 			// FR-4.2: uppercase becomes lowercase as it is typed.
@@ -266,6 +273,12 @@ public final class RuleEditorScreen extends AzScreen {
 	}
 
 	private Component previewText() {
+		if (searching()) {
+			String words = draft.text(Field.PATTERN).strip();
+			return Component.translatable(searchResults.isEmpty() ? "audiozone.rule_editor.search.none"
+					: searchResults.size() == 1 ? "audiozone.rule_editor.search.one" : "audiozone.rule_editor.search.many",
+					searchResults.size(), words);
+		}
 		if (preview.error() != null) {
 			return Component.empty();
 		}
@@ -293,13 +306,12 @@ public final class RuleEditorScreen extends AzScreen {
 
 	/** Any value changed: refresh the preview, the overridden line, the match list and Save. */
 	private void changed() {
-		String before = preview == null ? null : preview.normalizedPattern();
 		updatePreview();
-		if (matchList != null && !java.util.Objects.equals(before, preview.normalizedPattern())) {
+		if (matchList != null && !java.util.Objects.equals(shownListKey, listKey())) {
 			fillMatches();
 		}
 		if (saveButton != null) {
-			saveButton.active = draft.canSave();
+			saveButton.active = draft.canSave() && !searching();
 		}
 		// The "unchanged" values follow the pattern (an exact ID can inherit from other rules).
 		if (muteDropdown != null) {
@@ -316,6 +328,14 @@ public final class RuleEditorScreen extends AzScreen {
 	private void updatePreview() {
 		preview = PatternPreview.of(draft.text(Field.PATTERN), KnownSounds.ids(), KnownSounds.seenExcluded());
 		overridden = Component.empty();
+		if (searching()) {
+			inheritedVolume = 100;
+			inheritedMuted = false;
+			if (matchList != null && searchEntries != null) {
+				searchResults = SoundSearch.search(searchEntries, SearchQuery.parse(draft.text(Field.PATTERN)), KnownSounds.seenExcluded());
+			}
+			return;
+		}
 		updateInherited();
 		if (!draft.canSave()) {
 			return;
@@ -362,11 +382,115 @@ public final class RuleEditorScreen extends AzScreen {
 	}
 
 	private void fillMatches() {
+		shownListKey = listKey();
+		if (searching()) {
+			fillSearchResults();
+			return;
+		}
 		List<AzList.Row> rows = new ArrayList<>(preview.count());
 		for (String id : preview.matches()) {
 			rows.add(new AzList.Row(id, List.of(new AzList.Row.Column(() -> id, 0)), List.of()));
 		}
 		matchList.setRows(rows);
+	}
+
+	// ---- Plain-word search (FR-4.8) ----
+
+	/**
+	 * Whether the pattern field holds plain words to search for rather than a pattern: text with neither {@code :} nor
+	 * {@code *}. Such text could never be a useful pattern (FR-4.1: a pattern must match the whole ID), so nothing is
+	 * lost; {@code minecraft:entity.villager.*} or {@code *villager*} still work as patterns.
+	 */
+	static boolean isSearch(String text) {
+		String t = text.strip();
+		return !t.isEmpty() && t.indexOf(':') < 0 && t.indexOf('*') < 0;
+	}
+
+	public boolean searching() {
+		return isSearch(draft.text(Field.PATTERN));
+	}
+
+	/** What the list shows: the search words, or the pattern being previewed. */
+	private String listKey() {
+		if (searching()) {
+			return "search:" + draft.text(Field.PATTERN).strip();
+		}
+		return preview == null ? null : preview.normalizedPattern();
+	}
+
+	private List<SoundEntry> searchResults = List.of();
+	/** What the list was last filled for (see {@link #listKey}), so it is refilled only when that changes. */
+	private String shownListKey;
+	private List<SoundEntry> searchEntries;
+
+	/** The sounds matching the words, with the Search tab's syntax, each with This sound and Like this. */
+	private void fillSearchResults() {
+		if (searchEntries == null) {
+			searchEntries = KnownSounds.entries();
+		}
+		searchResults = SoundSearch.search(searchEntries, SearchQuery.parse(draft.text(Field.PATTERN)), KnownSounds.seenExcluded());
+		List<AzList.Row> rows = new ArrayList<>(searchResults.size());
+		for (SoundEntry entry : searchResults) {
+			String id = entry.id();
+			String name = entry.subtitle() == null ? id : entry.subtitle();
+			AzButton exact = Tooltips.describe(AzButton.text(Component.translatable("audiozone.rule_editor.this_sound"), PICK_WIDTH,
+					() -> usePattern(id)), Component.translatable("audiozone.rule_editor.this_sound.tip"));
+			AzButton[] like = new AzButton[1];
+			like[0] = Tooltips.describe(AzButton.text(Component.translatable("audiozone.rule_editor.like_this"), PICK_WIDTH,
+					() -> showFamilies(id, like[0])), Component.translatable("audiozone.rule_editor.like_this.tip"));
+			rows.add(new AzList.Row(id, List.of(new AzList.Row.Column(() -> name, 0, 0), new AzList.Row.Column(() -> id, 0, 1)),
+					List.of(exact, like[0])));
+		}
+		matchList.setRows(rows);
+	}
+
+	/** Puts a pattern into the field; the editor then previews it as usual. */
+	public void usePattern(String pattern) {
+		closeOverlay();
+		patternField.setValue(pattern);
+		setFocused(patternField);
+	}
+
+	/** "Like this": the sound's families, closest first (FR-1.5 "Make pattern…"), each with how many sounds it matches. */
+	public void showFamilies(String soundId, AbstractWidget below) {
+		List<String> families = PatternSuggestions.suggest(soundId);
+		List<AzButton> buttons = new ArrayList<>();
+		int width = 0;
+		for (String family : families) {
+			SoundPattern pattern = SoundPattern.of(family);
+			int count = 0;
+			for (String id : KnownSounds.ids()) {
+				if (pattern.matches(id)) {
+					count++;
+				}
+			}
+			Component label = Component.translatable("audiozone.rule_editor.family", family, count);
+			width = Math.max(width, font.width(label) + 16);
+			buttons.add(AzButton.text(label, () -> usePattern(family)));
+		}
+		width = Math.min(width, this.width - 2 * Theme.PADDING);
+		int height = buttons.size() * (Theme.WIDGET_HEIGHT + Theme.GAP) + Theme.GAP;
+		int x = Math.max(Theme.PADDING, Math.min(below.getRight() - width, this.width - width - Theme.PADDING));
+		int y = below.getBottom() + 2;
+		if (y + height > this.height - Theme.PADDING) {
+			y = Math.max(Theme.PADDING, below.getY() - height - 2);
+		}
+		for (int i = 0; i < buttons.size(); i++) {
+			AzButton button = buttons.get(i);
+			button.setWidth(width - 2 * Theme.GAP);
+			button.setPosition(x + Theme.GAP, y + Theme.GAP + i * (Theme.WIDGET_HEIGHT + Theme.GAP));
+		}
+		openOverlay(x, y, width, height, buttons, buttons.isEmpty() ? null : buttons.get(0), null);
+	}
+
+	/** The family buttons shown by {@link #showFamilies}, for tests. */
+	public List<AbstractWidget> familyButtons() {
+		return overlayWidgets();
+	}
+
+	/** The sounds found for the words in the field, for tests. */
+	public List<SoundEntry> searchResults() {
+		return searchResults;
 	}
 
 	// ---- Save, Cancel ----
@@ -384,6 +508,10 @@ public final class RuleEditorScreen extends AzScreen {
 
 	@Override
 	protected boolean saveChanges() {
+		if (searching()) {
+			// Words are a search, not a pattern: pick a sound or family first.
+			return false;
+		}
 		if (!draft.attemptSave()) {
 			patternField.revealError();
 			volumeField.revealError();

@@ -381,11 +381,8 @@ public final class AudioZoneScreen extends AzScreen {
 		}
 		if (searchEntries == null) {
 			// Built when the tab opens, so subtitles are in the current language and new resource packs are included.
-			List<String> ids = KnownSounds.ids();
-			searchEntries = new ArrayList<>(ids.size());
-			for (String id : ids) {
-				searchEntries.add(new SoundEntry(id, subtitle(id)));
-			}
+			// Names are subtitles, or readable names for sounds without one, so plain words find both.
+			searchEntries = KnownSounds.entries();
 		}
 		List<SoundEntry> found = SoundSearch.search(searchEntries, SearchQuery.parse(searchText), KnownSounds.seenExcluded());
 		List<AzList.Row> rows = new ArrayList<>(found.size());

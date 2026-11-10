@@ -24,6 +24,7 @@
 			"audiozone.gametest.M8ReviewClientGameTest",
 			"audiozone.gametest.CopyRuleClientGameTest",
 			"audiozone.gametest.ZoneToolsClientGameTest",
+			"audiozone.gametest.FindSoundClientGameTest",
 			"audiozone.gametest.AccessibilityClientGameTest",
 			"audiozone.gametest.M8StressClientGameTest"
 		]
