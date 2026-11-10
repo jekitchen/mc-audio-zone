@@ -22,7 +22,7 @@ public final class M0ClientGameTest implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		check(FabricLoader.getInstance().isModLoaded(AudioZoneClient.MOD_ID), "audiozone is not in the mod list");
 
-		try (TestSingleplayerContext world = context.worldBuilder().create()) {
+		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 
 			// Default key opens the screen.
