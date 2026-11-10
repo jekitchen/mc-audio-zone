@@ -177,6 +177,15 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		put(Field.DIMENSION, dimension);
 	}
 
+	/** A box zone at {@code center} with {@code box}'s size, e.g. from marking corners or moving a side. */
+	public void setBox(Point center, Shape.Box box, String worldKey, String dimension) {
+		setShape(ShapeKind.BOX);
+		setPosition(center, worldKey, dimension);
+		put(Field.WIDTH, Numbers.format(box.width()));
+		put(Field.HEIGHT, Numbers.format(box.height()));
+		put(Field.DEPTH, Numbers.format(box.depth()));
+	}
+
 	public ShapeKind shape() {
 		return ShapeKind.valueOf(text(Field.SHAPE));
 	}

@@ -167,6 +167,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		SETTINGS_ZONES(mc -> settings(AudioZoneScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(AudioZoneScreen.SettingsPage.DIAGNOSTICS), null),
 		RULE_EDITOR(mc -> RuleEditorScreen.edit(null, ProfileManager.profile().rule("r1")), null),
+		ZONE_EDITOR_NEW(mc -> ZoneEditorScreen.create(null), null),
 		ZONE_EDITOR(mc -> ZoneEditorScreen.edit(null, ProfileManager.profile().zone("z1")), null),
 		ZONE_EDITOR_BOX(mc -> ZoneEditorScreen.edit(null, ProfileManager.profile().zone("z1")), s -> {
 			((ZoneEditorScreen) s).setShape(audiozone.core.editor.ZoneDraft.ShapeKind.BOX);

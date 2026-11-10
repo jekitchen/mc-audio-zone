@@ -6,7 +6,9 @@ import audiozone.core.editor.ZoneDraft.Field;
 import audiozone.core.editor.ZoneDraft.ShapeKind;
 import audiozone.core.outline.ZoneColors;
 import audiozone.core.profile.Profile;
+import audiozone.core.zones.BoxEdit;
 import audiozone.core.zones.Point;
+import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
 import audiozone.mc.ui.AzButton;
 import audiozone.mc.ui.AzColorPicker;
@@ -30,7 +32,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The zone editor (PRD 6.1 Zones, FR-8 MVP, FR-10.4): name, on/off, color, the center with "My position" and "Block
- * I'm looking at" (FR-8.1), shape (sphere or box) and size (FR-8.3). The zone's own rules are edited on their own
+ * I'm looking at" (FR-8.1), and the box's size (FR-8.3), drawn by marking two corners in the world or moved one side at
+ * a time (M8 review). The zone's own rules are edited on their own
  * screen ("Zone rules", FR-8.6). Save and Cancel with the unsaved-changes dialog (FR-12.4), errors under the fields that
  * disable Save (FR-12.7). Outside mode, fade edges, cylinders and personal bubbles arrive in M13; a zone's existing
  * settings for them are kept.
@@ -42,6 +45,9 @@ public final class ZoneEditorScreen extends AzScreen {
 	private static final int SIZE_WIDTH = 50;
 	private static final int SHAPE_WIDTH = 130;
 	private static final int POSITION_WIDTH = 90;
+	private static final int MARK_WIDTH = 110;
+	private static final int SIDE_WIDTH = 140;
+	private static final int STEP_WIDTH = 60;
 
 	private final ZoneDraft draft;
 	private final String zoneId;
@@ -62,6 +68,10 @@ public final class ZoneEditorScreen extends AzScreen {
 	public AzTextField depthField;
 	public AzButton saveButton;
 	public AzButton rulesButton;
+	public AzButton markCornersButton;
+	public AzDropdown<BoxEdit.Side> sideDropdown;
+	public AzButton shrinkButton;
+	public AzButton growButton;
 
 	private ZoneEditorScreen(Screen parent, ZoneDraft draft, String zoneId, boolean isNew) {
 		super(Component.translatable(isNew ? "audiozone.zone_editor.title.new" : "audiozone.zone_editor.title.edit"), parent);
@@ -85,6 +95,8 @@ public final class ZoneEditorScreen extends AzScreen {
 		String name = Component.translatable("audiozone.zone_editor.default_name", profile.zones().size() + 1).getString();
 		ZoneDraft draft = ZoneDraft.blank(id, name, ProfileManager.key(), WorldSession.dimension(minecraft), playerPosition(minecraft),
 				ZoneColors.next(used));
+		// New zones are boxes, drawn by marking corners and adjusted side by side (M8 review).
+		draft.setShape(ShapeKind.BOX);
 		return new ZoneEditorScreen(parent, draft, id, true);
 	}
 
@@ -174,32 +186,42 @@ public final class ZoneEditorScreen extends AzScreen {
 				this::setToLookedAtBlock), Component.translatable("audiozone.zone_editor.looking_at.tip"));
 		body.row(xField, yField, zField, myPositionButton, lookingAtButton);
 
-		// MVP shapes (FR-8.3); a cylinder from a later version stays a cylinder.
-		List<ShapeKind> shapes = draft.shape() == ShapeKind.CYLINDER
-				? List.of(ShapeKind.values()) : List.of(ShapeKind.SPHERE, ShapeKind.BOX);
-		shapeDropdown = Tooltips.describe(new AzDropdown<>(SHAPE_WIDTH, Component.translatable("audiozone.zone_editor.shape"), shapes,
-				shape -> Component.translatable("audiozone.zone_editor.shape." + shape.name().toLowerCase(Locale.ROOT)),
-				draft.shape(), this::setShape), Component.translatable("audiozone.zone_editor.shape.tip"));
+		shapeDropdown = null;
+		markCornersButton = null;
+		sideDropdown = null;
 		radiusField = textField(Field.RADIUS, SIZE_WIDTH, "radius");
 		widthField = textField(Field.WIDTH, SIZE_WIDTH, "width");
 		heightField = textField(Field.HEIGHT, SIZE_WIDTH, "height");
 		depthField = textField(Field.DEPTH, SIZE_WIDTH, "depth");
-		List<AbstractWidget> shapeRow = new ArrayList<>();
-		shapeRow.add(shapeDropdown);
-		switch (draft.shape()) {
-			case SPHERE -> shapeRow.add(radiusField);
-			case BOX -> {
-				shapeRow.add(widthField);
+		if (draft.shape() == ShapeKind.BOX) {
+			// Size, then the drawing tools: mark two corners in the world, or move one side at a time.
+			markCornersButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.zone_editor.mark_corners"), MARK_WIDTH,
+					this::markCorners), Component.translatable("audiozone.zone_editor.mark_corners.tip", audiozone.AudioZoneClient.openKey.getTranslatedKeyMessage()));
+			body.label(() -> Component.translatable("audiozone.zone_editor.size_label"));
+			body.row(widthField, heightField, depthField, markCornersButton);
+			sideDropdown = Tooltips.describe(new AzDropdown<>(SIDE_WIDTH, Component.translatable("audiozone.zone_editor.side"),
+					List.of(BoxEdit.Side.values()),
+					side -> Component.translatable("audiozone.zone_editor.side." + side.name().toLowerCase(Locale.ROOT)),
+					selectedSide, side -> selectedSide = side), Component.translatable("audiozone.zone_editor.side.tip"));
+			shrinkButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.zone_editor.shrink"), STEP_WIDTH,
+					() -> moveSide(-1)), Component.translatable("audiozone.zone_editor.shrink.tip"));
+			growButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.zone_editor.grow"), STEP_WIDTH,
+					() -> moveSide(1)), Component.translatable("audiozone.zone_editor.grow.tip"));
+			body.row(sideDropdown, shrinkButton, growButton);
+		} else {
+			// A sphere or cylinder from an older profile or a later version keeps its shape, and can become a box.
+			shapeDropdown = Tooltips.describe(new AzDropdown<>(SHAPE_WIDTH, Component.translatable("audiozone.zone_editor.shape"),
+					List.of(draft.shape(), ShapeKind.BOX),
+					shape -> Component.translatable("audiozone.zone_editor.shape." + shape.name().toLowerCase(Locale.ROOT)),
+					draft.shape(), this::setShape), Component.translatable("audiozone.zone_editor.shape.tip"));
+			List<AbstractWidget> shapeRow = new ArrayList<>();
+			shapeRow.add(shapeDropdown);
+			shapeRow.add(radiusField);
+			if (draft.shape() == ShapeKind.CYLINDER) {
 				shapeRow.add(heightField);
-				shapeRow.add(depthField);
 			}
-			case CYLINDER -> {
-				shapeRow.add(radiusField);
-				shapeRow.add(heightField);
-			}
+			body.row(shapeRow.toArray(new AbstractWidget[0]));
 		}
-		body.row(shapeRow.toArray(new AbstractWidget[0]));
-		body.label(() -> Component.translatable("audiozone.zone_editor.size_hint." + draft.shape().name().toLowerCase(Locale.ROOT)));
 
 		// After Save was refused, keep every error visible.
 		for (AzTextField field : List.of(nameField, xField, yField, zField, radiusField, widthField, heightField, depthField)) {
@@ -210,6 +232,8 @@ public final class ZoneEditorScreen extends AzScreen {
 	}
 
 	private boolean saveAttempted;
+	/** The side Grow and Shrink move; remembered while the game runs. */
+	private static BoxEdit.Side selectedSide = BoxEdit.Side.NORTH;
 
 	/** A text field bound to a draft field: its tooltip names the value, and its errors come from the draft. */
 	private AzTextField textField(Field field, int width, String key) {
@@ -260,13 +284,72 @@ public final class ZoneEditorScreen extends AzScreen {
 		updateButtons();
 	}
 
+	/** "Mark corners": the editor closes while the player marks two corners in the world (see {@link ZoneMarking}). */
+	public void markCorners() {
+		ZoneMarking.start(this);
+	}
+
+	/**
+	 * Grow ({@code direction} 1) or Shrink (-1) the chosen side by one block, or five with Shift. The opposite side stays
+	 * where it is.
+	 */
+	public void moveSide(int direction) {
+		BoxEdit.Placed current = currentBox();
+		if (current == null) {
+			return;
+		}
+		int blocks = minecraft.hasShiftDown() ? 5 : 1;
+		applyBox(BoxEdit.moveSide(current.center(), current.box(), selectedSide, direction * blocks));
+	}
+
+	public BoxEdit.Side selectedSide() {
+		return selectedSide;
+	}
+
+	public void selectSide(BoxEdit.Side side) {
+		selectedSide = side;
+		if (sideDropdown != null) {
+			sideDropdown.setValue(side);
+		}
+	}
+
+	/** The box as the editor has it now, or null while a center or size field is invalid. */
+	private BoxEdit.Placed currentBox() {
+		for (Field field : List.of(Field.X, Field.Y, Field.Z, Field.WIDTH, Field.HEIGHT, Field.DEPTH)) {
+			if (draft.error(field) != null) {
+				return null;
+			}
+		}
+		Zone zone = draft.build();
+		return zone.shape() instanceof Shape.Box box ? new BoxEdit.Placed(zone.anchor(), box) : null;
+	}
+
+	/** Puts a box's center and size into the editor (from marking corners or moving a side). */
+	public void applyBox(BoxEdit.Placed placed) {
+		draft.setBox(placed.center(), placed.box(), ProfileManager.key(), WorldSession.dimension(Minecraft.getInstance()));
+		if (Minecraft.getInstance().gui.screen() == this) {
+			rebuildWidgets();
+		}
+	}
+
+	/** The zone as currently edited, or its saved version while a value is invalid; null for a new zone not saved yet. */
+	Zone draftZone() {
+		return draft.canSave() ? draft.build() : ProfileManager.profile().zone(zoneId);
+	}
+
+	/** The chosen color, as {@code 0xRRGGBB}. */
+	int currentColor() {
+		return draft.error(Field.COLOR) == null ? draft.color() : ZoneColors.next(List.of());
+	}
+
 	public void setShape(ShapeKind shape) {
 		if (shape == draft.shape()) {
 			return;
 		}
 		draft.setShape(shape);
 		rebuildWidgets();
-		setInitialFocus(shapeDropdown);
+		// A box has no shape choice (it is the only shape new zones get), so focus moves to its width.
+		setInitialFocus(shapeDropdown != null ? shapeDropdown : widthField);
 	}
 
 	/** FR-8.1 "Set to my position": the player's feet, in this world and dimension. */

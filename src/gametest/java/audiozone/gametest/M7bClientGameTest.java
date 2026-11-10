@@ -53,18 +53,18 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(ZoneEditorScreen.class);
 			Vec3 feet = context.computeOnClient(mc -> mc.player.position());
 			check(editor(context, e -> e.nameField.getValue()).equals("Zone 1"), "a new zone should be named Zone 1");
-			check(editor(context, e -> e.draft().shape() == ZoneDraft.ShapeKind.SPHERE && e.radiusField.getValue().equals("10")),
-					"a new zone should be a 10-block sphere");
+			check(editor(context, e -> e.draft().shape() == ZoneDraft.ShapeKind.BOX && e.widthField.getValue().equals("10")
+					&& e.heightField.getValue().equals("10") && e.depthField.getValue().equals("10")), "a new zone should be a 10-block box");
 			check(editor(context, e -> Math.abs(Double.parseDouble(e.xField.getValue()) - feet.x) < 0.1
 					&& Math.abs(Double.parseDouble(e.zField.getValue()) - feet.z) < 0.1), "a new zone should be centered on the player");
 			check(editor(context, e -> e.colorPicker.color()) == 0xE69F00, "the first zone takes the first palette color (orange)");
 			// Invalid size: an error and Save disabled; then a valid one.
-			context.runOnClient(mc -> editorScreen(mc).radiusField.setValue("300"));
+			context.runOnClient(mc -> editorScreen(mc).widthField.setValue("600"));
 			context.waitTicks(1);
-			check(editor(context, e -> !e.saveButton.active && e.radiusField.error() != null), "radius 300 should be refused");
-			context.runOnClient(mc -> editorScreen(mc).radiusField.setValue("8"));
+			check(editor(context, e -> !e.saveButton.active && e.widthField.error() != null), "width 600 should be refused");
+			context.runOnClient(mc -> editorScreen(mc).widthField.setValue("8"));
 			context.waitTicks(1);
-			check(editor(context, e -> e.saveButton.active), "radius 8 should be accepted");
+			check(editor(context, e -> e.saveButton.active), "width 8 should be accepted");
 			context.takeScreenshot("m7b-zone-editor");
 
 			// FR-10 AC: change the color by swatch (keyboard: focus the swatch, Enter) and by hex; #XYZ is refused.
@@ -83,7 +83,7 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(ZoneRulesScreen.class);
 			String zoneId = context.computeOnClient(mc -> ((ZoneRulesScreen) mc.gui.screen()).zoneId());
 			Zone saved = context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId));
-			check(saved != null && saved.shape().equals(new Shape.Sphere(8)), "Zone rules should save the zone first, was " + saved);
+			check(saved != null && saved.shape().equals(new Shape.Box(8, 10, 10)), "Zone rules should save the zone first, was " + saved);
 			check(context.computeOnClient(mc -> ProfileManager.profile().colorOf(zoneId)) == 0x56B4E9, "the color should be saved");
 			context.runOnClient(mc -> ((ZoneRulesScreen) mc.gui.screen()).panel.addButton.onPress(null));
 			context.waitForScreen(RuleEditorScreen.class);
@@ -103,23 +103,22 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			// The zone works: a villager where the player stands is muted; the row shows color, place and rule count.
 			check(play(context, feet.x + 2, feet.y, feet.z) <= SILENT, "a villager inside the new zone should be muted");
 			List<String> row = context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow(zoneId).columnTexts());
-			check(row.get(0).equals("Zone 1") && row.contains("Here") && row.contains("1 rule") && row.contains("Sphere, radius 8, Inside"), "the zone row should describe it, was " + row);
+			check(row.get(0).equals("Zone 1") && row.contains("Here") && row.contains("1 rule") && row.contains("Box 8 × 10 × 10, Inside"), "the zone row should describe it, was " + row);
 			check(context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow(zoneId).swatch()) == 0x56B4E9, "the row shows the zone color");
 			context.takeScreenshot("m7b-zones-list");
 
-			// FR-12.4: change the radius and press Esc: the dialog appears; Keep editing keeps the value.
+			// FR-12.4: change the width and press Esc: the dialog appears; Keep editing keeps the value.
 			context.runOnClient(mc -> mc.gui.setScreen(ZoneEditorScreen.edit(main(mc), ProfileManager.profile().zone(zoneId))));
 			context.waitForScreen(ZoneEditorScreen.class);
-			context.runOnClient(mc -> editorScreen(mc).radiusField.setValue("5"));
+			context.runOnClient(mc -> editorScreen(mc).widthField.setValue("5"));
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitForScreen(AzDialog.class);
 			context.runOnClient(mc -> ((AzDialog) mc.gui.screen()).choose(2));
 			context.waitForScreen(ZoneEditorScreen.class);
-			check(editor(context, e -> e.radiusField.getValue()).equals("5"), "Keep editing should keep the radius");
-			// Box shape: width, height and depth fields.
-			context.runOnClient(mc -> editorScreen(mc).setShape(ZoneDraft.ShapeKind.BOX));
-			check(editor(context, e -> e.bodyWidgets().contains(e.widthField) && e.bodyWidgets().contains(e.depthField)
-					&& !e.bodyWidgets().contains(e.radiusField)), "a box shows width, height and depth");
+			check(editor(context, e -> e.widthField.getValue()).equals("5"), "Keep editing should keep the width");
+			// A box shows width, height and depth with the drawing tools; there is no sphere for new zones.
+			check(editor(context, e -> e.bodyWidgets().contains(e.widthField) && e.bodyWidgets().contains(e.markCornersButton)
+					&& e.bodyWidgets().contains(e.sideDropdown) && e.shapeDropdown == null), "a box shows its size and the drawing tools");
 			context.runOnClient(mc -> editorScreen(mc).save());
 			context.waitForScreen(AudioZoneScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId).shape()) instanceof Shape.Box, "Save should store the box");

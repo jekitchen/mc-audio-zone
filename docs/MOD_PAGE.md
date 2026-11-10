@@ -27,8 +27,8 @@ Press <kbd>;</kbd> in game to open it.
   `villager|zombie`, `villager -ambient` or `block.*.step`.
 - **Write rules.** Mute or turn down one sound or a whole family (`minecraft:entity.villager.*`). The editor shows which
   sounds a rule matches and warns when a more specific rule overrides it.
-- **Draw zones.** A sphere or box around your trading hall, farm or base, with its own rules. Outlines show where your
-  zones are, in their own colors and with their names.
+- **Draw zones.** Mark two corners of your trading hall, farm or base and it becomes a zone with its own rules; nudge
+  any side in or out. Outlines show where your zones are, in their own colors, with their names and sizes.
 - **Ask why.** "Why does it sound like this?" shows every rule and zone that touched a sound, which one won, and why.
 - **One profile per server and world**, created automatically and saved across restarts.
 - **Bypass** with <kbd>F10</kbd> to hear plain vanilla sound at any time, without losing a single setting.
