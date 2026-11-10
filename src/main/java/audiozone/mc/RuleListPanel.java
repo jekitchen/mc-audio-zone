@@ -34,6 +34,8 @@ public final class RuleListPanel {
 	private final AzScreen host;
 	private final RuleTarget target;
 	public AzButton addButton;
+	/** "Add existing rule", on a zone's list only. */
+	public AzButton addExistingButton;
 	public AzList list;
 
 	public RuleListPanel(AzScreen host, RuleTarget target) {
@@ -45,11 +47,18 @@ public final class RuleListPanel {
 		return target;
 	}
 
-	/** Adds the Add rule button, a hint line and the list to the body. */
+	/** Adds Add rule (and, for a zone, Add existing rule), a hint line and the list to the body. */
 	public void build(AzScreen.Body body) {
 		addButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.rules.add"),
 				() -> setScreen(RuleEditorScreen.create(host, target))), Component.translatable("audiozone.rules.add.tip"));
-		body.row(addButton);
+		if (target.isGlobal()) {
+			body.row(addButton);
+		} else {
+			// A zone's list can also take a copy of a rule from the global list or another zone.
+			addExistingButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.rules.add_existing"),
+					() -> setScreen(new RuleCopyScreen(host, target))), Component.translatable("audiozone.rules.add_existing.tip"));
+			body.row(addButton, addExistingButton);
+		}
 		body.label(() -> Component.translatable("audiozone.rules.hint"));
 		list = new AzList(body.width(), 100, Component.translatable(target.isGlobal() ? "audiozone.rules.list" : "audiozone.zone_rules.list"));
 		list.setEmptyText(() -> Component.translatable(target.isGlobal() ? "audiozone.rules.empty" : "audiozone.zone_rules.empty"));

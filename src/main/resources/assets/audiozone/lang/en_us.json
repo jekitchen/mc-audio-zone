@@ -409,5 +409,17 @@
 	"audiozone.rules.matches.one": "Matches 1 sound",
 	"audiozone.rules.matches.none": "⚠ No known sound matches",
 	"audiozone.rule_editor.inherited.muted": "muted",
-	"audiozone.rule_editor.inherited.not_muted": "not muted"
+	"audiozone.rule_editor.inherited.not_muted": "not muted",
+	"audiozone.rules.add_existing": "Add existing rule",
+	"audiozone.rules.add_existing.tip": "Copy a rule from the global list or another zone into this zone. The copy is separate: changing one later does not change the other.",
+	"audiozone.rule_copy.title": "Add existing rule",
+	"audiozone.rule_copy.hint": "Copies are separate: changing one later does not change the other.",
+	"audiozone.rule_copy.list": "Rules you can copy",
+	"audiozone.rule_copy.empty": "No other rules yet. Rules from the global list and other zones show here.",
+	"audiozone.rule_copy.from_global": "From the global rules",
+	"audiozone.rule_copy.from_zone": "From zone %s",
+	"audiozone.rule_copy.copy": "Copy",
+	"audiozone.rule_copy.copy.tip": "Add a copy of this rule to this zone",
+	"audiozone.rule_copy.duplicate": "This zone already has a rule for this pattern; edit that one instead",
+	"audiozone.rule_copy.copied": "Copied %s into this zone"
 }
