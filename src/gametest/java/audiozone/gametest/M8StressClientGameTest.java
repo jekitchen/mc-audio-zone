@@ -53,7 +53,7 @@ public final class M8StressClientGameTest implements FabricClientGameTest {
 	public void runTest(ClientGameTestContext context) {
 		double factor = System.getenv("CI") != null ? CI_FACTOR : 1.0;
 		int soakSeconds = Integer.getInteger("audiozone.soakSeconds", 20);
-		try (TestSingleplayerContext world = context.worldBuilder().create()) {
+		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			// The stress pen is centered on (0, 64, 0); move it (and its zones) to where the player stands.
