@@ -33,6 +33,11 @@ public record Rule(String id, boolean enabled, SoundPattern pattern, Boolean mut
 		return new Rule(id, true, SoundPattern.of(pattern), null, null, null, null);
 	}
 
+	/** The same rule under another ID, e.g. a copy in another list. */
+	public Rule withId(String value) {
+		return new Rule(value, enabled, pattern, mute, volume, limit, cue);
+	}
+
 	public Rule withEnabled(boolean value) {
 		return new Rule(id, value, pattern, mute, volume, limit, cue);
 	}

@@ -1,6 +1,7 @@
 package audiozone.core.profile;
 
 import audiozone.core.rules.Rule;
+import audiozone.core.rules.SoundPattern;
 import audiozone.core.zones.Zone;
 import java.util.ArrayList;
 import java.util.List;
@@ -90,6 +91,49 @@ public record RuleTarget(String zoneId) {
 				return id;
 			}
 		}
+	}
+
+	/** A rule and the list it is in, for "Add existing rule". */
+	public record Sourced(RuleTarget source, Rule rule) {
+	}
+
+	/**
+	 * Every rule in the profile's other lists, to copy into this one: the global list first (unless this is it), then
+	 * each other zone in zone order.
+	 */
+	public List<Sourced> otherRules(Profile profile) {
+		List<Sourced> out = new ArrayList<>();
+		if (!isGlobal()) {
+			for (Rule rule : profile.globalRules()) {
+				out.add(new Sourced(GLOBAL, rule));
+			}
+		}
+		for (Zone zone : profile.zones()) {
+			if (!zone.id().equals(zoneId)) {
+				for (Rule rule : zone.rules()) {
+					out.add(new Sourced(zone(zone.id()), rule));
+				}
+			}
+		}
+		return out;
+	}
+
+	/** Whether this list already has a rule with this pattern. */
+	public boolean hasPattern(Profile profile, SoundPattern pattern) {
+		for (Rule rule : rules(profile)) {
+			if (rule.pattern().equals(pattern)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * "Add existing rule": a copy of {@code rule} at the end of this list, under a new ID. Rules are values, so the
+	 * copy and the original are independent: changing one never changes the other.
+	 */
+	public Profile copyIn(Profile profile, Rule rule) {
+		return put(profile, rule.withId(newRuleId(profile)));
 	}
 
 	private Profile with(Profile profile, List<Rule> rules) {
