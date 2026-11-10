@@ -34,7 +34,7 @@ public final class M1ClientGameTest implements FabricClientGameTest {
 		List<Seen> seen = new CopyOnWriteArrayList<>();
 		SoundObserver observer = o -> seen.add(new Seen(o.id(), o.category(), o.volume(), o.range(), o.distance(), o.audible()));
 
-		try (TestSingleplayerContext world = context.worldBuilder().create()) {
+		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			SoundHook.addObserver(observer);
 			try {
