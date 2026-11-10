@@ -182,6 +182,7 @@ Browse every sound the game knows by name or ID.
 | `/entity\.(cow\|pig)\..*/` | regex between slashes (Future), ID only, max 100 characters | cow and pig sounds |
 
 - **FR-3.6** (Future) An invalid regex shows a message under the field in plain words ("Missing closing bracket") and keeps the previous results. A regex that takes longer than 50 ms over all IDs is stopped and reported as "too complex".
+- **FR-3.7 (v1)** Search results have the same "Apply to" selector as Recently Played (FR-1.5): a quick action creates or edits the exact-ID rule in the global list or in a chosen zone's list, so a zone rule can be made straight from a search.
 
 **Fair play.** Search lists sound IDs, which are public game data. It shows nothing about the world.
 
@@ -193,6 +194,7 @@ Browse every sound the game knows by name or ID.
 - [ ] Install a resource pack that adds a new sound in `sounds.json`, press F3+T, search its name: it appears.
 - [ ] (v1) Type `/entity\.(cow|pig)\..*/`: only cow and pig sounds; type `/(/`: a readable error appears and the game does not freeze.
 - [ ] Every control on the screen can be reached and used with Tab, arrows and Enter.
+- [ ] (v1) On Search, set Apply to to a zone, find `villager`, and Mute a result: the rule appears in that zone's rules, not in the global list.
 
 ### FR-4 Wildcard rule patterns (MVP)
 
@@ -209,6 +211,7 @@ A rule targets sound IDs through a pattern, so one rule can cover a family of so
   4. A rule higher in the list beats a lower one.
 - **FR-4.6** The rule editor shows "Partly overridden by: \<rule>" when a more specific rule takes over one of this rule's properties.
 - **FR-4.7** A rule can be disabled without deleting it.
+- **FR-4.8 (v1)** **Find sound.** Every rule editor (the global list and each zone's list) has a "Find sound…" button next to the pattern field. It opens a picker that searches in plain words with the Search syntax (FR-3.5), over subtitles, the readable names of sounds without a subtitle ("Basalt deltas: additions (ambient)") and IDs. Choosing a result offers two buttons: **This sound** fills in its exact ID; **Sounds like this** fills in the closest wildcard suggestion (the first "Make pattern…" suggestion of FR-1.5, e.g. `minecraft:entity.villager.*`) and lists the others to pick from. The pattern field stays editable, and the live preview (FR-4.3) updates at once. The picker is keyboard-usable like Search, and Esc returns to the editor unchanged.
 
 **Fair play.** Patterns only choose which sounds a rule changes.
 
@@ -219,6 +222,9 @@ A rule targets sound IDs through a pattern, so one rule can cover a family of so
 - [ ] Add rule `minecraft:entity.villager.ambient` at 100% below the mute rule above: villager ambient sounds play; other villager sounds stay muted; the wildcard rule shows "Partly overridden by…".
 - [ ] Type `Minecraft:Entity.Cow.*`: it becomes lowercase. Type `entity.cow.#`: error shown and Save disabled.
 - [ ] Disable a rule: its effect stops immediately; enable it: the effect returns.
+- [ ] (v1) In a zone's rule editor, use Find sound, type `villager hurt`, pick "Villager hurts", choose This sound: the pattern is `minecraft:entity.villager.hurt` and the preview says "Matches 1 sound".
+- [ ] (v1) In the global rule editor, Find sound `cow`, pick a cow sound, choose Sounds like this: the pattern is `minecraft:entity.cow.*` and the preview lists only cow sounds.
+- [ ] (v1) Open Find sound and press Esc: the editor is unchanged.
 
 ### FR-5 Mute and volume, 0–200% (MVP: mute and 0–100%; v1: boost to 200%)
 
@@ -732,7 +738,7 @@ Three releases: **MVP (0.1)** after milestones M0–M**8, v1 (1.0) after M9**–
 | M13 | Full zones | Cylinder, personal bubble, Outside mode, fade, zone limits and cues, P6–P8, dashed and fade outlines, color picker | Fade maths, per-tick cost |
 | M14 | Profile management | FR-11.2–11.3 copy settings from another server, rename, reset, delete | Link bookkeeping |
 | M15 | Import/export | FR-11.4–11.7 with validation and migrations | Validation gaps |
-| M16 | 1.0 polish | Sound trace inline editing (FR-14.4), Undo toasts, localization pass, full compatibility pass, accessibility audit | Scope creep |
+| M16 | 1.0 polish | Sound trace inline editing (FR-14.4), Undo toasts, Find sound in rule editors (FR-4.8), Apply to on Search (FR-3.7), localization pass, full compatibility pass, accessibility audit | Scope creep |
 
 ### 10.3 Future (after 1.0, not committed)
 
@@ -747,6 +753,7 @@ Three releases: **MVP (0.1)** after milestones M0–M**8, v1 (1.0) after M9**–
 - Filled zone display (FR-10.7), moved from v1 in the feature review.
 - Regex search (FR-3), moved from v1 in the feature review.
 - Preview: play a search result once at 100% (FR-3.3), moved from v1 in the feature review.
+- Search synonyms: everyday words that are not in a sound's subtitle or ID find it too ("moo" finds the cow sounds, whose subtitle is "Cow moos"), from a word list that ships with the mod and can be translated. Needs upkeep as Minecraft adds sounds.
 
 ### 10.4 Working with Claude Code per milestone
 
@@ -986,3 +993,4 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Outlines use vanilla's gizmo lines and billboard labels (the same API in 26.2 and 26.3), emitted at the end of level extraction; "through blocks" uses the gizmos' always-on-top mode. Labels are white for contrast (A-3); the zone's color is on its lines | M7 |
 | 2026-11-09 | "Show zone outlines" (a profile setting) and "Outlines visible through blocks" (app-wide, in `config/audiozone/settings.json`) are on a new Settings → Zones page. The optional outlines hotkey (unbound) cycles Always, Only while editing, Never | M7 |
 | 2026-11-09 | The zone open in the zone editor is outlined from the editor's current values, so size and shape changes show before Save | M7 |
+| 2026-11-09 | Plain-word sound finding comes to the rule editors (global and zone) as a "Find sound…" picker that reuses Search and the "Make pattern…" suggestions (FR-4.8, v1), and Search gets "Apply to" so zone rules can be made from it (FR-3.7, v1). Both are planned for M16; synonyms are a Future item | maxismagical, M8 review |
