@@ -41,10 +41,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Mod Menu is optional (FR-12.3): 26.2 runs without it, 26.3 with it, so every run checks both.
           - minecraft: '26.2'
             fabric_api: '0.161.0+26.2'
+            modmenu: 'false'
           - minecraft: '26.3'
             fabric_api: '0.165.2+26.3'
+            modmenu: 'true'
     name: client game tests (Minecraft ${{ matrix.minecraft }})
     # A game that cannot create a window hangs instead of exiting; fail fast instead of after 6 hours.
     timeout-minutes: 20
@@ -67,7 +70,7 @@ jobs:
         # so the sound tests (M1 onward) can observe sounds.
         env:
           ALSOFT_DRIVERS: 'null'
-        run: ./gradlew runClientGameTest -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }}
+        run: ./gradlew runClientGameTest -Pminecraft_version=${{ matrix.minecraft }} -Pfabric_api_version=${{ matrix.fabric_api }} -Pmodmenu=${{ matrix.modmenu }}
       - name: capture screenshots and logs
         if: always()
         uses: actions/upload-artifact@v7

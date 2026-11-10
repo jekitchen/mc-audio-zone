@@ -128,7 +128,9 @@ public final class AudioZoneScreen extends AzScreen {
 
 	@Override
 	protected Component headerSubtitle() {
-		return Component.translatable("audiozone.header.profile", ProfileManager.profile().name());
+		return ProfileManager.isLoaded()
+				? Component.translatable("audiozone.header.profile", ProfileManager.profile().name())
+				: Component.translatable("audiozone.header.no_world");
 	}
 
 	@Override
@@ -153,6 +155,12 @@ public final class AudioZoneScreen extends AzScreen {
 
 	@Override
 	protected void buildTab(int index, Body body) {
+		if (index != TAB_SETTINGS && !ProfileManager.isLoaded()) {
+			// Opened outside a world (e.g. from Mod Menu on the title screen): sounds, rules and zones belong to a
+			// world's profile (FR-11.1), so there is nothing to show or change yet.
+			body.label(() -> Component.translatable("audiozone.no_world"));
+			return;
+		}
 		if (index == TAB_RECENT) {
 			buildRecent(body);
 		} else if (index == TAB_SEARCH) {
@@ -466,6 +474,10 @@ public final class AudioZoneScreen extends AzScreen {
 			return;
 		}
 		body.label(() -> Component.translatable("audiozone.settings.bypass_hint", bypassKeyName()));
+		if (!ProfileManager.isLoaded()) {
+			body.label(() -> Component.translatable("audiozone.settings.no_world"));
+			return;
+		}
 		body.row(Tooltips.describe(new AzToggle(160, Component.translatable("audiozone.settings.show_distance"),
 				AudioZoneSettings.showDistance(), AudioZoneSettings::setShowDistance),
 				Component.translatable("audiozone.settings.show_distance.tip")));
@@ -486,15 +498,21 @@ public final class AudioZoneScreen extends AzScreen {
 
 	/** Settings → Zones (PRD 6.1): FR-10.1 "Show zone outlines" and FR-10.5 "Outlines visible through blocks". */
 	private void buildZoneSettings(Body body) {
+		// "Outlines visible through blocks" is app-wide; "Show zone outlines" belongs to a world's profile.
+		throughBlocksToggle = Tooltips.describe(new AzToggle(OUTLINE_MODE_WIDTH, Component.translatable("audiozone.settings.through_blocks"),
+				AudioZoneSettings.outlinesThroughBlocks(), AudioZoneSettings::setOutlinesThroughBlocks),
+				Component.translatable("audiozone.settings.through_blocks.tip"));
+		if (!ProfileManager.isLoaded()) {
+			body.row(throughBlocksToggle);
+			body.label(() -> Component.translatable("audiozone.settings.no_world"));
+			return;
+		}
 		outlineModeDropdown = Tooltips.describe(new AzDropdown<>(OUTLINE_MODE_WIDTH, Component.translatable("audiozone.settings.outlines"),
 				List.of(OutlineMode.values()),
 				mode -> Component.translatable("audiozone.settings.outlines." + mode.name().toLowerCase(Locale.ROOT)),
 				AudioZoneSettings.outlineMode(), AudioZoneSettings::setOutlineMode),
 				Component.translatable("audiozone.settings.outlines.tip", outlinesKeyName()));
 		body.row(outlineModeDropdown);
-		throughBlocksToggle = Tooltips.describe(new AzToggle(OUTLINE_MODE_WIDTH, Component.translatable("audiozone.settings.through_blocks"),
-				AudioZoneSettings.outlinesThroughBlocks(), AudioZoneSettings::setOutlinesThroughBlocks),
-				Component.translatable("audiozone.settings.through_blocks.tip"));
 		body.row(throughBlocksToggle);
 	}
 

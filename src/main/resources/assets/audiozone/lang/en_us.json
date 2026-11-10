@@ -421,5 +421,8 @@
 	"audiozone.rule_copy.copy": "Copy",
 	"audiozone.rule_copy.copy.tip": "Add a copy of this rule to this zone",
 	"audiozone.rule_copy.duplicate": "This zone already has a rule for this pattern; edit that one instead",
-	"audiozone.rule_copy.copied": "Copied %s into this zone"
+	"audiozone.rule_copy.copied": "Copied %s into this zone",
+	"audiozone.no_world": "Join a world or server to see and change its sounds. Each one keeps its own rules and zones.",
+	"audiozone.header.no_world": "No world loaded",
+	"audiozone.settings.no_world": "The other settings belong to a world or server; join one to change them."
 }
