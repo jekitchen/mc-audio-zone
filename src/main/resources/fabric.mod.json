@@ -17,6 +17,9 @@
 	"entrypoints": {
 		"client": [
 			"audiozone.AudioZoneClient"
+		],
+		"modmenu": [
+			"audiozone.mc.ModMenuEntry"
 		]
 	},
 	"mixins": [

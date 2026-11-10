@@ -358,12 +358,14 @@ public abstract class AzScreen extends Screen {
 		placeRow(header, width - Theme.PADDING, (HEADER_HEIGHT - Theme.WIDGET_HEIGHT) / 2);
 
 		// Tab bar (not shown for a single tab, e.g. an editor).
-		int tabWidth = Math.min(MAX_TAB_WIDTH, (width - 2 * Theme.PADDING) / tabs.size());
+		int[] tabWidths = tabWidths(tabs);
+		int tabX = Theme.PADDING;
 		for (int i = 0; tabs.size() > 1 && i < tabs.size(); i++) {
 			int index = i;
-			AzTabButton button = new AzTabButton(tabWidth, tabs.get(i).title(), i, tabs.size(), i == currentTab, () -> selectTab(index));
-			button.setPosition(Theme.PADDING + i * tabWidth, HEADER_HEIGHT);
+			AzTabButton button = new AzTabButton(tabWidths[i], tabs.get(i).title(), i, tabs.size(), i == currentTab, () -> selectTab(index));
+			button.setPosition(tabX, HEADER_HEIGHT);
 			tabButtons.add(addRenderableWidget(button));
+			tabX += tabWidths[i];
 		}
 
 		// Body.
@@ -398,6 +400,35 @@ public abstract class AzScreen extends Screen {
 			setInitialFocus(bodyWidgets.isEmpty() ? tabButtons.get(currentTab) : bodyWidgets.get(0));
 		}
 	}
+
+	/**
+	 * Tab widths: each tab gets its text's width plus padding, and spare room is shared equally up to
+	 * {@value #MAX_TAB_WIDTH} per tab, so a long title ("Recently Played") is not cut off just because every tab got the
+	 * same share. If the titles do not fit even so, every tab shrinks in proportion.
+	 */
+	private int[] tabWidths(List<Tab> tabs) {
+		int available = width - 2 * Theme.PADDING;
+		int[] widths = new int[tabs.size()];
+		int natural = 0;
+		for (int i = 0; i < tabs.size(); i++) {
+			widths[i] = font.width(tabs.get(i).title()) + 2 * TAB_TEXT_PADDING;
+			natural += widths[i];
+		}
+		if (natural > available) {
+			for (int i = 0; i < widths.length; i++) {
+				widths[i] = widths[i] * available / natural;
+			}
+			return widths;
+		}
+		int spare = available - natural;
+		for (int i = 0; i < widths.length; i++) {
+			widths[i] = Math.max(widths[i], Math.min(MAX_TAB_WIDTH, widths[i] + spare / widths.length));
+		}
+		return widths;
+	}
+
+	/** Room on each side of a tab's title. */
+	private static final int TAB_TEXT_PADDING = 8;
 
 	/** Places widgets in a row ending at {@code right}, and adds them left to right. */
 	private void placeRow(List<AbstractWidget> widgets, int right, int y) {
