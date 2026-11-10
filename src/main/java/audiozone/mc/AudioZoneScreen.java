@@ -10,8 +10,10 @@ import audiozone.core.profile.RuleTarget;
 import audiozone.core.rules.Rule;
 import audiozone.core.search.SoundSearch;
 import audiozone.core.search.SoundEntry;
+import audiozone.core.search.SoundNames;
 import audiozone.core.search.SearchQuery;
 import audiozone.mc.ui.AzButton;
+import audiozone.mc.ui.AzTabButton;
 import audiozone.mc.ui.AzDropdown;
 import audiozone.mc.ui.AzList;
 import audiozone.mc.ui.AzScreen;
@@ -59,7 +61,7 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final int ZONE_WIDTH = 110;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/edit");
 	private static final Identifier WHY_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/help");
-	private static final int PAGE_WIDTH = 160;
+	private static final int PAGE_TAB_WIDTH = 100;
 	private static final int OUTLINE_MODE_WIDTH = 240;
 	private static final int SEEN_WIDTH = 150;
 
@@ -92,7 +94,8 @@ public final class AudioZoneScreen extends AzScreen {
 	private long searchChangedAt;
 	private List<SoundEntry> searchEntries;
 	public AzButton addRuleButton;
-	public AzDropdown<SettingsPage> pageDropdown;
+	/** The Settings tab's page tabs, in {@link SettingsPage} order. */
+	public final List<AzTabButton> pageTabs = new ArrayList<>();
 	public AzButton copyReportButton;
 	public AzDropdown<OutlineMode> outlineModeDropdown;
 	public AzToggle throughBlocksToggle;
@@ -235,7 +238,7 @@ public final class AudioZoneScreen extends AzScreen {
 		List<AzList.Row> rows = new ArrayList<>(snapshot.size());
 		for (RecentRow row : snapshot) {
 			String name = subtitle(row.id());
-			String shownName = name == null ? row.id() : name;
+			String shownName = name == null ? SoundNames.readable(row.id()) : name;
 			String category = row.category() == null ? "?" : Component.translatable("soundCategory." + row.category()).getString();
 			if (!needle.isEmpty() && !(shownName + " " + row.id() + " " + category).toLowerCase(Locale.ROOT).contains(needle)) {
 				continue;
@@ -380,7 +383,7 @@ public final class AudioZoneScreen extends AzScreen {
 		List<AzList.Row> rows = new ArrayList<>(found.size());
 		for (SoundEntry entry : found) {
 			String id = entry.id();
-			String name = entry.subtitle() == null ? id : entry.subtitle();
+			String name = entry.subtitle() == null ? SoundNames.readable(id) : entry.subtitle();
 			String category = RecentLog.get().sounds().seenCategory(id);
 			String seen = category == null ? "" : Component.translatable("audiozone.search.seen_as",
 					Component.translatable("soundCategory." + category)).getString();
@@ -444,11 +447,16 @@ public final class AudioZoneScreen extends AzScreen {
 	// ---- Settings ----
 
 	private void buildSettings(Body body) {
-		pageDropdown = Tooltips.describe(new AzDropdown<>(PAGE_WIDTH, Component.translatable("audiozone.settings.page"),
-				List.of(SettingsPage.values()),
-				page -> Component.translatable("audiozone.settings.page." + page.name().toLowerCase(Locale.ROOT)),
-				settingsPage, this::setSettingsPage), Component.translatable("audiozone.settings.page.tip"));
-		body.row(pageDropdown);
+		// Page tabs (M8 review): every page visible, the current one underlined, like the main tab bar.
+		SettingsPage[] pages = SettingsPage.values();
+		pageTabs.clear();
+		for (int i = 0; i < pages.length; i++) {
+			SettingsPage page = pages[i];
+			pageTabs.add(new AzTabButton(PAGE_TAB_WIDTH,
+					Component.translatable("audiozone.settings.page." + page.name().toLowerCase(Locale.ROOT)), i, pages.length,
+					page == settingsPage, () -> setSettingsPage(page)));
+		}
+		body.row(pageTabs.toArray(new AbstractWidget[0]));
 		if (settingsPage == SettingsPage.DIAGNOSTICS) {
 			buildDiagnostics(body);
 			return;
@@ -469,7 +477,7 @@ public final class AudioZoneScreen extends AzScreen {
 		}
 		settingsPage = page;
 		rebuildWidgets();
-		setInitialFocus(pageDropdown);
+		setInitialFocus(pageTabs.get(page.ordinal()));
 	}
 
 	public SettingsPage settingsPage() {

@@ -18,6 +18,7 @@
 			"audiozone.gametest.M7ClientGameTest",
 			"audiozone.gametest.M7bClientGameTest",
 			"audiozone.gametest.M7cClientGameTest",
+			"audiozone.gametest.M8ReviewClientGameTest",
 			"audiozone.gametest.M8StressClientGameTest"
 		]
 	},
