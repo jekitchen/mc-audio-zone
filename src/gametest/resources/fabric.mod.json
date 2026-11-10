@@ -5,6 +5,9 @@
 	"name": "Audio Zone game tests",
 	"environment": "client",
 	"entrypoints": {
+		"client": [
+			"audiozone.gametest.GameTestWatchdog"
+		],
 		"fabric-client-gametest": [
 			"audiozone.gametest.M0ClientGameTest",
 			"audiozone.gametest.M1ClientGameTest",
