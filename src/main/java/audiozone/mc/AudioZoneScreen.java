@@ -6,7 +6,13 @@ import audiozone.core.diag.TimingWindow;
 import audiozone.core.outline.OutlineMode;
 import audiozone.core.recent.RecentRow;
 import audiozone.core.recent.SortOrder;
+import audiozone.core.profile.Profile;
 import audiozone.core.profile.RuleTarget;
+import audiozone.core.quick.ApplyTarget;
+import audiozone.core.quick.QuickActionResult;
+import audiozone.core.quick.QuickActions;
+import audiozone.core.trace.RuleEdit;
+import audiozone.core.trace.TraceEditError;
 import audiozone.core.rules.Rule;
 import audiozone.core.search.SoundSearch;
 import audiozone.core.search.SoundEntry;
@@ -292,7 +298,7 @@ public final class AudioZoneScreen extends AzScreen {
 	 * pressing it does.
 	 */
 	private AzButton muteButton(String soundId) {
-		boolean muted = ProfileManager.profile().isExactMuted(soundId);
+		boolean muted = QuickActions.isMuted(ProfileManager.profile(), applyTarget(), soundId);
 		return AzButton.icon(
 				Identifier.fromNamespaceAndPath("audiozone", muted ? "icon/mute" : "icon/volume"),
 				Component.translatable(muted ? "audiozone.recent.unmute" : "audiozone.recent.mute"),
@@ -311,12 +317,54 @@ public final class AudioZoneScreen extends AzScreen {
 				() -> minecraft.gui.setScreen(new TraceScreen(this, soundId)));
 	}
 
+	/**
+	 * Mute/Unmute on a Recently Played or Search row (FR-1.5): edits the sound's exact-ID rule in the list "Apply to"
+	 * chose, saves at once and shows a 5-second toast with Undo (FR-12.5). A new mute takes the profile's Cue default.
+	 */
 	public void toggleMute(String soundId) {
-		ProfileManager.update(profile -> profile.isExactMuted(soundId) ? profile.unmuteExact(soundId) : profile.muteExact(soundId));
+		ApplyTarget target = applyTarget();
+		Profile profile = ProfileManager.profile();
+		RuleEdit edit = QuickActions.toggleMute(profile, target, soundId);
+		QuickActionResult result = QuickActions.apply(profile, target, soundId, edit);
+		if (!result.ok()) {
+			showToast(errorText(result.error()), null);
+			return;
+		}
+		if (result.changed()) {
+			ProfileManager.update(current -> result.after());
+			String toastKey = edit instanceof RuleEdit.MuteWithCue ? "audiozone.recent.toast.muted" : "audiozone.recent.toast.unmuted";
+			QuickUndo.offer(this, this::refreshLists, result.before(), result.after(), toastKey, List.of(soundName(soundId)));
+		}
+		refreshLists();
+	}
+
+	/** Where quick actions on Recently Played and Search rows put their rule. */
+	public ApplyTarget applyTarget() {
+		return ApplyTarget.EVERYWHERE;
+	}
+
+	/** Rebuilds the open tab's list from the profile, e.g. after a quick action or Undo. */
+	public void refreshLists() {
 		refresh();
 		if (currentTab() == TAB_SEARCH) {
 			runSearch();
 		}
+		refreshRules();
+		if (zonesPanel != null && currentTab() == TAB_ZONES) {
+			zonesPanel.refresh();
+		}
+	}
+
+	/** The sound's subtitle, or a readable name made from its ID, for toasts. */
+	private String soundName(String soundId) {
+		String name = subtitle(soundId);
+		return name == null ? SoundNames.readable(soundId) : name;
+	}
+
+	static Component errorText(TraceEditError error) {
+		return error == TraceEditError.TOO_MANY_RULES
+				? Component.translatable(error.translationKey(), error.max())
+				: Component.translatable(error.translationKey(), error.min(), error.max());
 	}
 
 	private static String ago(long millis) {
