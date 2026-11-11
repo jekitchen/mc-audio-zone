@@ -43,7 +43,7 @@ import net.minecraft.util.FormattedCharSequence;
  *   {@code -Pmodmenu=true}), the screen says to join a world instead of offering settings that would go nowhere.</li>
  *   <li>A-3 layout: every Audio Zone screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
- *   <li>A-4 narration: every control on the Rules and Zones tabs, including list row buttons, has a label to read.</li>
+ *   <li>A-4 narration: every control on the Rules, Zones and Profiles tabs, including list row buttons, has a label to read.</li>
  *   <li>Pseudo-language (PRD 9.3): the same layout check with every Audio Zone text about 40% longer, reported.</li>
  * </ul>
  * Grayscale, Sodium, Iris, Sound Physics Remastered and servers stay manual checks.
@@ -83,7 +83,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 					.withZones(List.of(zone("z1", "Trading hall", key), zone("z2", "Very long zone name for the bee farm by the river", key)))));
 
 			// A-4: every control on the Rules and Zones tabs has something to read out.
-			for (int tab : new int[] {AudioZoneScreen.TAB_RULES, AudioZoneScreen.TAB_ZONES}) {
+			for (int tab : new int[] {AudioZoneScreen.TAB_RULES, AudioZoneScreen.TAB_ZONES, AudioZoneScreen.TAB_PROFILES}) {
 				List<String> silent = context.computeOnClient(mc -> {
 					AudioZoneScreen screen = new AudioZoneScreen();
 					mc.gui.setScreen(screen);
@@ -163,6 +163,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		}),
 		RULES(mc -> tab(AudioZoneScreen.TAB_RULES), null),
 		ZONES(mc -> tab(AudioZoneScreen.TAB_ZONES), null),
+		PROFILES(mc -> tab(AudioZoneScreen.TAB_PROFILES), null),
+		PROFILE_RENAME(mc -> new audiozone.mc.ProfileRenameScreen(null, ProfileManager.key(), ProfileManager.profile()), null),
 		SETTINGS_GENERAL(mc -> settings(AudioZoneScreen.SettingsPage.GENERAL), null),
 		SETTINGS_ZONES(mc -> settings(AudioZoneScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(AudioZoneScreen.SettingsPage.DIAGNOSTICS), null),

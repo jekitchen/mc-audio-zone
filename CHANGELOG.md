@@ -3,6 +3,14 @@
 All notable changes to Audio Zone. Versions follow `major.minor.patch`, with `-alpha` or `-beta` for test releases.
 Each release ships one jar per supported Minecraft version.
 
+## Unreleased (1.0)
+
+### Features
+- **Profiles tab:** every server and world with a profile, with its name, address or world, rule and zone counts and
+  when you last joined. Copy another server's global rules, personal bubbles and settings into this world (fixed zones
+  are never copied), rename, reset or delete a profile. The profile of the world you are in can be reset but not
+  deleted. In singleplayer, "Give this copy its own profile" for a copied world.
+
 ## 0.1.0-alpha (unreleased)
 
 First public alpha, for Minecraft Java Edition 26.2 and 26.3 with Fabric.

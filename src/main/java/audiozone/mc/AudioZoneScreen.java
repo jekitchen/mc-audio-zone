@@ -37,8 +37,8 @@ import net.minecraft.util.Util;
 
 /**
  * The main Audio Zone screen (FR-12.1). Header: active profile and the Bypass toggle (FR-13.1). Tabs: Recently
- * Played (FR-1, with the Mute and Edit quick actions), Rules (M5: the global rules) and Settings; the other tabs
- * arrive with their milestones. Lives in {@code audiozone.mc} because it uses Minecraft's sound manager and GUI
+ * Played (FR-1, with the Mute and Edit quick actions), Search, Rules (the global rules), Zones, Profiles (FR-11.2,
+ * FR-11.3) and Settings; Inspect arrives with M12. Lives in {@code audiozone.mc} because it uses Minecraft's sound manager and GUI
  * classes.
  */
 public final class AudioZoneScreen extends AzScreen {
@@ -46,7 +46,8 @@ public final class AudioZoneScreen extends AzScreen {
 	public static final int TAB_SEARCH = 1;
 	public static final int TAB_RULES = 2;
 	public static final int TAB_ZONES = 3;
-	public static final int TAB_SETTINGS = 4;
+	public static final int TAB_PROFILES = 4;
+	public static final int TAB_SETTINGS = 5;
 	/** FR-3.4: results update 150 ms after the player stops typing. */
 	public static final long SEARCH_DELAY_MS = 150;
 	/** FR-1.6: the list refreshes at most 4 times per second (every 5 ticks). */
@@ -86,6 +87,7 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzList rulesList;
 	private RuleListPanel rulesPanel;
 	private ZoneListPanel zonesPanel;
+	private ProfileListPanel profilesPanel;
 	public AzTextField searchField;
 	public AzButton searchHelpButton;
 	public AzList searchList;
@@ -123,6 +125,7 @@ public final class AudioZoneScreen extends AzScreen {
 				new Tab(Component.translatable("audiozone.tab.search"), true),
 				new Tab(Component.translatable("audiozone.tab.rules"), true),
 				new Tab(Component.translatable("audiozone.tab.zones"), true),
+				new Tab(Component.translatable("audiozone.tab.profiles"), true),
 				new Tab(Component.translatable("audiozone.tab.settings"), true));
 	}
 
@@ -155,7 +158,7 @@ public final class AudioZoneScreen extends AzScreen {
 
 	@Override
 	protected void buildTab(int index, Body body) {
-		if (index != TAB_SETTINGS && !ProfileManager.isLoaded()) {
+		if (index != TAB_SETTINGS && index != TAB_PROFILES && !ProfileManager.isLoaded()) {
 			// Opened outside a world (e.g. from Mod Menu on the title screen): sounds, rules and zones belong to a
 			// world's profile (FR-11.1), so there is nothing to show or change yet.
 			body.label(() -> Component.translatable("audiozone.no_world"));
@@ -169,6 +172,9 @@ public final class AudioZoneScreen extends AzScreen {
 			buildRules(body);
 		} else if (index == TAB_ZONES) {
 			buildZones(body);
+		} else if (index == TAB_PROFILES) {
+			profilesPanel = new ProfileListPanel(this);
+			profilesPanel.build(body);
 		} else {
 			buildSettings(body);
 		}
@@ -447,6 +453,12 @@ public final class AudioZoneScreen extends AzScreen {
 
 	public ZoneListPanel zonesPanel() {
 		return zonesPanel;
+	}
+
+	// ---- Profiles (FR-11.2, FR-11.3) ----
+
+	public ProfileListPanel profilesPanel() {
+		return profilesPanel;
 	}
 
 	// ---- Settings ----

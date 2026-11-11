@@ -97,6 +97,38 @@ public final class WorldSession {
 		return WorldKey.server(data.ip).map(key -> new Joined(key, key.value()));
 	}
 
+	/**
+	 * Whether "Give this copy its own profile" (FR-11.1) applies: a singleplayer world whose profile comes from the ID
+	 * file in its save folder. A copied save folder shares that ID, and so the profile, until this is used.
+	 */
+	public static boolean canGiveOwnProfile(Minecraft minecraft) {
+		String key = ProfileManager.key();
+		return minecraft.getSingleplayerServer() != null && key != null && key.startsWith(WorldKey.Kind.WORLD.prefix());
+	}
+
+	/**
+	 * Gives this singleplayer world a new ID and its own copy of the shared profile (FR-11.1): the new ID is written to
+	 * the world's ID file, and the copy is saved under the new key. The original world keeps the shared profile.
+	 *
+	 * @return whether it worked; if the ID file cannot be written, nothing changes
+	 */
+	public static boolean giveOwnProfile(Minecraft minecraft) {
+		if (!canGiveOwnProfile(minecraft)) {
+			return false;
+		}
+		Path root = minecraft.getSingleplayerServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+		WorldIds.OwnProfile own = WorldIds.giveOwnProfile(ProfileManager.profile(), ProfileManager.key(), UUID::randomUUID);
+		Path file = root.resolve(WorldIds.FILE_NAME);
+		try {
+			Files.writeString(file, own.fileText(), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			AudioZoneClient.LOGGER.warn("Audio Zone could not write {}", file, e);
+			return false;
+		}
+		ProfileManager.moveTo(own.worldKey().key(), own.profile());
+		return true;
+	}
+
 	/** Reads the world's ID file, writing a new one on first join; the folder name if that fails. */
 	public static WorldKey singleplayerKey(Path root) {
 		Path file = root.resolve(WorldIds.FILE_NAME);
