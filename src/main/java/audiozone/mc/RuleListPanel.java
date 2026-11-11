@@ -20,7 +20,7 @@ import net.minecraft.resources.Identifier;
 /**
  * A rule list with Add rule (PRD 6.1 Rules): each row shows the pattern, its summary ("Muted", "Volume 50%") and match
  * count, with On/Off, Edit, Move up/down and Delete. Used for the global list on the Rules tab and for a zone's own
- * list (FR-8.6).
+ * list (FR-8.6). On/Off, Move and Delete save at once and show a 5-second toast with Undo (FR-12.5).
  */
 public final class RuleListPanel {
 	private static final int STATUS_WIDTH = 110;
@@ -147,16 +147,17 @@ public final class RuleListPanel {
 
 	/** FR-4.7: a rule can be turned off without deleting it; the effect stops at once. */
 	public void setEnabled(String ruleId, boolean enabled) {
-		ProfileManager.update(profile -> {
+		QuickUndo.apply(host, this::refresh, profile -> {
 			Rule rule = target.rule(profile, ruleId);
 			return rule == null ? profile : target.put(profile, rule.withEnabled(enabled));
-		});
+		}, enabled ? "audiozone.rules.toast.on" : "audiozone.rules.toast.off", patternOf(ruleId));
 		refresh();
 	}
 
 	/** Moves a rule up or down; list order is the last tie-break between rules (FR-4.5 step 4). */
 	public void move(String ruleId, int delta) {
-		ProfileManager.update(profile -> target.move(profile, ruleId, delta));
+		QuickUndo.apply(host, this::refresh, profile -> target.move(profile, ruleId, delta),
+				delta < 0 ? "audiozone.rules.toast.moved_up" : "audiozone.rules.toast.moved_down", patternOf(ruleId));
 		refresh();
 	}
 
@@ -170,8 +171,15 @@ public final class RuleListPanel {
 	}
 
 	public void delete(String ruleId) {
-		ProfileManager.update(profile -> target.remove(profile, ruleId));
+		String pattern = patternOf(ruleId);
+		QuickUndo.apply(host, this::refresh, profile -> target.remove(profile, ruleId), "audiozone.rules.toast.deleted", pattern);
 		refresh();
+	}
+
+	/** The rule's pattern for its toast, or its ID if it is gone. */
+	private String patternOf(String ruleId) {
+		Rule rule = target.rule(ProfileManager.profile(), ruleId);
+		return rule == null ? ruleId : rule.pattern().text();
 	}
 
 	private static void setScreen(net.minecraft.client.gui.screens.Screen screen) {
