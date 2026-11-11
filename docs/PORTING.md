@@ -14,7 +14,7 @@ Supported versions: **26.2, 26.3**. Each version gets its own jar from one sourc
 Most code compiles unchanged against every supported version, because each version gets its own jar. Only when the
 *source code* has to differ does a class go in `src/main/versions/<minecraft_version>/java/`, one copy per version,
 with the same class name and public API. Gradle adds the folder for the version being built and fails if it is
-missing. Today that is `audiozone.mc.compat.NarrationCompat` and `audiozone.mc.compat.KeyEventCompat`. When adding a
+missing. Today that is `audiozone.mc.compat.NarrationCompat`, `audiozone.mc.compat.KeyEventCompat` and `audiozone.mc.compat.FolderCompat`. When adding a
 version, copy the nearest version's folder and fix what does not compile.
 
 ## Version-sensitive touch points
@@ -46,6 +46,8 @@ Add a row whenever you add a Mixin, an access widener entry or a call into versi
 | M7 | Zone outlines (`ZoneOutlines`) | Fabric `LevelRenderEvents.END_EXTRACTION`; vanilla `Gizmos.line(Vec3, Vec3, int, float)`, `Gizmos.billboardText(String, Vec3, TextGizmo.Style)`, `GizmoProperties.setAlwaysOnTop()`; `GameRenderer.mainCamera().position()`. Vanilla drains the frame's gizmos in `LevelRenderer.submitFeatures`, so gizmos added in `BEFORE_GIZMOS` are not drawn | M7c game test (screenshot `m7c-outline-always` must show the sphere and its label) |
 | M8 | **Mixin** `MinecraftMixin`: left-click marks a zone corner while marking (`ZoneMarking`) | `@Inject(cancellable = true)` at the head of `Minecraft.startAttack()Z` and `continueAttack(Z)V`, active only while marking | ZoneTools game test (left-click on the ground in Creative marks it and does not break it) |
 | M2 | Version-specific: `NarrationCompat`, `KeyEventCompat` | `ScreenNarrationCollector.update` (26.3 adds a `NarrationTrigger`); `KeyEvent(int, int, int)` (second field is a scancode in 26.2, a layout keycode in 26.3) | M2 game test |
+| M15 | Version-specific: `FolderCompat` (Open folder for exports and imports) | `Util.getPlatform().openPath(Path)` in 26.2; `Blaze3D.openPath(Path)` in 26.3 | Manual: Export → Open folder |
+| M15 | File drop on the Profiles tab (`AudioZoneScreen.onFilesDrop`) | `Screen.onFilesDrop(List<Path>)` | ImportExport game test |
 | M1 | Range formula (`audiozone.core.SoundRange`) | Must match vanilla: `max(volume, 1) × attenuation distance`, infinite if relative or `NONE`; audible when strictly closer (`Vec3.closerThan`, used by `SubtitleOverlay$Subtitle.isAudibleFrom`) | `SoundRangeTest`, M1 game test |
 
 ## Known differences between 26.2 and 26.3

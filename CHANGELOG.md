@@ -10,6 +10,9 @@ Each release ships one jar per supported Minecraft version.
   when you last joined. Copy another server's global rules, personal bubbles and settings into this world (fixed zones
   are never copied), rename, reset or delete a profile. The profile of the world you are in can be reset but not
   deleted. In singleplayer, "Give this copy its own profile" for a copied world.
+- **Export and import:** Export saves a profile, fixed zones included, to `config/audiozone/exports/`. Import a file by
+  dropping it on the Profiles tab or from `config/audiozone/imports/`. Files are checked first, and a dialog says what
+  will change; fixed zones made for another server are skipped. A broken or out-of-range file changes nothing.
 
 ## 0.1.0-alpha (unreleased)
 

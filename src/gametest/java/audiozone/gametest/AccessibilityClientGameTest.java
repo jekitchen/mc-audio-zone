@@ -167,6 +167,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		ZONES(mc -> tab(AudioZoneScreen.TAB_ZONES), null),
 		PROFILES(mc -> tab(AudioZoneScreen.TAB_PROFILES), null),
 		PROFILE_RENAME(mc -> new audiozone.mc.ProfileRenameScreen(null, ProfileManager.key(), ProfileManager.profile()), null),
+		PROFILE_IMPORT(mc -> new audiozone.mc.ProfileImportScreen(null), null),
 		SETTINGS_GENERAL(mc -> settings(AudioZoneScreen.SettingsPage.GENERAL), null),
 		SETTINGS_ZONES(mc -> settings(AudioZoneScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(AudioZoneScreen.SettingsPage.DIAGNOSTICS), null),
