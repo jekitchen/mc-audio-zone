@@ -31,6 +31,14 @@ import java.util.Set;
  */
 public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fixedImported, int fixedSkipped,
 		String problem) {
+	/**
+	 * Whether the boost dialog (FR-5.4) must be confirmed before this is done: the result sets a volume above 100%
+	 * and this profile has not confirmed boost yet. After the confirm, save {@code result().withBoostConfirmed(true)}.
+	 */
+	public boolean needsBoostConfirm() {
+		return problem == null && !result.boostConfirmed() && result.hasBoost();
+	}
+
 	public static ImportPlan of(Profile current, Profile file, String currentWorldKey) {
 		String here = currentWorldKey.toLowerCase(Locale.ROOT);
 		List<Zone> imported = new ArrayList<>();

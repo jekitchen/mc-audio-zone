@@ -58,6 +58,15 @@ class ProfileOpsTest {
 	}
 
 	@Test
+	void copyingABoostAsksForTheBoostConfirmFirst() {
+		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
+		Profile loud = A.withGlobalRules(List.of(Rule.of("a1", "x:one").withVolume(200)));
+		assertTrue(ProfileOps.copyFrom(loud, B).needsBoostConfirm());
+		assertFalse(ProfileOps.copyFrom(loud, B.withBoostConfirmed(true)).needsBoostConfirm());
+		assertFalse(ProfileOps.copyFrom(A, B).needsBoostConfirm());
+	}
+
+	@Test
 	void copyIsOneTime() {
 		Profile copied = ProfileOps.copyFrom(A, B).result();
 		Profile aChanged = A.muteExact("x:new");

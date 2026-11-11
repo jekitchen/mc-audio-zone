@@ -4,6 +4,7 @@ import static audiozone.core.profile.ProfileZonesTest.SERVER;
 import static audiozone.core.profile.ProfileZonesTest.bubble;
 import static audiozone.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -41,6 +42,20 @@ class ImportPlanTest {
 		assertEquals(1, plan.bubbleCount());
 		assertEquals(0, plan.fixedImported());
 		assertEquals(1, plan.fixedSkipped());
+	}
+
+	@Test
+	void importingABoostAsksForTheBoostConfirmFirst() {
+		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
+		Zone loudBubble = bubble("b1").withRules(List.of(Rule.of("z", "x:z").withVolume(150)));
+		Profile global = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("n", "x:n").withVolume(120)));
+		Profile inZone = new Profile("F", ProfileSettings.DEFAULTS, List.of()).withZones(List.of(loudBubble));
+		Profile quiet = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("n", "x:n").withVolume(100)));
+		assertTrue(ImportPlan.of(CURRENT, global, SERVER).needsBoostConfirm());
+		assertTrue(ImportPlan.of(CURRENT, inZone, SERVER).needsBoostConfirm());
+		assertFalse(ImportPlan.of(CURRENT, quiet, SERVER).needsBoostConfirm());
+		assertFalse(ImportPlan.of(CURRENT.withBoostConfirmed(true), global, SERVER).needsBoostConfirm(),
+				"this profile already confirmed");
 	}
 
 	@Test
