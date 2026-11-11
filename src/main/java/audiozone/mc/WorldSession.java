@@ -52,6 +52,7 @@ public final class WorldSession {
 	}
 
 	static void leave() {
+		ZoneMarking.stop();
 		ProfileManager.leave();
 		PlayingChannels.get().clear();
 		dimensionLevel = null;

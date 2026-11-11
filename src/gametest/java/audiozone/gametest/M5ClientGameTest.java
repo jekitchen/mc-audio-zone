@@ -178,6 +178,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((AzDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(AudioZoneScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().rule(starId) == null), "Delete should remove the rule");
+			check(context.computeOnClient(mc -> main(mc).rulesList.findRow(starId) == null), "the deleted rule's row should be gone at once");
 			check(play(context, TRADER_AMBIENT, SoundSource.NEUTRAL), "after deleting *, the trader plays again");
 
 			// Edit from Recently Played opens the sound's exact rule.

@@ -10,6 +10,7 @@ import audiozone.mc.ProfileManager;
 import audiozone.mc.RecentLog;
 import audiozone.mc.SoundLogger;
 import audiozone.mc.WorldSession;
+import audiozone.mc.ZoneMarking;
 import audiozone.mc.ZoneOutlines;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
@@ -44,6 +45,8 @@ public final class AudioZoneClient implements ClientModInitializer {
 	public static KeyMapping bypassKey;
 	/** FR-10.1: optional hotkey for "Show zone outlines", unbound by default. */
 	public static KeyMapping outlinesKey;
+	/** Cancels marking a zone's corners (Backspace by default; only acts while marking). */
+	public static KeyMapping cancelMarkingKey;
 
 	@Override
 	public void onInitializeClient() {
@@ -52,6 +55,8 @@ public final class AudioZoneClient implements ClientModInitializer {
 				"key.audiozone.open", DEFAULT_OPEN_KEY, KEY_CATEGORY));
 		bypassKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.audiozone.bypass", DEFAULT_BYPASS_KEY, KEY_CATEGORY));
+		cancelMarkingKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
+				"key.audiozone.cancel_marking", InputConstants.KEY_BACKSPACE, KEY_CATEGORY));
 		outlinesKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.audiozone.outlines", InputConstants.UNKNOWN.getValue(), KEY_CATEGORY));
 
@@ -60,6 +65,7 @@ public final class AudioZoneClient implements ClientModInitializer {
 		ProfileManager.init(FabricLoader.getInstance().getConfigDir());
 		WorldSession.register();
 		ZoneOutlines.register();
+		ZoneMarking.register();
 		ClientTickEvents.END_CLIENT_TICK.register(AudioZoneClient::onEndTick);
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
 			ProfileManager.flushSaves();
@@ -73,8 +79,12 @@ public final class AudioZoneClient implements ClientModInitializer {
 	}
 
 	private static void onEndTick(Minecraft minecraft) {
+		ZoneMarking.tick(minecraft);
 		while (openKey.consumeClick()) {
-			if (minecraft.gui.screen() == null) {
+			if (ZoneMarking.isActive()) {
+				// Marking a zone's corners: the key marks the next corner instead of opening the screen.
+				ZoneMarking.mark(minecraft);
+			} else if (minecraft.gui.screen() == null) {
 				minecraft.gui.setScreen(new AudioZoneScreen());
 			}
 		}

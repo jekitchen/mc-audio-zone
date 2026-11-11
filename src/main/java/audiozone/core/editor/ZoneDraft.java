@@ -7,6 +7,7 @@ import audiozone.core.outline.ColorError;
 import audiozone.core.outline.ZoneColors;
 import audiozone.core.rules.Rule;
 import audiozone.core.zones.AnchorType;
+import audiozone.core.zones.BoxEdit;
 import audiozone.core.zones.Point;
 import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
@@ -177,6 +178,15 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		put(Field.DIMENSION, dimension);
 	}
 
+	/** A box zone at {@code center} with {@code box}'s size, e.g. from marking corners or moving a side. */
+	public void setBox(Point center, Shape.Box box, String worldKey, String dimension) {
+		setShape(ShapeKind.BOX);
+		setPosition(center, worldKey, dimension);
+		put(Field.WIDTH, Numbers.format(box.width()));
+		put(Field.HEIGHT, Numbers.format(box.height()));
+		put(Field.DEPTH, Numbers.format(box.depth()));
+	}
+
 	public ShapeKind shape() {
 		return ShapeKind.valueOf(text(Field.SHAPE));
 	}
@@ -218,10 +228,11 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 			case RADIUS -> shape() == ShapeKind.SPHERE
 					? Numbers.checkDecimal(text, Shape.Sphere.MIN_RADIUS, Shape.Sphere.MAX_RADIUS)
 					: Numbers.checkDecimal(text, Shape.Cylinder.MIN_RADIUS, Shape.Cylinder.MAX_RADIUS);
+			// Boxes line up with the block grid: whole-block sizes (M8 review).
 			case HEIGHT -> shape() == ShapeKind.BOX
-					? Numbers.checkDecimal(text, Shape.Box.MIN_SIDE, Shape.Box.MAX_SIDE)
+					? Numbers.checkWhole(text, (int) Shape.Box.MIN_SIDE, (int) Shape.Box.MAX_SIDE)
 					: Numbers.checkDecimal(text, Shape.Cylinder.MIN_HEIGHT, Shape.Cylinder.MAX_HEIGHT);
-			case WIDTH, DEPTH -> Numbers.checkDecimal(text, Shape.Box.MIN_SIDE, Shape.Box.MAX_SIDE);
+			case WIDTH, DEPTH -> Numbers.checkWhole(text, (int) Shape.Box.MIN_SIDE, (int) Shape.Box.MAX_SIDE);
 			case FADE -> Numbers.checkDecimal(text, ZoneEdge.MIN_FADE, ZoneEdge.MAX_FADE);
 			default -> null;
 		};
@@ -269,6 +280,10 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		Point anchor = anchorType == AnchorType.FIXED
 				? new Point(number(Field.X), number(Field.Y), number(Field.Z))
 				: storedAnchor;
+		if (shape instanceof Shape.Box box && anchorType == AnchorType.FIXED) {
+			// Every edge on a block boundary, however the center was set (typed, My position, Looking at).
+			anchor = BoxEdit.snap(anchor, box).center();
+		}
 		return new Zone(id, text(Field.NAME).trim(), enabled(), text(Field.WORLD_KEY), text(Field.DIMENSION), anchor, shape,
 				rules, mode(), edge, anchorType);
 	}

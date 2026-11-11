@@ -16,8 +16,8 @@ First public alpha, for Minecraft Java Edition 26.2 and 26.3 with Fabric.
 - **Rules:** mute or turn down (0 to 100%) one sound or a whole family with wildcard patterns such as
   `minecraft:entity.villager.*`. More specific rules win. The editor previews the matching sounds and says when a rule
   is partly overridden.
-- **Zones:** spheres and boxes, centered on you or the block you look at, each with its own rules (new or copied from
-  existing ones). Where zones overlap, the closest center wins. Outlines in the zone's color with its name, shown always,
+- **Zones:** boxes you draw by marking two corners in the world, then fine-tune side by side (Grow, Shrink), with the
+  size shown on the outline. Each zone has its own rules (new or copied from existing ones). Where zones overlap, the closest center wins. Outlines in the zone's color with its name, shown always,
   only while editing, or never.
 - **Why does it sound like this?** For any sound: every rule and zone that touched it, which one won and why, and the
   final volume. Copy as text.

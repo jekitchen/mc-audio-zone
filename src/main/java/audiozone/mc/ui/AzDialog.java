@@ -87,9 +87,15 @@ public final class AzDialog extends Screen {
 		setInitialFocus(buttons.get(defaultChoice));
 	}
 
+	/**
+	 * Runs the choice, then returns to the parent screen unless the choice opened another one. The choice runs first so
+	 * the parent is rebuilt from what it changed (e.g. a deleted rule is gone from the list), not from the state before.
+	 */
 	public void choose(int index) {
-		minecraft.gui.setScreen(parent);
 		choices.get(index).action().run();
+		if (minecraft.gui.screen() == this) {
+			minecraft.gui.setScreen(parent);
+		}
 	}
 
 	@Override

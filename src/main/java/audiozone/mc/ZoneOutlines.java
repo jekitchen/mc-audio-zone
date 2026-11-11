@@ -8,6 +8,7 @@ import audiozone.core.outline.OutlineVisibility;
 import audiozone.core.outline.ZoneColors;
 import audiozone.core.profile.Profile;
 import audiozone.core.zones.Point;
+import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
 import audiozone.core.zones.ZoneEdge;
 import java.util.IdentityHashMap;
@@ -16,6 +17,7 @@ import java.util.Map;
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.gizmos.GizmoProperties;
+import net.minecraft.network.chat.Component;
 import net.minecraft.gizmos.Gizmos;
 import net.minecraft.gizmos.TextGizmo;
 import net.minecraft.util.Util;
@@ -71,8 +73,10 @@ public final class ZoneOutlines {
 		try {
 			Profile profile = ProfileManager.profile();
 			OutlineMode mode = profile.settings().outlines();
-			Zone editing = ZoneEditorScreen.editingZone(minecraft);
-			if (mode == OutlineMode.NEVER || (profile.zones().isEmpty() && editing == null)) {
+			// The zone being edited, or the box being marked in the world, is always drawn (with its size).
+			Zone marking = ZoneMarking.preview(minecraft);
+			Zone editing = marking != null ? marking : ZoneEditorScreen.editingZone(minecraft);
+			if (marking == null && (mode == OutlineMode.NEVER || (profile.zones().isEmpty() && editing == null))) {
 				return;
 			}
 			if (profile.zones() != cachedFor) {
@@ -89,7 +93,7 @@ public final class ZoneOutlines {
 				if (zone.id().equals(editingId)) {
 					continue; // drawn below from the editor's values
 				}
-				if (OutlineVisibility.shouldDraw(zone, mode, editingId, key, dimension, camera.x, camera.y, camera.z)) {
+				if (mode != OutlineMode.NEVER && OutlineVisibility.shouldDraw(zone, mode, editingId, key, dimension, camera.x, camera.y, camera.z)) {
 					Outline outline = CACHE.computeIfAbsent(zone, z -> OutlineGeometry.of(z, edge, null));
 					drawZone(zone, outline, colorOf(profile, zone), onTop, camera);
 				}
@@ -98,7 +102,8 @@ public final class ZoneOutlines {
 				Point anchor = editing.isBubble() && minecraft.player != null
 						? new Point(minecraft.player.getEyePosition().x, minecraft.player.getEyePosition().y, minecraft.player.getEyePosition().z)
 						: null;
-				drawZone(editing, OutlineGeometry.of(editing, edge, anchor), ZoneEditorScreen.editingColor(minecraft), onTop, camera);
+				int color = marking != null ? ZoneMarking.color(minecraft) : ZoneEditorScreen.editingColor(minecraft);
+				drawZone(editing, OutlineGeometry.of(editing, edge, anchor), color, onTop, camera);
 			}
 		} catch (RuntimeException | LinkageError e) {
 			// Never break world rendering: stop drawing outlines for the rest of the session.
@@ -130,6 +135,15 @@ public final class ZoneOutlines {
 			}
 			labelsLastFrame++;
 		}
+	}
+
+	/** "10 × 4 × 12": width (x) × height (y) × depth (z) in blocks. */
+	static String size(Shape.Box box) {
+		return Component.translatable("audiozone.outline.size", plain(box.width()), plain(box.height()), plain(box.depth())).getString();
+	}
+
+	private static String plain(double value) {
+		return value == Math.rint(value) ? Long.toString((long) value) : Double.toString(value);
 	}
 
 	private static void drawOutline(Outline outline, int argb, boolean onTop) {
