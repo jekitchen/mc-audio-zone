@@ -20,11 +20,13 @@ import net.minecraft.resources.Identifier;
  * The Profiles tab (PRD FR-11.2, FR-11.3): every server and world with a profile, with its display name, world key,
  * rule and zone counts and last joined date. Actions: Copy (into this world's profile), Rename, Reset and Delete; the
  * profile of the world you are in can be reset but not deleted. In a singleplayer world, "Give this copy its own
- * profile" (FR-11.1). Works outside a world too (from Mod Menu), without Copy.
+ * profile" (FR-11.1). Export on every row and Import for this world (FR-11.4, FR-11.5; files can also be dropped on
+ * the tab). Works outside a world too (from Mod Menu), without Copy and Import.
  */
 public final class ProfileListPanel {
 	private static final int WHEN_WIDTH = 110;
 	private static final int COPY_WIDTH = 44;
+	private static final int EXPORT_WIDTH = 50;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/edit");
 	private static final Identifier RESET_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/reset");
 	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("audiozone", "icon/delete");
@@ -32,6 +34,7 @@ public final class ProfileListPanel {
 	private final AzScreen host;
 	public AzList list;
 	public AzButton ownProfileButton;
+	public AzButton importButton;
 	private List<ProfileManager.Stored> stored = List.of();
 
 	public ProfileListPanel(AzScreen host) {
@@ -41,10 +44,21 @@ public final class ProfileListPanel {
 	public void build(AzScreen.Body body) {
 		Minecraft minecraft = Minecraft.getInstance();
 		ownProfileButton = null;
+		importButton = null;
+		List<AzButton> top = new ArrayList<>();
+		if (ProfileManager.isLoaded()) {
+			// Imports always go into the profile of the world you are in (FR-11.5).
+			importButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.transfer.import_button"),
+					() -> setScreen(new ProfileImportScreen(host))), Component.translatable("audiozone.transfer.import_button.tip"));
+			top.add(importButton);
+		}
 		if (WorldSession.canGiveOwnProfile(minecraft)) {
 			ownProfileButton = Tooltips.describe(AzButton.text(Component.translatable("audiozone.profiles.own"), this::confirmOwnProfile),
 					Component.translatable("audiozone.profiles.own.tip"));
-			body.row(ownProfileButton);
+			top.add(ownProfileButton);
+		}
+		if (!top.isEmpty()) {
+			body.row(top.toArray(new AzButton[0]));
 		}
 		if (ProfileManager.isLoaded() && WorldSession.usesFolderFallback()) {
 			body.label(() -> Component.translatable("audiozone.profiles.folder_fallback"));
@@ -106,6 +120,9 @@ public final class ProfileListPanel {
 					.narrationContext(() -> rowName), Component.translatable("audiozone.profiles.copy.tip")));
 		}
 		if (s.keyKnown()) {
+			buttons.add(Tooltips.describe(AzButton.text(Component.translatable("audiozone.transfer.export"), EXPORT_WIDTH,
+					() -> ProfileTransfer.exportWithDialog(host, s.key(), s.profile())).narrationContext(() -> rowName),
+					Component.translatable("audiozone.transfer.export.tip")));
 			buttons.add(AzButton.icon(EDIT_ICON, Component.translatable("audiozone.profiles.rename"),
 					() -> setScreen(new ProfileRenameScreen(host, s.key(), s.profile()))).narrationContext(() -> rowName));
 			buttons.add(AzButton.icon(RESET_ICON, Component.translatable("audiozone.profiles.reset"), () -> confirmReset(s))

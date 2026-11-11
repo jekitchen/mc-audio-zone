@@ -461,6 +461,15 @@ public final class AudioZoneScreen extends AzScreen {
 		return profilesPanel;
 	}
 
+	/** FR-11.5: a profile file dropped on the Profiles tab is imported into this world's profile (the first one, if several). */
+	@Override
+	public void onFilesDrop(List<java.nio.file.Path> paths) {
+		if (currentTab() != TAB_PROFILES || paths.isEmpty() || hasOverlay()) {
+			return;
+		}
+		ProfileTransfer.importWithDialog(this, paths.get(0));
+	}
+
 	// ---- Settings ----
 
 	private void buildSettings(Body body) {
