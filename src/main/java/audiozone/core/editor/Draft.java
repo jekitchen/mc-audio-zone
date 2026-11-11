@@ -63,19 +63,19 @@ public abstract class Draft<F extends Enum<F> & DraftField, T> {
 		touched.add(field);
 	}
 
-	/** The value the reset button puts back. */
+	/** The value the reset button puts back. Subclasses may make it depend on other values. */
 	public String defaultText(F field) {
 		return defaults.get(field);
 	}
 
 	/** FR-12.6: put the field back to its default. */
 	public void resetToDefault(F field) {
-		put(field, defaults.get(field));
+		put(field, defaultText(field));
 	}
 
 	/** Whether the field already holds its default (the reset button can be disabled). */
 	public boolean isDefault(F field) {
-		return same(field, values.get(field), defaults.get(field));
+		return same(field, values.get(field), defaultText(field));
 	}
 
 	/** Why the field's value is refused, or null. Fields not in use have no error. */

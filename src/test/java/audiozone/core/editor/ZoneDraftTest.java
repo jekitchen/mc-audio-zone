@@ -31,19 +31,58 @@ class ZoneDraftTest {
 	private static final List<Rule> RULES = List.of(Rule.of("zr1", "*villager*").withVolume(50));
 
 	@Test
-	void aNewZoneIsATenBlockSphereAtThePlayer() {
+	void aNewZoneIsATenBlockBoxAtThePlayerOnTheBlockGrid() {
+		// FR-8.1a, FR-8.3: new zones are boxes, and every box edge is on a block boundary.
 		ZoneDraft d = ZoneDraft.blank("z1", "Trading hall", WORLD, OVERWORLD, new Point(120.5, 64, -33.5), ORANGE);
 		assertTrue(d.canSave());
 		assertFalse(d.isDirty());
+		assertEquals(ShapeKind.BOX, d.shape());
 		Zone z = d.build();
-		assertEquals(new Shape.Sphere(10), z.shape());
-		assertEquals(new Point(120.5, 64, -33.5), z.anchor());
+		assertEquals(new Shape.Box(10, 10, 10), z.shape());
+		assertEquals(new Point(121, 64, -33), z.anchor());
 		assertEquals(ZoneMode.INSIDE, z.mode());
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
 		assertEquals(AnchorType.FIXED, z.anchorType());
 		assertEquals(WORLD, z.worldKey());
 		assertTrue(z.rules().isEmpty());
 		assertEquals(ORANGE, d.color());
+	}
+
+	@Test
+	void spheresAreNotOfferedForFixedZonesUnlessTheZoneIsOne() {
+		// FR-8.3: boxes and (v1) cylinders for fixed zones; an existing sphere keeps its shape and can become a box.
+		ZoneDraft box = ZoneDraft.blank("z1", "Pen", WORLD, OVERWORLD, new Point(0, 64, 0), ORANGE);
+		assertEquals(List.of(ShapeKind.BOX, ShapeKind.CYLINDER), box.shapeChoices());
+		ZoneDraft sphere = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(12),
+				RULES), ORANGE, ORANGE);
+		assertEquals(List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER), sphere.shapeChoices());
+		sphere.setShape(ShapeKind.BOX);
+		assertEquals(List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER), sphere.shapeChoices(),
+				"the sphere stays on offer while the editor is open, so the change can be undone");
+	}
+
+	@Test
+	void bubblesAreSpheres() {
+		// FR-8.3: spheres remain the shape of personal bubbles.
+		ZoneDraft d = ZoneDraft.blank("z1", "Bubble", WORLD, OVERWORLD, new Point(0, 64, 0), ORANGE);
+		d.setAnchorType(AnchorType.BUBBLE);
+		assertEquals(ShapeKind.SPHERE, d.shape());
+		assertEquals(List.of(ShapeKind.SPHERE), d.shapeChoices());
+		assertEquals(new Shape.Sphere(10), d.build().shape());
+		d.resetToDefault(Field.SHAPE);
+		assertEquals(ShapeKind.SPHERE, d.shape(), "a bubble's shape resets to a sphere");
+		d.setAnchorType(AnchorType.FIXED);
+		assertEquals(ShapeKind.BOX, d.shape(), "a fixed zone that was not a sphere goes back to a box");
+	}
+
+	@Test
+	void aFixedZonesShapeResetsToABox() {
+		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(12),
+				RULES), ORANGE, ORANGE);
+		assertFalse(d.isDefault(Field.SHAPE));
+		d.resetToDefault(Field.SHAPE);
+		assertEquals(ShapeKind.BOX, d.shape());
+		assertTrue(d.isDefault(Field.SHAPE));
 	}
 
 	@Test
@@ -185,7 +224,7 @@ class ZoneDraftTest {
 			assertTrue(d.isDefault(f), f.name());
 		}
 		Zone z = d.build();
-		assertEquals(new Shape.Sphere(10), z.shape());
+		assertEquals(new Shape.Box(10, 10, 10), z.shape());
 		assertEquals(ZoneMode.INSIDE, z.mode());
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
 		assertFalse(z.isBubble());
@@ -214,7 +253,9 @@ class ZoneDraftTest {
 		assertThrows(IllegalStateException.class, d::build);
 	}
 
+	/** An unsaved-looking sphere zone, so the field tests are not affected by box snapping. */
 	private static ZoneDraft draft() {
-		return ZoneDraft.blank("z1", "Trading hall", WORLD, OVERWORLD, new Point(120.5, 64, -33.5), ORANGE);
+		return ZoneDraft.of(new Zone("z1", "Trading hall", true, WORLD, OVERWORLD, new Point(120.5, 64, -33.5),
+				new Shape.Sphere(10), List.of()), ORANGE, ORANGE);
 	}
 }

@@ -69,12 +69,14 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		CYLINDER
 	}
 
-	/** Size of a new zone, and what a size's reset button puts back: a 10-block sphere, box or cylinder. */
+	/** Size of a new zone, and what a size's reset button puts back: a 10-block box, sphere or cylinder. */
 	public static final double DEFAULT_SIZE = 10;
 
 	private final String id;
 	private final List<Rule> rules;
 	private final Point storedAnchor;
+	/** The shape when the editor opened: a sphere stays on offer for a zone that already was one (FR-8.3). */
+	private final ShapeKind openedShape;
 
 	private ZoneDraft(String id, List<Rule> rules, Point storedAnchor, EnumMap<Field, String> values,
 			EnumMap<Field, String> defaults) {
@@ -82,16 +84,18 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		this.id = id;
 		this.rules = List.copyOf(rules);
 		this.storedAnchor = storedAnchor;
+		this.openedShape = ShapeKind.valueOf(values.get(Field.SHAPE));
 	}
 
 	/**
-	 * A new fixed Inside zone: a {@value #DEFAULT_SIZE}-block sphere at {@code position} (normally "my position"),
-	 * with the profile's default edge and no rules yet.
+	 * A new fixed Inside zone (FR-8.1a, FR-8.3): a {@value #DEFAULT_SIZE}-block box around {@code position} (normally
+	 * "my position"), snapped to the block grid, with the profile's default edge and no rules yet.
 	 *
 	 * @param rgb the next palette color ({@link ZoneColors#next}), also the color's reset value
 	 */
 	public static ZoneDraft blank(String id, String name, String worldKey, String dimension, Point position, int rgb) {
-		Zone zone = new Zone(id, name, true, worldKey, dimension, position, new Shape.Sphere(DEFAULT_SIZE), List.of());
+		Shape.Box box = new Shape.Box(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
+		Zone zone = new Zone(id, name, true, worldKey, dimension, BoxEdit.snap(position, box).center(), box, List.of());
 		return of(zone, rgb, rgb);
 	}
 
@@ -143,7 +147,7 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		defaults.put(Field.ENABLED, "true");
 		defaults.put(Field.COLOR, ZoneColors.format(defaultRgb));
 		defaults.put(Field.ANCHOR_TYPE, AnchorType.FIXED.name());
-		defaults.put(Field.SHAPE, ShapeKind.SPHERE.name());
+		defaults.put(Field.SHAPE, ShapeKind.BOX.name()); // see defaultText: a bubble's is a sphere
 		for (Field f : List.of(Field.RADIUS, Field.WIDTH, Field.HEIGHT, Field.DEPTH)) {
 			defaults.put(f, size);
 		}
@@ -165,8 +169,46 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		return AnchorType.valueOf(text(Field.ANCHOR_TYPE));
 	}
 
+	/**
+	 * Fixed zone or personal bubble. Bubbles are spheres (FR-8.3), so making a bubble turns the shape into a sphere,
+	 * and making a fixed zone of a sphere that was not one when the editor opened turns it into a box.
+	 */
 	public void setAnchorType(AnchorType value) {
 		put(Field.ANCHOR_TYPE, value.name());
+		if (!shapeChoices().contains(shape())) {
+			setShape(value == AnchorType.BUBBLE ? ShapeKind.SPHERE : ShapeKind.BOX);
+		}
+	}
+
+	/**
+	 * The shapes the editor offers (FR-8.3): a sphere for a personal bubble; a box or a cylinder for a fixed zone, and
+	 * a sphere too if the zone was one when the editor opened (existing sphere zones keep working and can become boxes).
+	 */
+	public List<ShapeKind> shapeChoices() {
+		if (anchorType() == AnchorType.BUBBLE) {
+			return List.of(ShapeKind.SPHERE);
+		}
+		return openedShape == ShapeKind.SPHERE
+				? List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER)
+				: List.of(ShapeKind.BOX, ShapeKind.CYLINDER);
+	}
+
+	/** A bubble's shape resets to a sphere, a fixed zone's to a box (FR-8.3). */
+	@Override
+	public String defaultText(Field field) {
+		if (field == Field.SHAPE) {
+			return (anchorType() == AnchorType.BUBBLE ? ShapeKind.SPHERE : ShapeKind.BOX).name();
+		}
+		return super.defaultText(field);
+	}
+
+	@Override
+	public void resetToDefault(Field field) {
+		if (field == Field.ANCHOR_TYPE) {
+			setAnchorType(AnchorType.valueOf(super.defaultText(field)));
+		} else {
+			super.resetToDefault(field);
+		}
 	}
 
 	/** FR-8.1 "Set to my position" or "Set to the block I'm looking at": the anchor and where it is. */
