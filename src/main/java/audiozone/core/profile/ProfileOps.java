@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.Message;
 import audiozone.core.zones.Precedence;
 import audiozone.core.zones.Zone;
 import java.util.ArrayList;
@@ -28,7 +29,7 @@ public final class ProfileOps {
 	 * @param fixedKept   the target's own fixed zones, which are kept
 	 * @param problem     why the copy cannot be done (too many zones), or null
 	 */
-	public record Copy(Profile result, int ruleCount, int bubbleCount, int fixedKept, String problem) {
+	public record Copy(Profile result, int ruleCount, int bubbleCount, int fixedKept, Message problem) {
 		/**
 		 * Whether the boost dialog (FR-5.4) must be confirmed before this is done: the result sets a volume above 100%
 		 * and this profile has not confirmed boost yet. After the confirm, save {@code result().withBoostConfirmed(true)}.
@@ -74,8 +75,8 @@ public final class ProfileOps {
 		}
 		int rules = source.globalRules().size();
 		if (zones.size() > Precedence.MAX_ZONES) {
-			return new Copy(target, rules, bubbles, fixedKept, "After copying this profile would have " + zones.size()
-					+ " zones; the maximum is " + Precedence.MAX_ZONES + ".");
+			return new Copy(target, rules, bubbles, fixedKept,
+					Message.of(ProfileText.COPY_TOO_MANY_ZONES, zones.size(), Precedence.MAX_ZONES));
 		}
 		// Last joined and the boost confirm describe this server and this player's choices, so they stay.
 		Profile result = new Profile(target.name(), source.settings(), source.globalRules(), zones, colors, target.lastJoined(),
@@ -84,13 +85,13 @@ public final class ProfileOps {
 	}
 
 	/** Why a display name cannot be used, or null if it can. Spaces at either end are ignored. */
-	public static String nameProblem(String name) {
+	public static Message nameProblem(String name) {
 		String trimmed = name.strip();
 		if (trimmed.isEmpty()) {
-			return "Enter a name.";
+			return Message.of(ProfileText.NAME_EMPTY);
 		}
 		if (trimmed.codePointCount(0, trimmed.length()) > MAX_NAME_LENGTH) {
-			return "The name can be at most " + MAX_NAME_LENGTH + " characters.";
+			return Message.of(ProfileText.NAME_TOO_LONG, MAX_NAME_LENGTH);
 		}
 		return null;
 	}
@@ -101,9 +102,9 @@ public final class ProfileOps {
 	 * @throws IllegalArgumentException if {@link #nameProblem} reports a problem
 	 */
 	public static Profile rename(Profile profile, String name) {
-		String problem = nameProblem(name);
+		Message problem = nameProblem(name);
 		if (problem != null) {
-			throw new IllegalArgumentException(problem);
+			throw new IllegalArgumentException(problem.toString());
 		}
 		return profile.withName(name.strip());
 	}

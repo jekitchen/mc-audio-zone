@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.Message;
 import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -19,7 +20,7 @@ import java.util.List;
  */
 public final class ProfileImport {
 	/** A profile that passed every check, and the unknown fields that were ignored. */
-	public record Checked(Profile profile, List<String> warnings) {
+	public record Checked(Profile profile, List<Message> warnings) {
 		public Checked {
 			warnings = List.copyOf(warnings);
 		}
@@ -37,14 +38,14 @@ public final class ProfileImport {
 			}
 			bytes = Files.readAllBytes(file);
 		} catch (IOException e) {
-			throw new ProfileFormatException("The file could not be read: " + e.getMessage(), e);
+			throw new ProfileFormatException(Message.of(ProfileText.UNREADABLE, String.valueOf(e.getMessage())), e);
 		}
 		String text;
 		try {
 			text = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
 					.onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString();
 		} catch (CharacterCodingException e) {
-			throw new ProfileFormatException("The file is not UTF-8 text.", e);
+			throw new ProfileFormatException(Message.of(ProfileText.NOT_UTF8), e);
 		}
 		return check(text);
 	}
@@ -55,11 +56,11 @@ public final class ProfileImport {
 			throw tooLarge();
 		}
 		if (text.isBlank()) {
-			throw new ProfileFormatException("The file is empty.");
+			throw ProfileText.problem(ProfileText.EMPTY);
 		}
 		JsonObject root = ProfileCodec.parse(text);
 		if (ProfileMigrations.versionOf(root) > ProfileMigrations.CURRENT.target()) {
-			throw new ProfileFormatException("This file was made with a newer Audio Zone. Update the mod to import it.");
+			throw ProfileText.problem(ProfileText.NEWER_IMPORT);
 		}
 		// An import file is not one of the stored profiles: there is nothing to back up before migrating it.
 		ProfileCodec.Read read = ProfileCodec.read(root, version -> { });
@@ -67,6 +68,6 @@ public final class ProfileImport {
 	}
 
 	private static ProfileFormatException tooLarge() {
-		return new ProfileFormatException("The file is larger than 1 MB.");
+		return ProfileText.problem(ProfileText.TOO_LARGE);
 	}
 }

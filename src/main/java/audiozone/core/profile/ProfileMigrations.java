@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.Message;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.io.IOException;
@@ -72,8 +73,7 @@ public final class ProfileMigrations {
 	public JsonObject migrate(JsonObject root, Backup backup) throws ProfileFormatException {
 		int version = versionOf(root);
 		if (version > target()) {
-			throw new ProfileFormatException("This file was made with a newer Audio Zone (schema " + version
-					+ "). Update the mod to use it.");
+			throw ProfileText.problem(ProfileText.NEWER, version);
 		}
 		if (version == target()) {
 			return root;
@@ -81,7 +81,7 @@ public final class ProfileMigrations {
 		try {
 			backup.save(version);
 		} catch (IOException e) {
-			throw new ProfileFormatException("The file could not be backed up before upgrading it: " + e.getMessage(), e);
+			throw new ProfileFormatException(Message.of(ProfileText.BACKUP_FAILED, String.valueOf(e.getMessage())), e);
 		}
 		JsonObject copy = root.deepCopy();
 		for (int v = version; v < target(); v++) {
@@ -95,15 +95,15 @@ public final class ProfileMigrations {
 	static int versionOf(JsonObject root) throws ProfileFormatException {
 		JsonElement value = root.get("schemaVersion");
 		if (value == null || value.isJsonNull()) {
-			throw new ProfileFormatException("The file has no schemaVersion.");
+			throw ProfileText.problem(ProfileText.NO_SCHEMA);
 		}
 		if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()
 				|| value.getAsDouble() != Math.rint(value.getAsDouble())) {
-			throw new ProfileFormatException("Unknown schemaVersion " + value + ".");
+			throw ProfileText.problem(ProfileText.UNKNOWN_SCHEMA, value.toString());
 		}
 		double version = value.getAsDouble();
 		if (version < 1 || version > Integer.MAX_VALUE) {
-			throw new ProfileFormatException("Unknown schemaVersion " + ProfileCodec.format(version) + ".");
+			throw ProfileText.problem(ProfileText.UNKNOWN_SCHEMA, ProfileCodec.format(version));
 		}
 		return (int) version;
 	}

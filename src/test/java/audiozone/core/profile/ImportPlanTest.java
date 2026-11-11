@@ -14,10 +14,14 @@ import audiozone.core.zones.Point;
 import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
 
+import audiozone.core.TestEnglish;
+
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-11.5 and FR-11.7: what an import changes on the current server's profile. */
 class ImportPlanTest {
+	private static final TestEnglish EN = new TestEnglish();
+
 	private static Zone fixedOn(String id, String worldKey) {
 		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), List.of());
 	}
@@ -106,7 +110,7 @@ class ImportPlanTest {
 		assertEquals(null, plan.problem());
 		many.add(fixedOn("f63", SERVER));
 		ImportPlan over = ImportPlan.of(CURRENT, new Profile("F", ProfileSettings.DEFAULTS, List.of(), many, java.util.Map.of()), SERVER);
-		assertEquals("After the import this profile would have 65 zones; the maximum is 64.", over.problem());
+		assertEquals("After the import this profile would have 65 zones; the maximum is 64.", over.problem().text(EN));
 	}
 
 	@Test
