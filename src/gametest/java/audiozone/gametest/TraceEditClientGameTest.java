@@ -96,6 +96,12 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 				check(t.trace().volumePercent() == 30, "the wildcard should win now, volume " + t.trace().volumePercent());
 				check(t.text().contains("  *:*villager*: Volume 30%\n    Decides loudness"), "the wildcard should decide:\n" + t.text());
 				check(!ProfileManager.profile().rule("e").enabled(), "the exact rule should be off");
+				// The shared quick-action Undo (FR-12.5): Ctrl+Z presses the toast's Undo.
+				t.pressUndo();
+				check(ProfileManager.profile().rule("e").enabled() && t.trace().volumePercent() == 60, "Undo should turn the exact rule back on");
+				check(t.toast() != null && t.toast().message().getString().equals("Undone"), "the toast should say Undone");
+				row = t.row(new TraceText.RuleTarget(RuleLocation.global("e"), exact));
+				row.buttons().get(0).onPress(null);
 			});
 			closeTrace(context);
 

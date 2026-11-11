@@ -74,7 +74,7 @@ public final class TraceScreen extends AzScreen {
 	public AzSlider volumeSlider;
 	public AzTextField volumeField;
 	private RuleLocation volumeTarget;
-	private EditableRules volumeBefore;
+	private Profile volumeBefore;
 	private TraceEditResult volumeLast;
 
 	public TraceScreen(Screen parent, String soundId) {
@@ -270,8 +270,9 @@ public final class TraceScreen extends AzScreen {
 			showToast(errorText(result.error()), null);
 			return;
 		}
+		Profile before = ProfileManager.profile();
 		save(result);
-		offerUndo(result.before(), result.after(), result);
+		offerUndo(before, result);
 	}
 
 	/** Saves the edit at once (no Save button) and shows the recomputed trace. */
@@ -283,20 +284,21 @@ public final class TraceScreen extends AzScreen {
 		refreshRows();
 	}
 
-	private void offerUndo(EditableRules before, EditableRules after, TraceEditResult result) {
+	/**
+	 * The shared quick-action Undo toast (FR-12.5, {@link QuickUndo}): Ctrl+Z, the countdown pausing while Undo has
+	 * focus, the same narration, and Undo refused if the profile was changed again since (then nothing is lost).
+	 * {@code before} is the profile before the change; for the Volume panel, before the panel opened.
+	 */
+	private void offerUndo(Profile before, TraceEditResult result) {
+		Profile after = ProfileManager.profile();
 		if (before.equals(after)) {
 			return;
 		}
-		showToast(Component.translatable(result.toastKey(), result.toastArgs().toArray()), () -> undo(before, after));
+		QuickUndo.offer(this, this::afterUndo, before, after, result.toastKey(), result.toastArgs());
 	}
 
-	/** Undo: back to the rules before the change, unless they were changed again since (then nothing is lost). */
-	private void undo(EditableRules before, EditableRules after) {
-		if (!currentRules().equals(after)) {
-			showToast(Component.translatable("audiozone.trace.edit.undo_stale"), null);
-			return;
-		}
-		ProfileManager.update(profile -> withRules(profile, before));
+	/** After Undo: the trace for the restored rules, still predicted from the last play. */
+	private void afterUndo() {
 		predicted = play != null;
 		recompute();
 		refreshRows();
@@ -316,7 +318,7 @@ public final class TraceScreen extends AzScreen {
 	public void openVolume(RuleLocation where, Rule rule) {
 		finishVolume();
 		volumeTarget = where;
-		volumeBefore = currentRules();
+		volumeBefore = ProfileManager.profile();
 		volumeLast = null;
 		int max = BoostWarning.sliderMax(false);
 		int panelWidth = Math.min(PANEL_WIDTH, width - 2 * Theme.PADDING);
@@ -377,12 +379,12 @@ public final class TraceScreen extends AzScreen {
 	/** The Volume panel closed: one Undo toast for everything changed in it. */
 	private void finishVolume() {
 		TraceEditResult last = volumeLast;
-		EditableRules before = volumeBefore;
+		Profile before = volumeBefore;
 		volumeTarget = null;
 		volumeBefore = null;
 		volumeLast = null;
 		if (last != null && before != null) {
-			offerUndo(before, last.after(), last);
+			offerUndo(before, last);
 		}
 	}
 

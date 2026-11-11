@@ -13,6 +13,12 @@ Each release ships one jar per supported Minecraft version.
 - **Export and import:** Export saves a profile, fixed zones included, to `config/audiozone/exports/`. Import a file by
   dropping it on the Profiles tab or from `config/audiozone/imports/`. Files are checked first, and a dialog says what
   will change; fixed zones made for another server are skipped. A broken or out-of-range file changes nothing.
+- **Undo:** Mute and Unmute on Recently Played and Search, and On/Off, Move and Delete on the Rules and Zones lists,
+  apply at once and show a 5-second toast with **Undo**. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd>
+  on Mac) or Tab to the button. The toast stays while Undo has focus. A new mute rule starts with the profile's Cue
+  default.
+- **Apply to:** Recently Played and Search have an "Apply to" selector: Everywhere, or a zone you are standing in. With a
+  zone chosen, Mute and Edit work on that zone's rule for the sound, so a zone rule can be made straight from a search.
 - **Edit from "Why?":** every rule line in the sound trace has On/Off, Mute and Volume, every zone line has On/Off,
   and each opens its full editor. Where no rule matches, "Add rule" adds one for this exact sound, globally or in a
   zone. Changes save at once, the trace updates straight away ("Predicted for next play") and a toast offers Undo.

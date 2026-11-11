@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -32,7 +33,8 @@ import net.minecraft.util.Util;
  *   <li>Overlays (e.g. an open dropdown) draw above everything and trap focus until closed with Esc, a choice, or a
  *   click outside.</li>
  *   <li>Toasts: a short message for 5 seconds above the footer, with an optional Undo button, narrated once and
- *   sliding in unless reduced motion is on (FR-12.5, A-6).</li>
+ *   sliding in unless reduced motion is on (FR-12.5, A-6). Ctrl+Z (Cmd+Z on Mac) presses Undo, unless a text field
+ *   has focus.</li>
  * </ul>
  */
 public abstract class AzScreen extends Screen {
@@ -217,8 +219,16 @@ public abstract class AzScreen extends Screen {
 
 	/** Shows a toast for 5 seconds, replacing any current one. {@code undo} may be null for no Undo button. */
 	public void showToast(Component message, Runnable undo) {
+		showToast(message, undo, null);
+	}
+
+	/**
+	 * Shows a toast with Undo. {@code onHold} hears {@code true} when the Undo button gets keyboard focus (the toast
+	 * then stays) and {@code false} when it loses it, so the action's own countdown can pause too.
+	 */
+	public void showToast(Component message, Runnable undo, Consumer<Boolean> onHold) {
 		dismissToast();
-		toast = new Toast(message, undo);
+		toast = new Toast(message, undo, onHold);
 		addToastWidgets();
 		if (minecraft.getNarrator().isActive()) {
 			minecraft.getNarrator().saySystemQueued(message);
@@ -242,18 +252,33 @@ public abstract class AzScreen extends Screen {
 
 	private void addToastWidgets() {
 		if (toast.undo != null) {
-			toast.undoButton = addRenderableWidget(AzButton.text(Component.translatable("audiozone.ui.undo"), () -> {
-				Runnable undo = toast.undo;
-				dismissToast();
-				undo.run();
-			}));
+			Component message = toast.message;
+			toast.undoButton = addRenderableWidget(AzButton.text(Component.translatable("audiozone.ui.undo"), this::pressUndo)
+					.narrationContext(() -> message));
 			toast.layout();
 		}
+	}
+
+	/** Undoes the toast's action and closes the toast. Does nothing if the toast has no Undo. */
+	public void pressUndo() {
+		if (toast == null || toast.undo == null) {
+			return;
+		}
+		Runnable undo = toast.undo;
+		dismissToast();
+		undo.run();
 	}
 
 	@Override
 	public void tick() {
 		super.tick();
+		if (toast != null && toast.onHold != null && toast.undoButton != null) {
+			boolean held = toast.undoButton.isFocused();
+			if (held != toast.held) {
+				toast.held = held;
+				toast.onHold.accept(held);
+			}
+		}
 		// A toast stays while its Undo button has keyboard focus, so focus is never pulled away mid-use.
 		if (toast != null && toast.ageMillis() > TOAST_MILLIS && (toast.undoButton == null || !toast.undoButton.isFocused())) {
 			dismissToast();
@@ -264,13 +289,16 @@ public abstract class AzScreen extends Screen {
 	public final class Toast {
 		private final Component message;
 		private final Runnable undo;
+		private final Consumer<Boolean> onHold;
 		private final long shownAt = Util.getMillis();
 		private AzButton undoButton;
 		private int announcements;
+		private boolean held;
 
-		private Toast(Component message, Runnable undo) {
+		private Toast(Component message, Runnable undo, Consumer<Boolean> onHold) {
 			this.message = message;
 			this.undo = undo;
+			this.onHold = onHold;
 		}
 
 		public Component message() {
@@ -455,6 +483,12 @@ public abstract class AzScreen extends Screen {
 		}
 		if (event.key() == InputConstants.KEY_TAB && event.hasControlDown() && !hasOverlay()) {
 			selectTab(currentTab + (event.hasShiftDown() ? -1 : 1));
+			return true;
+		}
+		// Ctrl+Z (Cmd+Z on Mac) undoes the last quick action while its toast shows; a text field keeps it for itself.
+		if (event.key() == InputConstants.KEY_Z && event.hasControlDownWithQuirk() && !hasOverlay() && toast != null && toast.undo != null
+				&& !(getFocused() instanceof net.minecraft.client.gui.components.EditBox)) {
+			pressUndo();
 			return true;
 		}
 		return super.keyPressed(event);

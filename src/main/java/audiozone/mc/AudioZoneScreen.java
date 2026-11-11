@@ -6,7 +6,15 @@ import audiozone.core.diag.TimingWindow;
 import audiozone.core.outline.OutlineMode;
 import audiozone.core.recent.RecentRow;
 import audiozone.core.recent.SortOrder;
+import audiozone.core.profile.Profile;
 import audiozone.core.profile.RuleTarget;
+import audiozone.core.quick.ApplyTarget;
+import audiozone.core.quick.ApplyTo;
+import audiozone.core.quick.QuickActionResult;
+import audiozone.core.quick.QuickActions;
+import audiozone.core.trace.RuleEdit;
+import audiozone.core.trace.TraceEditError;
+import audiozone.core.zones.Point;
 import audiozone.core.rules.Rule;
 import audiozone.core.search.SoundSearch;
 import audiozone.core.search.SoundEntry;
@@ -34,6 +42,7 @@ import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * The main Audio Zone screen (FR-12.1). Header: active profile and the Bypass toggle (FR-13.1). Tabs: Recently
@@ -65,10 +74,13 @@ public final class AudioZoneScreen extends AzScreen {
 	private static final int PAGE_TAB_WIDTH = 100;
 	private static final int OUTLINE_MODE_WIDTH = 240;
 	private static final int SEEN_WIDTH = 150;
+	private static final int APPLY_TO_WIDTH = 200;
 
 	// Remembered while the game runs, like the last used tab.
 	private static SortOrder sort = SortOrder.MOST_RECENT;
 	private static boolean paused;
+	/** The zone "Apply to" chose last (FR-1.5, FR-3.7), or null for Everywhere; shared by Recently Played and Search. */
+	private static String applyZoneId;
 	private static SettingsPage settingsPage = SettingsPage.GENERAL;
 
 	/** Settings pages (PRD 6.1); Zones and Accessibility arrive with their milestones. */
@@ -91,6 +103,9 @@ public final class AudioZoneScreen extends AzScreen {
 	public AzTextField searchField;
 	public AzButton searchHelpButton;
 	public AzList searchList;
+	/** "Apply to" on Recently Played and Search (FR-1.5, FR-3.7). */
+	public AzDropdown<ApplyTarget> applyToDropdown;
+	private List<ApplyTarget> applyChoices = List.of(ApplyTarget.EVERYWHERE);
 	public int searchCount;
 	private boolean searchPending;
 	private long searchChangedAt;
@@ -196,6 +211,8 @@ public final class AudioZoneScreen extends AzScreen {
 			filter = text;
 			refresh();
 		});
+		// "Apply to" goes first, so Tab still moves from the filter straight into the list.
+		body.row(buildApplyTo());
 		body.row(pauseToggle, sortDropdown, filterField);
 
 		recentList = new AzList(body.width(), 100, Component.translatable("audiozone.recent.list"));
@@ -238,6 +255,15 @@ public final class AudioZoneScreen extends AzScreen {
 		}
 		if (currentTab() == TAB_RECENT && !paused && ticks % REFRESH_TICKS == 0) {
 			refresh();
+		}
+		if ((currentTab() == TAB_RECENT || currentTab() == TAB_SEARCH) && ticks % REFRESH_TICKS == 0 && !hasOverlay()
+				&& applyToDropdown != null && !computeApplyChoices().equals(applyChoices)) {
+			// The player walked into or out of a zone: offer the zones they now stand in.
+			boolean focused = getFocused() == applyToDropdown;
+			rebuildWidgets();
+			if (focused) {
+				setInitialFocus(applyToDropdown);
+			}
 		}
 	}
 
@@ -292,7 +318,7 @@ public final class AudioZoneScreen extends AzScreen {
 	 * pressing it does.
 	 */
 	private AzButton muteButton(String soundId) {
-		boolean muted = ProfileManager.profile().isExactMuted(soundId);
+		boolean muted = QuickActions.isMuted(ProfileManager.profile(), applyTarget(), soundId);
 		return AzButton.icon(
 				Identifier.fromNamespaceAndPath("audiozone", muted ? "icon/mute" : "icon/volume"),
 				Component.translatable(muted ? "audiozone.recent.unmute" : "audiozone.recent.mute"),
@@ -302,7 +328,7 @@ public final class AudioZoneScreen extends AzScreen {
 	/** Quick action Edit: opens the rule editor on the sound's exact-ID rule (a new one if it has none). */
 	private AzButton editSoundButton(String soundId) {
 		return AzButton.icon(EDIT_ICON, Component.translatable("audiozone.recent.edit"),
-				() -> minecraft.gui.setScreen(RuleEditorScreen.forSound(this, soundId)));
+				() -> minecraft.gui.setScreen(RuleEditorScreen.forSound(this, applyTarget(), soundId)));
 	}
 
 	/** Why?: the sound trace for this sound's most recent play (FR-14.1). */
@@ -311,12 +337,91 @@ public final class AudioZoneScreen extends AzScreen {
 				() -> minecraft.gui.setScreen(new TraceScreen(this, soundId)));
 	}
 
+	/**
+	 * Mute/Unmute on a Recently Played or Search row (FR-1.5): edits the sound's exact-ID rule in the list "Apply to"
+	 * chose, saves at once and shows a 5-second toast with Undo (FR-12.5). A new mute takes the profile's Cue default.
+	 */
 	public void toggleMute(String soundId) {
-		ProfileManager.update(profile -> profile.isExactMuted(soundId) ? profile.unmuteExact(soundId) : profile.muteExact(soundId));
+		ApplyTarget target = applyTarget();
+		Profile profile = ProfileManager.profile();
+		RuleEdit edit = QuickActions.toggleMute(profile, target, soundId);
+		QuickActionResult result = QuickActions.apply(profile, target, soundId, edit);
+		if (!result.ok()) {
+			showToast(errorText(result.error()), null);
+			return;
+		}
+		if (result.changed()) {
+			ProfileManager.update(current -> result.after());
+			String toastKey = (edit instanceof RuleEdit.MuteWithCue ? "audiozone.recent.toast.muted" : "audiozone.recent.toast.unmuted")
+					+ (target.isEverywhere() ? "" : "_in");
+			List<String> args = target.isEverywhere() ? List.of(soundName(soundId)) : List.of(soundName(soundId), target.zoneName());
+			QuickUndo.offer(this, this::refreshLists, result.before(), result.after(), toastKey, args);
+		}
+		refreshLists();
+	}
+
+	/**
+	 * Where quick actions on Recently Played and Search rows put their rule (FR-1.5, FR-3.7): Everywhere, or the zone
+	 * chosen in "Apply to" while the player still stands in it.
+	 */
+	public ApplyTarget applyTarget() {
+		return ApplyTo.select(applyChoices, applyZoneId);
+	}
+
+	/** Chooses where quick actions put their rule; refreshes the rows, whose Mute/Unmute follows the choice. */
+	public void setApplyTarget(ApplyTarget target) {
+		applyZoneId = target.zoneId();
+		if (applyToDropdown != null && !applyToDropdown.value().equals(target)) {
+			applyToDropdown.setValue(target);
+		}
+		refreshLists();
+	}
+
+	/** The "Apply to" choices offered now. */
+	public List<ApplyTarget> applyChoices() {
+		return applyChoices;
+	}
+
+	private AzDropdown<ApplyTarget> buildApplyTo() {
+		applyChoices = computeApplyChoices();
+		applyToDropdown = Tooltips.describe(new AzDropdown<>(APPLY_TO_WIDTH, Component.translatable("audiozone.recent.apply_to"),
+				applyChoices, choice -> Component.translatable(choice.translationKey(), choice.args().toArray()),
+				applyTarget(), this::setApplyTarget), Component.translatable("audiozone.recent.apply_to.tip"));
+		return applyToDropdown;
+	}
+
+	/** Everywhere, then each zone the player is standing in (core {@link ApplyTo}). */
+	private List<ApplyTarget> computeApplyChoices() {
+		if (!ProfileManager.isLoaded() || minecraft == null || minecraft.player == null) {
+			return List.of(ApplyTarget.EVERYWHERE);
+		}
+		Vec3 eye = minecraft.player.getEyePosition();
+		String key = ProfileManager.key() == null ? "" : ProfileManager.key();
+		return ApplyTo.choices(ProfileManager.profile(), key, WorldSession.dimension(minecraft), new Point(eye.x, eye.y, eye.z));
+	}
+
+	/** Rebuilds the open tab's list from the profile, e.g. after a quick action or Undo. */
+	public void refreshLists() {
 		refresh();
 		if (currentTab() == TAB_SEARCH) {
 			runSearch();
 		}
+		refreshRules();
+		if (zonesPanel != null && currentTab() == TAB_ZONES) {
+			zonesPanel.refresh();
+		}
+	}
+
+	/** The sound's subtitle, or a readable name made from its ID, for toasts. */
+	private String soundName(String soundId) {
+		String name = subtitle(soundId);
+		return name == null ? SoundNames.readable(soundId) : name;
+	}
+
+	static Component errorText(TraceEditError error) {
+		return error == TraceEditError.TOO_MANY_RULES
+				? Component.translatable(error.translationKey(), error.max())
+				: Component.translatable(error.translationKey(), error.min(), error.max());
 	}
 
 	private static String ago(long millis) {
@@ -340,7 +445,10 @@ public final class AudioZoneScreen extends AzScreen {
 	// ---- Search (FR-3) ----
 
 	private void buildSearch(Body body) {
-		searchField = new AzTextField(font, body.width() - Theme.ICON_BUTTON_SIZE - Theme.GAP, Component.translatable("audiozone.search.field"))
+		// "Apply to" shares the search field's row, so the results keep their height in small windows.
+		AzDropdown<ApplyTarget> applyTo = buildApplyTo();
+		searchField = new AzTextField(font, body.width() - Theme.ICON_BUTTON_SIZE - applyTo.getWidth() - 2 * Theme.GAP,
+				Component.translatable("audiozone.search.field"))
 				.placeholder(Component.translatable("audiozone.search.hint"));
 		searchField.setMaxLength(200);
 		searchField.setValue(searchText);
@@ -351,7 +459,7 @@ public final class AudioZoneScreen extends AzScreen {
 		});
 		searchHelpButton = AzButton.icon(WHY_ICON,
 				Component.translatable(searchHelp ? "audiozone.search.help.hide" : "audiozone.search.help.show"), this::toggleSearchHelp);
-		body.row(searchField, searchHelpButton);
+		body.row(applyTo, searchField, searchHelpButton);
 		if (searchHelp) {
 			for (int i = 1; i <= SEARCH_HELP_LINES; i++) {
 				String key = "audiozone.search.help." + i;

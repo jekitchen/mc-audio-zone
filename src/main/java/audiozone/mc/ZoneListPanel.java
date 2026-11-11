@@ -22,7 +22,8 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The Zones tab (PRD 6.1): "New zone" and the list of zones. Each row shows the zone's color, name, shape and mode,
  * where it is ("Here", "120 blocks away", "Other world") and its rule count, with On/Off, Edit, Rules, Move up/down
- * and Delete. List order is the last tie-break between zones (FR-9 step 5).
+ * and Delete. List order is the last tie-break between zones (FR-9 step 5). On/Off, Move and Delete save at once and
+ * show a 5-second toast with Undo (FR-12.5).
  */
 public final class ZoneListPanel {
 	private static final int WHERE_WIDTH = 90;
@@ -111,15 +112,16 @@ public final class ZoneListPanel {
 	}
 
 	public void setEnabled(String zoneId, boolean enabled) {
-		ProfileManager.update(profile -> {
+		QuickUndo.apply(host, this::refresh, profile -> {
 			Zone zone = profile.zone(zoneId);
 			return zone == null ? profile : profile.putZone(zone.withEnabled(enabled));
-		});
+		}, enabled ? "audiozone.zones.toast.on" : "audiozone.zones.toast.off", nameOf(zoneId));
 		refresh();
 	}
 
 	public void move(String zoneId, int delta) {
-		ProfileManager.update(profile -> profile.moveZone(zoneId, delta));
+		QuickUndo.apply(host, this::refresh, profile -> profile.moveZone(zoneId, delta),
+				delta < 0 ? "audiozone.zones.toast.moved_up" : "audiozone.zones.toast.moved_down", nameOf(zoneId));
 		refresh();
 	}
 
@@ -133,8 +135,15 @@ public final class ZoneListPanel {
 	}
 
 	public void delete(String zoneId) {
-		ProfileManager.update(profile -> profile.removeZone(zoneId));
+		String name = nameOf(zoneId);
+		QuickUndo.apply(host, this::refresh, profile -> profile.removeZone(zoneId), "audiozone.zones.toast.deleted", name);
 		refresh();
+	}
+
+	/** The zone's name for its toast, or its ID if it has none or is gone. */
+	private static String nameOf(String zoneId) {
+		Zone zone = ProfileManager.profile().zone(zoneId);
+		return zone == null || zone.name() == null || zone.name().isBlank() ? zoneId : zone.name();
 	}
 
 	private static void setScreen(net.minecraft.client.gui.screens.Screen screen) {
