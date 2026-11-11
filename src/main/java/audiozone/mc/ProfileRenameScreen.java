@@ -101,7 +101,9 @@ public final class ProfileRenameScreen extends AzScreen {
 		if (key.equals(ProfileManager.key())) {
 			ProfileManager.update(p -> ProfileOps.rename(p, value));
 		} else {
-			ProfileManager.saveOther(key, ProfileOps.rename(profile, value));
+			// Rename what is stored now, not the copy read when the list was built, so no other change is lost.
+			Profile latest = ProfileManager.storedProfile(key);
+			ProfileManager.saveOther(key, ProfileOps.rename(latest != null ? latest : profile, value));
 		}
 		return true;
 	}

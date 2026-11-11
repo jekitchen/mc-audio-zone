@@ -209,6 +209,16 @@ public final class ProfileManager {
 		return out;
 	}
 
+	/** The profile stored under {@code key} as it is now (after queued saves), or null if there is none or it cannot be read. */
+	public static Profile storedProfile(String key) {
+		for (Stored s : storedProfiles()) {
+			if (s.key().equals(key)) {
+				return s.profile();
+			}
+		}
+		return null;
+	}
+
 	/** Saves another world's profile in the background (Rename, Reset). For the current world, use {@link #update}. */
 	public static void saveOther(String key, Profile profile) {
 		if (key.equals(current.key())) {
