@@ -11,6 +11,8 @@ import audiozone.core.editor.RuleDraft;
 import audiozone.core.editor.RuleDraft.Field;
 import audiozone.core.profile.Profile;
 import audiozone.core.profile.RuleTarget;
+import audiozone.core.quick.ApplyTarget;
+import audiozone.core.quick.QuickActions;
 import audiozone.core.rules.Rule;
 import audiozone.core.rules.RuleResolver;
 import audiozone.core.ui.SliderModel;
@@ -113,11 +115,20 @@ public final class RuleEditorScreen extends AzScreen {
 
 	/** Opens the editor on a sound's exact-ID rule, or a new exact-ID rule for it. */
 	public static RuleEditorScreen forSound(Screen parent, String soundId) {
-		Rule exact = ProfileManager.profile().exactRule(soundId);
+		return forSound(parent, ApplyTarget.EVERYWHERE, soundId);
+	}
+
+	/**
+	 * Opens the editor on the sound's exact-ID rule in the list "Apply to" chose (FR-1.5, FR-3.7), or a new exact-ID
+	 * rule for it there.
+	 */
+	public static RuleEditorScreen forSound(Screen parent, ApplyTarget applyTo, String soundId) {
+		RuleTarget target = applyTo.isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(applyTo.zoneId());
+		Rule exact = QuickActions.exactRule(ProfileManager.profile(), applyTo, soundId);
 		if (exact != null) {
-			return edit(parent, exact);
+			return edit(parent, target, exact);
 		}
-		RuleEditorScreen screen = create(parent);
+		RuleEditorScreen screen = create(parent, target);
 		screen.draft.set(Field.PATTERN, soundId);
 		screen.updatePreview();
 		return screen;
@@ -125,6 +136,11 @@ public final class RuleEditorScreen extends AzScreen {
 
 	public RuleDraft draft() {
 		return draft;
+	}
+
+	/** The list the rule is saved in: the global rules or a zone's. */
+	public RuleTarget target() {
+		return target;
 	}
 
 	public PatternPreview preview() {
