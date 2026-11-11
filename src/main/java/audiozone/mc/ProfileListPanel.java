@@ -1,5 +1,6 @@
 package audiozone.mc;
 
+import audiozone.core.profile.Profile;
 import audiozone.core.profile.ProfileOps;
 import audiozone.core.profile.ProfileSummary;
 import audiozone.mc.ui.AzButton;
@@ -161,8 +162,10 @@ public final class ProfileListPanel {
 
 	/** Copies the source's global rules, bubbles and settings into this world's profile; fixed zones stay. */
 	public void copy(ProfileManager.Stored source) {
+		Profile latest = ProfileManager.storedProfile(source.key());
+		Profile from = latest != null ? latest : source.profile();
 		ProfileManager.update(target -> {
-			ProfileOps.Copy copy = ProfileOps.copyFrom(source.profile(), target);
+			ProfileOps.Copy copy = ProfileOps.copyFrom(from, target);
 			return copy.problem() == null ? copy.result() : target;
 		});
 		refresh();
