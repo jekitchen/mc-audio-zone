@@ -37,6 +37,7 @@ class ZoneDraftTest {
 		assertTrue(d.canSave());
 		assertFalse(d.isDirty());
 		assertEquals(ShapeKind.BOX, d.shape());
+		assertEquals("120.5", d.text(Field.X), "the field shows the player's position");
 		Zone z = d.build();
 		assertEquals(new Shape.Box(10, 10, 10), z.shape());
 		assertEquals(new Point(121, 64, -33), z.anchor());

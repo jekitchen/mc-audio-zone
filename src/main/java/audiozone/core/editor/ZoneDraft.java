@@ -89,13 +89,14 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 
 	/**
 	 * A new fixed Inside zone (FR-8.1a, FR-8.3): a {@value #DEFAULT_SIZE}-block box around {@code position} (normally
-	 * "my position"), snapped to the block grid, with the profile's default edge and no rules yet.
+	 * "my position"), with the profile's default edge and no rules yet. The fields show the position as given; the
+	 * saved box is snapped to the block grid like every box.
 	 *
 	 * @param rgb the next palette color ({@link ZoneColors#next}), also the color's reset value
 	 */
 	public static ZoneDraft blank(String id, String name, String worldKey, String dimension, Point position, int rgb) {
 		Shape.Box box = new Shape.Box(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
-		Zone zone = new Zone(id, name, true, worldKey, dimension, BoxEdit.snap(position, box).center(), box, List.of());
+		Zone zone = new Zone(id, name, true, worldKey, dimension, position, box, List.of());
 		return of(zone, rgb, rgb);
 	}
 
