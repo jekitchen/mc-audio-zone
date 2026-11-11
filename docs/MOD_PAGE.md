@@ -11,9 +11,9 @@ and the README's "For server admins" section.
 
 ---
 
-# Audio Zone
+# Sound Sculptor
 
-Too many villagers? A noisy farm next to your base? An ambient sound that drives you up the wall? **Audio Zone** lets
+Too many villagers? A noisy farm next to your base? An ambient sound that drives you up the wall? **Sound Sculptor** lets
 you mute or turn down any individual sound, everywhere or only inside areas you choose, and it never lets you hear more
 than vanilla Minecraft would.
 
@@ -38,7 +38,7 @@ Everything works with the keyboard alone and with the narrator, and the screens 
 
 ## For server admins: fair play
 
-Audio Zone only changes how loud sounds are on the player's own computer. It never tells a player anything that vanilla
+Sound Sculptor only changes how loud sounds are on the player's own computer. It never tells a player anything that vanilla
 Minecraft's sounds and subtitles don't already tell them. This is a hard rule of the project, not a setting.
 
 - **Nothing sent to your server.** No custom packets, no plugin channel, no client brand change: your server sees a
@@ -52,7 +52,7 @@ Coming in 1.0, with the same rule: a volume boost that is still silent wherever 
 where vanilla shows subtitles, and an inspector that only selects mobs in clear sight.
 
 Questions or concerns: open an issue with "fair play" in the title at
-<https://github.com/jekitchen/mc-audio-zone/issues>.
+<https://github.com/jekitchen/mc-sound-sculptor/issues>.
 
 ## Requirements
 
@@ -72,6 +72,6 @@ This is an **alpha**: the features above are complete and tested, but expect rou
 above 100%, cues for muted sounds, repeat limits, the mob inspector, more zone shapes and modes, and copying settings
 between servers.
 
-Audio Zone is open source under the MIT license: <https://github.com/jekitchen/mc-audio-zone>.
+Sound Sculptor is open source under the MIT license: <https://github.com/jekitchen/mc-sound-sculptor>.
 
 ---

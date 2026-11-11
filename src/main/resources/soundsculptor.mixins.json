@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "soundsculptor.mc.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"MinecraftMixin",
+		"SoundEngineAccessor",
+		"SoundEngineMixin",
+		"SoundManagerAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

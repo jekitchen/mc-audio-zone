@@ -1,18 +1,18 @@
-# Audio Zone
+# Sound Sculptor
 
-Audio Zone is a client-only Fabric mod for Minecraft: Java Edition that lets you mute, turn down, boost or rate-limit any sound, everywhere or only inside areas you choose, without ever hearing more than vanilla allows.
+Sound Sculptor is a client-only Fabric mod for Minecraft: Java Edition that lets you mute, turn down, boost or rate-limit any sound, everywhere or only inside areas you choose, without ever hearing more than vanilla allows.
 
 By maxismagical and Sciencode. MIT licensed.
 
 ## For server admins
 
-Audio Zone only changes how loud sounds are on the player's own computer. It never tells a player anything that vanilla Minecraft's sounds and subtitles don't already tell them. This is a hard rule of the project, not a setting.
+Sound Sculptor only changes how loud sounds are on the player's own computer. It never tells a player anything that vanilla Minecraft's sounds and subtitles don't already tell them. This is a hard rule of the project, not a setting.
 
-**Nothing on your server, nothing sent to it.** Audio Zone is installed on the client only. It sends no custom packets, opens no plugin channel and does not change the client brand, so your server sees a vanilla client. You can check this with any packet logger.
+**Nothing on your server, nothing sent to it.** Sound Sculptor is installed on the client only. It sends no custom packets, opens no plugin channel and does not change the client brand, so your server sees a vanilla client. You can check this with any packet logger.
 
 **What it can and cannot do**
 
-| Feature | Could it give an advantage? | How Audio Zone rules that out |
+| Feature | Could it give an advantage? | How Sound Sculptor rules that out |
 | --- | --- | --- |
 | Mute, turn down, repeat limits | No: they only remove sound | Same effect as vanilla's own volume sliders, just per sound |
 | Volume boost (up to 200%) | Hearing sounds from farther away | Boost makes a sound louder only where vanilla already plays it. Hearing range is always worked out from the original vanilla volume, so at the edge of vanilla range a boosted sound is silent, exactly as in vanilla |
@@ -25,7 +25,7 @@ Audio Zone only changes how loud sounds are on the player's own computer. It nev
 
 **Status.** The first alpha, 0.1.0-alpha, has mute, volume (0 to 100%), rules, zones with outlines, the recently played list and search. Boost, cues, repeat limits and the inspector, listed above with their safeguards, follow in 1.0. See the [changelog](CHANGELOG.md).
 
-**Questions or concerns.** If you think any feature gives more information than vanilla, please [open an issue](https://github.com/jekitchen/mc-audio-zone/issues) and mention "fair play" in the title. We aim to look at these within 7 days.
+**Questions or concerns.** If you think any feature gives more information than vanilla, please [open an issue](https://github.com/jekitchen/mc-sound-sculptor/issues) and mention "fair play" in the title. We aim to look at these within 7 days.
 
 ## Specification
 

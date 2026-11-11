@@ -1,17 +1,20 @@
 # Changelog
 
-All notable changes to Audio Zone. Versions follow `major.minor.patch`, with `-alpha` or `-beta` for test releases.
+All notable changes to Sound Sculptor. Versions follow `major.minor.patch`, with `-alpha` or `-beta` for test releases.
 Each release ships one jar per supported Minecraft version.
 
 ## Unreleased (1.0)
+
+### Changes
+- **New name: Sound Sculptor** (was Audio Zone during development). Settings now live in `config/soundsculptor/`.
 
 ### Features
 - **Profiles tab:** every server and world with a profile, with its name, address or world, rule and zone counts and
   when you last joined. Copy another server's global rules, personal bubbles and settings into this world (fixed zones
   are never copied), rename, reset or delete a profile. The profile of the world you are in can be reset but not
   deleted. In singleplayer, "Give this copy its own profile" for a copied world.
-- **Export and import:** Export saves a profile, fixed zones included, to `config/audiozone/exports/`. Import a file by
-  dropping it on the Profiles tab or from `config/audiozone/imports/`. Files are checked first, and a dialog says what
+- **Export and import:** Export saves a profile, fixed zones included, to `config/soundsculptor/exports/`. Import a file by
+  dropping it on the Profiles tab or from `config/soundsculptor/imports/`. Files are checked first, and a dialog says what
   will change; fixed zones made for another server are skipped. A broken or out-of-range file changes nothing.
 - **Undo:** Mute and Unmute on Recently Played and Search, and On/Off, Move and Delete on the Rules and Zones lists,
   apply at once and show a 5-second toast with **Undo**. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd>
@@ -45,11 +48,11 @@ First public alpha, for Minecraft Java Edition 26.2 and 26.3 with Fabric.
 - **A profile per server and world,** created on first join and kept across restarts. Outside a world nothing changes.
 - **Bypass** (<kbd>F10</kbd>) turns every effect off at once; a broken setting or an error never stops a sound.
 - **Diagnostics:** live sounds per second, time per sound, cache hit rate, memory, and Copy report.
-- **Mod Menu** (optional) opens the Audio Zone screen.
+- **Mod Menu** (optional) opens the Sound Sculptor screen.
 - Keyboard-only use, narrator support, and layouts checked at every GUI scale.
 
 ### Fair play
-Audio Zone only changes how loud sounds are on your own computer, and never shows more than vanilla sounds and subtitles
+Sound Sculptor only changes how loud sounds are on your own computer, and never shows more than vanilla sounds and subtitles
 do. It sends nothing to servers. See "For server admins" in the README.
 
 ### Not yet included (planned for 1.0)

@@ -1,4 +1,4 @@
-# Releasing Audio Zone
+# Releasing Sound Sculptor
 
 How to publish a release on Modrinth and CurseForge. Publishing is done by a maintainer with access to the projects on
 both sites; the steps below prepare everything so that part is uploading files and pasting text.
@@ -36,7 +36,7 @@ To build by hand instead:
 ./gradlew build -Pminecraft_version=26.2 -Pfabric_api_version=0.161.0+26.2
 ```
 
-Each puts `audiozone-<version>+<minecraft>.jar` in `build/libs/` (ignore the `-sources` jar).
+Each puts `soundsculptor-<version>+<minecraft>.jar` in `build/libs/` (ignore the `-sources` jar).
 
 Smoke test each jar in a normal launcher (the official launcher with Fabric, or Prism): launch, mute a sound, make a
 zone, see its outline, Bypass with F10.
@@ -44,14 +44,14 @@ zone, see its outline, Bypass with F10.
 ## 3. Modrinth
 
 Project settings (once): client side **required**, server side **unsupported**; license MIT; source and issue links to
-the GitHub repository; icon `src/main/resources/assets/audiozone/icon.png`; description from MOD_PAGE.md.
+the GitHub repository; icon `src/main/resources/assets/soundsculptor/icon.png`; description from MOD_PAGE.md.
 
 For each jar, **Versions → Create version**:
 
 | Field | Value |
 | --- | --- |
 | Version number | `0.1.0-alpha+26.3` (the jar's version) |
-| Version title | `Audio Zone 0.1.0-alpha for 26.3` |
+| Version title | `Sound Sculptor 0.1.0-alpha for 26.3` |
 | Release channel | Alpha |
 | Loaders | Fabric |
 | Game versions | the jar's Minecraft version only (26.3 or 26.2) |
@@ -66,7 +66,7 @@ For each jar, **Upload file**:
 
 | Field | Value |
 | --- | --- |
-| Display name | `Audio Zone 0.1.0-alpha for 26.3` |
+| Display name | `Sound Sculptor 0.1.0-alpha for 26.3` |
 | Release type | Alpha |
 | Game versions | the jar's Minecraft version, plus **Fabric** and **Client** |
 | Related projects | Fabric API: required dependency. Mod Menu: optional dependency |

@@ -1,8 +1,8 @@
-# Audio Zone PRD
+# Sound Sculptor PRD
 
 Nov 8, 2026 · maxismagical, Sciencode
 
-Audio Zone is a client-only Fabric mod that lets a player mute, turn down, boost or rate-limit any Minecraft sound, everywhere or only inside areas they draw, without ever hearing more than vanilla allows. This is draft 1 of the full PRD. Every requirement is tagged **MVP**, **v1** or **Future**, and every FR has in-game acceptance criteria.
+Sound Sculptor is a client-only Fabric mod that lets a player mute, turn down, boost or rate-limit any Minecraft sound, everywhere or only inside areas they draw, without ever hearing more than vanilla allows. This is draft 1 of the full PRD. Every requirement is tagged **MVP**, **v1** or **Future**, and every FR has in-game acceptance criteria.
 
 ## Draft status and working assumptions
 
@@ -16,12 +16,12 @@ maxismagical had not yet answered questions on scope, so this draft picks defaul
 | A4 | Each server or world has exactly one profile, created automatically (MVP). Copying settings from another server and import/export are v1. | Fixed zones need a server/world key from day one; full profile management is a lot of UI. | 5, 10 |
 | A5 | Distances in the recently played list are shown as coarse bands (Close, Near, Far), not exact block counts. | Exact distance to an unseen mob is more than vanilla subtitles give. See FR-1.4. | 5, 8 |
 | A6 | Zone checks run when a sound starts, then every client tick (20 times a second) for sounds that are still playing. | Handles minecarts, entity-bound sounds and the moving personal bubble without per-frame cost. | 5, 7 |
-| A7 | The default hotkey that opens Audio Zone is **;** (semicolon). | Free in vanilla and in the 36 most-downloaded Fabric mods (K clashed with Iris, checked at M0); rebindable in Controls. | 5 |
+| A7 | The default hotkey that opens Sound Sculptor is **;** (semicolon). | Free in vanilla and in the 36 most-downloaded Fabric mods (K clashed with Iris, checked at M0); rebindable in Controls. | 5 |
 | A8 | English (en\_us) at launch, with every string in a language file ready for community translation. | Keeps launch small; localization is cheap to add later if planned now. | 9 |
 
 ## 1. Summary and problem statement
 
-**Summary.** Audio Zone gives players per-sound control over what they hear: mute, volume from 0% to 200%, repeat limits, and visual cues when a muted sound plays. Rules can apply everywhere, or only inside (or outside) zones placed at fixed coordinates or around the player. It runs on the client only, so it works on vanilla servers, Realms and singleplayer.
+**Summary.** Sound Sculptor gives players per-sound control over what they hear: mute, volume from 0% to 200%, repeat limits, and visual cues when a muted sound plays. Rules can apply everywhere, or only inside (or outside) zones placed at fixed coordinates or around the player. It runs on the client only, so it works on vanilla servers, Realms and singleplayer.
 
 **Problem.** Vanilla Minecraft offers only about ten volume sliders: Master plus one per sound category (Music, Jukebox/Note Blocks, Weather, Blocks, Hostile Creatures, Friendly Creatures, Players, Ambient/Environment, Voice, and others; checked at M0, 26.2 and 26.3 both have Master, Music, Jukebox/Note Blocks (`record`), Weather, Blocks, Hostile Creatures, Friendly Creatures (`neutral`), Players, Ambient/Environment, Voice/Speech and UI). A *category* is a broad bucket; a player cannot silence one sound (villager "hmm") without silencing every friendly mob. This causes three recurring pain points:
 
@@ -29,7 +29,7 @@ maxismagical had not yet answered questions on scope, so this draft picks defaul
 - **Sensory and hearing needs.** Players with sound sensitivity or sensory overload need specific harsh sounds removed (explosions, ghast screams, glass breaking). Players with hearing loss need some quiet sounds louder, which vanilla cannot do beyond 100%.
 - **Location matters.** A sound that is fine in the wild is unbearable next to a farm. Players want "quiet near my farm, normal everywhere else".
 
-Existing sound mods are mostly category sliders or global mute lists, and few address the fair-play question. Audio Zone's difference is **per-sound + per-place control with a strict no-information-advantage guarantee**, so it can be allowed on servers that ban cheat or "info" mods.
+Existing sound mods are mostly category sliders or global mute lists, and few address the fair-play question. Sound Sculptor's difference is **per-sound + per-place control with a strict no-information-advantage guarantee**, so it can be allowed on servers that ban cheat or "info" mods.
 
 Terms used here (*sound event*, *sound instance*, *category*, *client-only*, *Fabric*, *Mixin*) are explained in the Glossary (section 13).
 
@@ -37,7 +37,7 @@ Terms used here (*sound event*, *sound instance*, *category*, *client-only*, *Fa
 
 Five personas drive the requirements. The accessibility persona is a first-class persona: when trade-offs conflict, their needs win over convenience features.
 
-| Persona | Who they are | What they need from Audio Zone | Key FRs |
+| Persona | Who they are | What they need from Sound Sculptor | Key FRs |
 | --- | --- | --- | --- |
 | **Tess, technical/farm player** | Runs iron farms, villager halls and redstone builds on a survival SMP. | Silence or rate-limit farm noise only near the farm; keep danger sounds. No FPS loss with 300+ sounds per second. | FR-1, FR-4, FR-6, FR-8, FR-9 |
 | **Sam, streamer/recorder** | Records or streams gameplay; viewers complain about repetitive noise. | Per-sound volume for a clean mix; settings that follow each server automatically; stable behavior on stream. | FR-5, FR-11, FR-12 |
@@ -59,7 +59,7 @@ Five personas drive the requirements. The accessibility persona is a first-class
 
 ### 3.2 Non-goals
 
-- **No information advantage over vanilla.** Audio Zone never reveals a sound, entity, position or direction the player could not already hear or see in vanilla at vanilla range. This is a hard rule, not a preference.
+- **No information advantage over vanilla.** Sound Sculptor never reveals a sound, entity, position or direction the player could not already hear or see in vanilla at vanilla range. This is a hard rule, not a preference.
 - No server-side component in 1.0, and no features that need one (e.g. syncing zones between players). A companion server policy mod is a Future idea (section 10.3).
 - No NeoForge, Forge or Quilt-specific builds. Quilt may load Fabric mods but is not tested.
 - No sound replacement, pitch editing, equalizer, reverb or audio effects.
@@ -77,8 +77,8 @@ Five personas drive the requirements. The accessibility persona is a first-class
 | Performance | Hot-path cost under 5 microseconds per sound on average; under 1 ms per frame at 300 sounds/second | Built-in diagnostics readout (FR-13) during the noisy-farm test |
 | Findability | A new tester mutes a named sound from the recently played list in under 30 seconds, in 4 of 5 attempts | Moderated test with 5 players before v1 |
 | Accessibility | All 6 core tasks (section 6.4) completed keyboard-only by a tester | Pre-release accessibility checklist |
-| Server acceptance | At least 3 servers with client-mod allowlists add Audio Zone within 6 months | Self-reported, tracked in the README |
-| Version freshness | A compatible Audio Zone release within 7 days of each official Minecraft release | Release dates on Modrinth vs Mojang's release date |
+| Server acceptance | At least 3 servers with client-mod allowlists add Sound Sculptor within 6 months | Self-reported, tracked in the README |
+| Version freshness | A compatible Sound Sculptor release within 7 days of each official Minecraft release | Release dates on Modrinth vs Mojang's release date |
 
 ## 4. User stories and use cases
 
@@ -97,7 +97,7 @@ Each story maps to the FRs that satisfy it. Release tags show when the story fir
 | US-9 | multiplayer regular | have my settings switch automatically when I join each server | I don't redo setup every session | FR-11 | MVP |
 | US-10 | streamer | export my profile and send it to a friend | they get the same mix (fixed zones included if they play on the same server) | FR-11 | v1 |
 | US-11 | keyboard-only or narrator user | reach and change every control without a mouse | the mod is usable for me | FR-12, 6.4 | MVP |
-| US-12 | player | turn all Audio Zone effects off with one key | I can compare with vanilla or recover from a bad rule | FR-13 | MVP |
+| US-12 | player | turn all Sound Sculptor effects off with one key | I can compare with vanilla or recover from a bad rule | FR-13 | MVP |
 | US-13 | server admin | read a clear fair-play statement | I can decide to allow the mod | section 8 | MVP |
 | US-14 | player | see every rule and zone that affected a sound and which one won | I can fix a setup that isn't doing what I expect | FR-14 | MVP |
 
@@ -109,10 +109,10 @@ Fourteen functional requirement groups, FR-1 to FR-14. Each has numbered sub-req
 
 Two definitions are used throughout:
 
-- **Vanilla hearing range** of a sound = `max(vanilla volume, 1.0) × attenuation distance` (attenuation distance is 16 blocks for almost every sound). This is the distance vanilla itself uses to decide whether to notify subtitles. It is always computed from the *un-modified* vanilla volume, never from Audio Zone's volume. Verify the exact formula against 26.2 at M1.
+- **Vanilla hearing range** of a sound = `max(vanilla volume, 1.0) × attenuation distance` (attenuation distance is 16 blocks for almost every sound). This is the distance vanilla itself uses to decide whether to notify subtitles. It is always computed from the *un-modified* vanilla volume, never from Sound Sculptor's volume. Verify the exact formula against 26.2 at M1.
 - **Positional sound** = a sound instance with linear attenuation that is not relative to the listener. Everything else (music, UI clicks, most sounds attached to the player's own head) is **non-positional**.
 
-**Vanilla-covered sounds are out of scope.** A sound is *vanilla-covered* when a vanilla slider already controls that kind of sound and nothing else. Background and menu music (Music slider) and interface sounds such as button clicks (UI slider; 26.2 and 26.3 both have one) and the Voice/Speech slider's sounds are the excluded set. Audio Zone leaves these sounds untouched. They do not appear in the recently played list, the entity inspector or search, no rule or zone pattern matches them (not even `*`), and they produce no cues. Sounds in a broad category that holds many different sounds stay in scope. Jukebox records and note blocks are one example (shared slider). Mobs, blocks and weather are others. Checked at M1: 26.2 and 26.3 both have separate Music, UI and Voice/Speech categories (see Q8).
+**Vanilla-covered sounds are out of scope.** A sound is *vanilla-covered* when a vanilla slider already controls that kind of sound and nothing else. Background and menu music (Music slider) and interface sounds such as button clicks (UI slider; 26.2 and 26.3 both have one) and the Voice/Speech slider's sounds are the excluded set. Sound Sculptor leaves these sounds untouched. They do not appear in the recently played list, the entity inspector or search, no rule or zone pattern matches them (not even `*`), and they produce no cues. Sounds in a broad category that holds many different sounds stay in scope. Jukebox records and note blocks are one example (shared slider). Mobs, blocks and weather are others. Checked at M1: 26.2 and 26.3 both have separate Music, UI and Voice/Speech categories (see Q8).
 
 How the check works: a sound is excluded by the category it plays in (Music, UI, Voice/Speech). Search cannot know a sound's category in advance, so it hides IDs under `minecraft:music.*` and `minecraft:ui.*`, plus any modded ID that has already played in an excluded category this session.
 
@@ -120,7 +120,7 @@ How the check works: a sound is excluded by the category it plays in (Music, UI,
 
 The main entry point: a live list of sounds the player just heard, with one-click actions.
 
-- **FR-1.1** Audio Zone records every sound the client starts or would have started (including sounds Audio Zone muted or limited) **if** it is non-positional, or it is positional and the listener is within its vanilla hearing range at the moment it starts. Vanilla-covered sounds (Music, UI, Voice/Speech) are never recorded.
+- **FR-1.1** Sound Sculptor records every sound the client starts or would have started (including sounds Sound Sculptor muted or limited) **if** it is non-positional, or it is positional and the listener is within its vanilla hearing range at the moment it starts. Vanilla-covered sounds (Music, UI, Voice/Speech) are never recorded.
 - **FR-1.2** Rows are grouped by sound ID. Each row shows: subtitle text (or the ID if the sound has no subtitle), full ID, category, play count in the last 3 minutes, time since last play ("2s ago"), distance band (FR-1.4), and a status label: Playing, Muted, Limited, Boosted, or "Zone: \<name>". Status uses text and an icon, never color alone.
 - **FR-1.3** The list keeps the last 3 minutes, up to 200 distinct IDs. Sort by most recent (default), play count, or name. A Pause toggle (key **P** while the list is focused) freezes the list for reading.
 - **FR-1.4** Distance is shown as a band, not a number: **Close** (4 blocks or less), **Near** (4 to 16), **Far** (more than 16, only possible for loud sounds). No direction and no coordinates are shown. Non-positional sounds show "Around you".
@@ -131,7 +131,7 @@ The main entry point: a live list of sounds the player just heard, with one-clic
 
 **Acceptance criteria**
 
-- [ ] Stand near a villager; within 5 seconds of it making a sound, a row "minecraft:entity.villager.ambient" (or similar) appears with category Friendly Mobs (vanilla's name for the `neutral` category; Audio Zone shows vanilla's translated category names) and band Close or Near.
+- [ ] Stand near a villager; within 5 seconds of it making a sound, a row "minecraft:entity.villager.ambient" (or similar) appears with category Friendly Mobs (vanilla's name for the `neutral` category; Sound Sculptor shows vanilla's translated category names) and band Close or Near.
 - [ ] Walk 30 blocks from all villagers and wait 10 seconds: no new villager rows appear and existing counts stop increasing.
 - [ ] Click Mute on a row: the next play of that sound is silent and the row status changes to "Muted".
 - [ ] With the list open in singleplayer, the world keeps running (mobs move, sounds keep arriving).
@@ -143,7 +143,7 @@ The main entry point: a live list of sounds the player just heard, with one-clic
 Look at a mob or other entity and see the sounds it recently made, with the same quick actions as FR-1.
 
 - **FR-2.1** Pressing the Inspect key (default unbound; also a button on the main screen) selects the entity under the crosshair. Selection uses a line-of-sight ray up to 32 blocks that stops at solid blocks. Entities invisible to the player in vanilla are never selected.
-- **FR-2.2** For each entity within vanilla hearing range, Audio Zone remembers its last 20 sounds from the last 30 seconds (at most 256 entities tracked).
+- **FR-2.2** For each entity within vanilla hearing range, Sound Sculptor remembers its last 20 sounds from the last 30 seconds (at most 256 entities tracked).
 - **FR-2.3** Sounds are linked to entities in two ways, and each link is labeled:
   - **Linked** (certain): the sound instance itself is attached to the entity, or the server sent it as an entity sound with the entity's ID.
   - **Likely** (guessed): a plain positional sound that started within 1.0 block of the entity's position on that tick. Candidates whose type matches the sound ID (`entity.villager.*` and `minecraft:villager`) are preferred. If two candidates are within 0.25 blocks of each other, the link is marked "Uncertain".
@@ -272,7 +272,7 @@ Cap how often a sound or group can play, e.g. "at most 3 villager 'hmm' sounds p
 
 When a muted sound plays, the player still sees that it happened.
 
-- **FR-7.1** A cue appears when a sound's final volume is 0 because of an Audio Zone rule (mute, 0%, or a fully faded zone), the deciding rule has Cue on, and the sound passes the same range check vanilla uses for subtitles.
+- **FR-7.1** A cue appears when a sound's final volume is 0 because of an Sound Sculptor rule (mute, 0%, or a fully faded zone), the deciding rule has Cue on, and the sound passes the same range check vanilla uses for subtitles.
 - **FR-7.2** Cue text is the sound's vanilla subtitle. Sounds without a subtitle show no cue, unless the setting "Cue sounds without subtitles" is on (default off), which shows the sound ID instead.
 - **FR-7.3** Cues are drawn in their own box directly above the vanilla subtitle box (bottom right), whether vanilla subtitles are on or off. Each line starts with the text "(muted)" and a muted-speaker icon, is drawn in italics, and uses a different text color (default light blue-gray, configurable). The prefix makes the difference clear without color.
 - **FR-7.4** Direction is shown exactly as vanilla subtitles do (`<` or `>` when the source is to the side), nothing more. Lines fade out after 3 seconds, like vanilla.
@@ -296,7 +296,7 @@ When a muted sound plays, the player still sees that it happened.
 A zone applies its own rules (mute, volume, limit, cue) to positional sounds based on where they come from.
 
 - **FR-8.1 Fixed anchor (MVP).** A point (x, y, z) plus the dimension (e.g. `minecraft:overworld`) and the world key of the server or singleplayer world (FR-11.1). Buttons: "Set to my position" and "Set to the block I'm looking at". A fixed zone is active only in its own world and dimension.
-- **FR-8.1a Drawing a box (MVP).** New zones are boxes. **Mark corners** closes the zone editor; the player left-clicks a block (or presses the Audio Zone key; with the crosshair on no block, the block the player stands in counts) for the first corner, then again for the second. While marking, left-click never attacks or breaks anything. The box covering both corner blocks is outlined live from the first corner to the current target, and the editor comes back with it filled in. A two-line hint at the top of the screen gives the corner and the box's size so far ("Second corner · 5 × 2 × 7 blocks"), then the keys; a rebindable "Cancel marking zone corners" key (Backspace) returns unchanged. Only blocks the player can see or reach can be marked. In the editor, **Grow** and **Shrink** move one chosen side (North, South, East, West, Up, Down) by 1 block, or 5 with Shift; the opposite side stays where it is.
+- **FR-8.1a Drawing a box (MVP).** New zones are boxes. **Mark corners** closes the zone editor; the player left-clicks a block (or presses the Sound Sculptor key; with the crosshair on no block, the block the player stands in counts) for the first corner, then again for the second. While marking, left-click never attacks or breaks anything. The box covering both corner blocks is outlined live from the first corner to the current target, and the editor comes back with it filled in. A two-line hint at the top of the screen gives the corner and the box's size so far ("Second corner · 5 × 2 × 7 blocks"), then the keys; a rebindable "Cancel marking zone corners" key (Backspace) returns unchanged. Only blocks the player can see or reach can be marked. In the editor, **Grow** and **Shrink** move one chosen side (North, South, East, West, Up, Down) by 1 block, or 5 with Shift; the opposite side stays where it is.
 - **FR-8.2 Personal bubble (v1).** The anchor is the local player's eye position, updated every tick. A profile can have several bubble zones (e.g. a small mute bubble inside a larger 50% bubble). A bubble never follows another player.
 - **FR-8.3 Shapes.** Axis-aligned box (width, height, depth 1 to 512 whole blocks, every edge on a block boundary: the center is snapped, however it was set) in MVP; spheres (radius 1 to 256 blocks) are not offered for new zones, but a sphere zone from an existing profile still works, can be edited and can be turned into a box, and spheres remain the shape of personal bubbles (v1); vertical cylinder (radius 1 to 256, height 1 to 512) in v1. The anchor is the shape's geometric center for all three, so a box or cylinder extends half its size in each direction from the anchor.
 - **FR-8.4 Affect mode.** Inside (default, MVP): the zone affects sounds inside its shape. Outside (v1): it affects every sound outside its shape in the same dimension.
@@ -399,14 +399,14 @@ Worked examples (also the basis of the test matrix in section 11.4):
 
 Each multiplayer server, Realm and singleplayer world has exactly one *profile*: its global rules, zones (fixed and personal bubble), and profile settings (cue defaults, outline mode, default edge, show distance). Profiles are never shared or switched between servers. Keybinds and UI preferences are app-wide, not per profile.
 
-- **FR-11.1 Auto-create (MVP).** On joining, Audio Zone works out a world key: multiplayer = server address in lowercase with the default port 25565 removed (`play.example.net`); Realms = `realms:<realm id>`; singleplayer = `world:<ID from audiozone_id.txt>`. For singleplayer, Audio Zone writes a small file, audiozone\_id.txt, into the world's save folder on first join and uses the ID in it, so the profile survives folder renames and backups. If the file cannot be written (e.g. a read-only save), it falls back to the folder name and the Profiles tab says so. A copied world shares the original's ID, and so its profile, until the player clicks "Give this copy its own profile". If that key has no profile yet, one is created with no rules or zones and default settings. Its display name is the server's name from the server list, or the world's name.
+- **FR-11.1 Auto-create (MVP).** On joining, Sound Sculptor works out a world key: multiplayer = server address in lowercase with the default port 25565 removed (`play.example.net`); Realms = `realms:<realm id>`; singleplayer = `world:<ID from soundsculptor_id.txt>`. For singleplayer, Sound Sculptor writes a small file, soundsculptor\_id.txt, into the world's save folder on first join and uses the ID in it, so the profile survives folder renames and backups. If the file cannot be written (e.g. a read-only save), it falls back to the folder name and the Profiles tab says so. A copied world shares the original's ID, and so its profile, until the player clicks "Give this copy its own profile". If that key has no profile yet, one is created with no rules or zones and default settings. Its display name is the server's name from the server list, or the world's name.
 - **FR-11.2 Copy settings from another server (v1).** The Profiles tab has "Copy from…", which lists the other servers and worlds. Copying brings over only the parts that are not tied to a place: global rules, personal bubble zones, and profile settings. Fixed zones are never copied, because they belong to their own server. A dialog lists what will be copied ("12 global rules, 2 bubble zones, settings") and that this server's fixed zones are kept. Choosing Copy replaces this server's global rules, bubble zones and settings. It is a one-time copy: later changes on either server do not sync.
 - **FR-11.3 Manage (v1).** The Profiles tab lists every server and world that has a profile, with display name, world key, rule and zone counts, and last joined date. Actions: Rename (display name only), Reset (back to empty defaults, with confirmation), and Delete (removes the profile; a new empty one is created on next join; with confirmation). The profile of the server you are connected to can be Reset but not Deleted.
-- **FR-11.4 Export (v1).** Writes `config/audiozone/exports/<display name>-<date>.json` and shows an "Open folder" button. The file contains the whole profile, including fixed zones with coordinates, dimension and world key.
-- **FR-11.5 Import (v1).** Two ways: drag a file onto the game window while the Profiles tab is open (vanilla supports file drop on screens), or choose from files placed in `config/audiozone/imports/`. Import applies to the current server's profile. A dialog shows what the file holds and what will happen: global rules, bubble zones and settings replace this server's; fixed zones are imported only if their world key matches this server (restoring a backup, or a friend who plays on the same server). Fixed zones for other servers are skipped and counted ("3 fixed zones skipped: made for another server"). The current profile is saved as a `.bak` before import.
-- **FR-11.6 Validation (v1).** Before anything changes, the file is checked: valid JSON; size 1 MB or less; schema version known (older versions are migrated, newer ones are refused with "This file was made with a newer Audio Zone. Update the mod to import it."); every value in range (volume 0–200, shapes within FR-8.3 limits, at most 1,000 rules and 64 zones); patterns valid. Unknown fields are ignored with a warning. On any error nothing is imported and a dialog names the problem in plain words and the location ("Zone 3, field radius: 900 is above the maximum 256").
+- **FR-11.4 Export (v1).** Writes `config/soundsculptor/exports/<display name>-<date>.json` and shows an "Open folder" button. The file contains the whole profile, including fixed zones with coordinates, dimension and world key.
+- **FR-11.5 Import (v1).** Two ways: drag a file onto the game window while the Profiles tab is open (vanilla supports file drop on screens), or choose from files placed in `config/soundsculptor/imports/`. Import applies to the current server's profile. A dialog shows what the file holds and what will happen: global rules, bubble zones and settings replace this server's; fixed zones are imported only if their world key matches this server (restoring a backup, or a friend who plays on the same server). Fixed zones for other servers are skipped and counted ("3 fixed zones skipped: made for another server"). The current profile is saved as a `.bak` before import.
+- **FR-11.6 Validation (v1).** Before anything changes, the file is checked: valid JSON; size 1 MB or less; schema version known (older versions are migrated, newer ones are refused with "This file was made with a newer Sound Sculptor. Update the mod to import it."); every value in range (volume 0–200, shapes within FR-8.3 limits, at most 1,000 rules and 64 zones); patterns valid. Unknown fields are ignored with a warning. On any error nothing is imported and a dialog names the problem in plain words and the location ("Zone 3, field radius: 900 is above the maximum 256").
 - **FR-11.7** Fixed zones keep their exact coordinates and dimension through export and import, and are only ever active on their own server.
-- **FR-11.8 Storage (MVP).** One human-readable JSON file per server in `config/audiozone/profiles/`, named from its world key (made safe for file names). Every file has a `schemaVersion`. Writes are atomic (write a temp file, then rename) and the previous version is kept as `.bak`. A file that fails to load is renamed `.broken`, a toast explains, and the mod continues with an empty profile for that server.
+- **FR-11.8 Storage (MVP).** One human-readable JSON file per server in `config/soundsculptor/profiles/`, named from its world key (made safe for file names). Every file has a `schemaVersion`. Writes are atomic (write a temp file, then rename) and the previous version is kept as `.bak`. A file that fails to load is renamed `.broken`, a toast explains, and the mod continues with an empty profile for that server.
 
 **Fair play.** Copied and shared profiles contain only rules and zones; they carry no world data beyond coordinates the author chose.
 
@@ -423,8 +423,8 @@ Each multiplayer server, Realm and singleplayer world has exactly one *profile*:
 
 ### FR-12 Config screen, hotkey and Mod Menu (MVP)
 
-- **FR-12.1** One main screen with tabs: Recently Played, Inspect (v1), Search, Rules, Zones, Profiles, Settings. The header always shows the active profile and a "Bypass Audio Zone" toggle (FR-13.1).
-- **FR-12.2** Hotkey **;** (semicolon) **opens the screen on the last used tab. It is rebindable in vanilla Options → Controls under the category "Audio Zone". At M0, K was checked against the default keys of the 36 most-downloaded Fabric mods, clashed with Iris, and was replaced by ; (see the Decisions Log)**.
+- **FR-12.1** One main screen with tabs: Recently Played, Inspect (v1), Search, Rules, Zones, Profiles, Settings. The header always shows the active profile and a "Bypass Sound Sculptor" toggle (FR-13.1).
+- **FR-12.2** Hotkey **;** (semicolon) **opens the screen on the last used tab. It is rebindable in vanilla Options → Controls under the category "Sound Sculptor". At M0, K was checked against the default keys of the 36 most-downloaded Fabric mods, clashed with Iris, and was replaced by ; (see the Decisions Log)**.
 - **FR-12.3** If Mod Menu is installed, its config button opens the same screen. Without Mod Menu, the mod works identically.
 - **FR-12.4** Editors (rule, zone, profile settings) use Save and Cancel. Pressing Esc or Cancel with unsaved changes opens a dialog: Save, Discard, Keep editing.
 - **FR-12.5** Quick actions in lists apply immediately and show a 5-second toast with Undo (v1).
@@ -433,8 +433,8 @@ Each multiplayer server, Realm and singleplayer world has exactly one *profile*:
 
 **Acceptance criteria**
 
-- [ ] Press ; in game: the screen opens. Rebind to ' (apostrophe) in Controls: ' opens it, ; does nothing. With JourneyMap or Iris installed, Controls shows no key conflict for Audio Zone. (Rebind to a free key: a key that vanilla already uses, such as L for Advancements, opens that screen instead.)
-- [ ] With Mod Menu installed, its Audio Zone config button opens the screen; remove Mod Menu: the game still launches.
+- [ ] Press ; in game: the screen opens. Rebind to ' (apostrophe) in Controls: ' opens it, ; does nothing. With JourneyMap or Iris installed, Controls shows no key conflict for Sound Sculptor. (Rebind to a free key: a key that vanilla already uses, such as L for Advancements, opens that screen instead.)
+- [ ] With Mod Menu installed, its Sound Sculptor config button opens the screen; remove Mod Menu: the game still launches.
 - [ ] Change a zone radius and press Esc: the discard dialog appears; Keep editing returns with the value intact.
 - [ ] Change a setting, press its reset button: it returns to the default.
 
@@ -442,9 +442,9 @@ Each multiplayer server, Realm and singleplayer world has exactly one *profile*:
 
 Tools that let a non-programmer recover from mistakes and check performance in game.
 
-- **FR-13.1** "Bypass Audio Zone" turns every effect off at once (vanilla sound) without changing any rule. Available as a header toggle and a rebindable hotkey, default **F10** (unused by vanilla). Many laptop and Mac keyboards send their own system-mute signal on that key, so the key's tooltip and the Settings page say "On laptops you may need Fn+F10". A small HUD label "Audio Zone: bypassed" shows while on.
-- **FR-13.2** Fail open: if Audio Zone hits an error while handling a sound, that sound plays as vanilla and the error is logged once. More than 10 errors in a minute turns on bypass and shows a toast asking the player to report the bug.
-- **FR-13.3** Settings → Diagnostics shows live: sounds per second, average and maximum microseconds Audio Zone spends per sound, outline drawing time per frame, rules and zones active, pattern cache hit rate, and a "Copy report" button for bug reports.
+- **FR-13.1** "Bypass Sound Sculptor" turns every effect off at once (vanilla sound) without changing any rule. Available as a header toggle and a rebindable hotkey, default **F10** (unused by vanilla). Many laptop and Mac keyboards send their own system-mute signal on that key, so the key's tooltip and the Settings page say "On laptops you may need Fn+F10". A small HUD label "Sound Sculptor: bypassed" shows while on.
+- **FR-13.2** Fail open: if Sound Sculptor hits an error while handling a sound, that sound plays as vanilla and the error is logged once. More than 10 errors in a minute turns on bypass and shows a toast asking the player to report the bug.
+- **FR-13.3** Settings → Diagnostics shows live: sounds per second, average and maximum microseconds Sound Sculptor spends per sound, outline drawing time per frame, rules and zones active, pattern cache hit rate, and a "Copy report" button for bug reports.
 
 **Acceptance criteria**
 
@@ -462,7 +462,7 @@ A player who is confused by what they hear can see every rule and zone that affe
   2. **Zones considered**: each zone in the current world and dimension that contains (or, for Outside zones, excludes) the sound, with Inside/Outside, fade weight w, and distance from the sound to the zone's anchor.
   3. **Winner per setting** among the zones, with the tie-break used if any ("tie on distance; smaller zone wins").
   4. **Final result**: volume %, limit and whether this play was allowed or dropped, cue on/off, and whether a cue was shown.
-- **FR-14.3** Special cases are stated plainly at the top of the panel: "Bypass is on: nothing is changed"; "This sound has its own vanilla slider, so Audio Zone does not handle it"; "Non-positional: zones never apply"; "Above 100%: boost applied".
+- **FR-14.3** Special cases are stated plainly at the top of the panel: "Bypass is on: nothing is changed"; "This sound has its own vanilla slider, so Sound Sculptor does not handle it"; "Non-positional: zones never apply"; "Above 100%: boost applied".
 - **FR-14.4** Inline editing (v1). Every rule line in the panel has inline controls: enable/disable, Mute, Volume slider, Limit (count, window, per source), and Cue. Every zone line has enable/disable and the same controls for the zone rule that matched this sound. If no rule matched at some level, "Add rule for this sound" creates an exact-ID rule in the global list or in any zone shown in the trace. Edits save immediately (no Save button), show a 5-second Undo toast, and recompute the trace at once using the sound's last play position, labelled "Predicted for next play" until the sound plays again. Edits are validated like the full editors (FR-12.7). An "Open full editor" link on each line opens the rule or zone editor for changes the panel does not offer (pattern, shape, anchor), and returning refreshes the trace.
 - **FR-14.5** A "Copy trace" button copies the panel as plain text, for asking for help or filing a bug.
 - **FR-14.6** Recording a trace costs nothing on the hot path: the engine stores only the last decision per sound ID (rule IDs, zone IDs, weights) in a fixed-size table, and the panel rebuilds the text when opened.
@@ -533,14 +533,14 @@ Every screen is built only from these components. Version-specific drawing calls
 - **A-1 Keyboard.** Every control is reachable with Tab and Shift+Tab in reading order (left to right, top to bottom), usable with Enter/Space/arrows, and shows a visible focus ring at least 1 GUI pixel thick.
 - **A-2 Six core tasks keyboard-only:** mute a recently played sound; edit a rule's volume; create a sphere zone at your position; change a zone's color; copy settings from another server; turn on Bypass.
 - **A-3 Readable text.** Text uses the vanilla font, never scaled below the GUI scale, with a contrast ratio of at least 4.5:1 against its background. Layouts pass at GUI scales 1 to 4 and Auto at 854 × 480 and 1920 × 1080.
-- **A-4 Narrator.** Where vanilla narration works (screens and widgets), every Audio Zone widget provides narration text: label, value, state, and errors.
+- **A-4 Narrator.** Where vanilla narration works (screens and widgets), every Sound Sculptor widget provides narration text: label, value, state, and errors.
 - **A-5 Color.** Default zone colors are the Okabe–Ito palette. No information relies on color alone: statuses have text and icons, zone modes use line style, cues use a "(muted)" prefix. **Exception:** a slider's warning zone (e.g. volume above 100%) is shown on screen by its warning outline only; the slider's value is always shown as text, the tooltip explains the zone, and the narrator reads the warning.
 - **A-6 Motion.** A "Reduced motion" setting disables list animations and toast slide-ins.
 - **A-7 Cue readability.** Cue text scale (100% to 200%) and color are adjustable.
 
 ## 7. Technical requirements and architecture
 
-Audio Zone hooks one decision point in the client sound engine, keeps all game-version-specific code in a small "adapter" layer, and keeps all decision logic in plain Java that can be unit-tested without starting Minecraft. Class and method names below are Mojang's official names and must be checked against 26.2 at M0/M1.
+Sound Sculptor hooks one decision point in the client sound engine, keeps all game-version-specific code in a small "adapter" layer, and keeps all decision logic in plain Java that can be unit-tested without starting Minecraft. Class and method names below are Mojang's official names and must be checked against 26.2 at M0/M1.
 
 ```mermaid
 flowchart TD
@@ -576,14 +576,14 @@ The range check always uses the vanilla volume, so rules and boost can change lo
 
 ### 7.2 Interception points
 
-*Mixin* is the standard tool for changing Minecraft's code at load time: it injects small pieces of Audio Zone code into named vanilla methods. Each injection point below is a place where an update can break the mod.
+*Mixin* is the standard tool for changing Minecraft's code at load time: it injects small pieces of Sound Sculptor code into named vanilla methods. Each injection point below is a place where an update can break the mod.
 
-- **Sound start: `SoundEngine.play(SoundInstance)`.** The main decision point. Audio Zone reads the sound's ID, category, attenuation, position and vanilla volume, computes vanilla range, logs the sound, then decides: drop (repeat limit), mute (no channel created, cue fired), or play with a volume multiplier.
-- **Volume calculation: `SoundEngine.calculateVolume(...)`.** Vanilla multiplies the instance volume by category and Master sliders and clamps to 0–1. Audio Zone applies its multiplier *after* the vanilla value is computed and raises the clamp to 2.0 for boost. The hearing-range calculation, which uses the sound instance's own volume, is left untouched. This is how boost avoids increasing range.
-- **Channel gain (boost, v1).** OpenAL (the audio library Minecraft uses) caps each source's gain at `AL_MAX_GAIN`, default 1.0. Audio Zone must raise it to 2.0 when a channel is created. Fallback: if a driver ignores it, boost is disabled with a message and volumes cap at 100%.
+- **Sound start: `SoundEngine.play(SoundInstance)`.** The main decision point. Sound Sculptor reads the sound's ID, category, attenuation, position and vanilla volume, computes vanilla range, logs the sound, then decides: drop (repeat limit), mute (no channel created, cue fired), or play with a volume multiplier.
+- **Volume calculation: `SoundEngine.calculateVolume(...)`.** Vanilla multiplies the instance volume by category and Master sliders and clamps to 0–1. Sound Sculptor applies its multiplier *after* the vanilla value is computed and raises the clamp to 2.0 for boost. The hearing-range calculation, which uses the sound instance's own volume, is left untouched. This is how boost avoids increasing range.
+- **Channel gain (boost, v1).** OpenAL (the audio library Minecraft uses) caps each source's gain at `AL_MAX_GAIN`, default 1.0. Sound Sculptor must raise it to 2.0 when a channel is created. Fallback: if a driver ignores it, boost is disabled with a message and volumes cap at 100%.
 - **Per-tick updates.** Each client tick, the gain controller walks the engine's playing sounds and sets the new volume for any whose zone result changed. Channel changes must run on the sound engine's own executor thread, never directly from the game thread.
 - **Entity links.** The client packet handler for entity sound packets (which carry an entity ID) and sound instances bound to an entity (minecarts, bees, guardians) give certain links. Everything else is matched by proximity (FR-2.3).
-- **Cues.** Not hooked into the vanilla subtitle overlay: Audio Zone draws its own HUD element, which avoids a fragile injection.
+- **Cues.** Not hooked into the vanilla subtitle overlay: Sound Sculptor draws its own HUD element, which avoids a fragile injection.
 
 ### 7.3 Fabric API usage
 
@@ -627,11 +627,11 @@ Profile file sketch (field names final at M4):
 ### 7.6 Migrations and version-update strategy
 
 - Each schema change bumps `schemaVersion` and adds one migration step (v1→v2, v2→v3…). Before migrating, the original is saved as `<name>.v1.bak`.
-- All version-sensitive code lives in one package (`audiozone.mc`). A written porting checklist lists every Mixin target, the drawing adapter, the HUD and outline renderers, and the AC to re-run.
+- All version-sensitive code lives in one package (`soundsculptor.mc`). A written porting checklist lists every Mixin target, the drawing adapter, the HUD and outline renderers, and the AC to re-run.
 - Mixins that the mod cannot work without fail at startup with a clear log message naming the missing target, instead of failing silently.
 - Pure logic (patterns, search syntax, precedence, limiter, validation, migrations) has JUnit tests that run without Minecraft, so they survive every port unchanged.
-- **Supported versions.** The first release supports Minecraft 26.2 and 26.3. Decided at M0: **each version gets its own jar**, built from one source tree with `-Pminecraft_version`. The code Audio Zone touches differs between 26.2 and 26.3 (the play path and range helper in `SoundEngine`, `SoundInstance.resolve` renamed, `InputConstants.Type` renamed, Screen narration and `LevelRenderer` changes); see `docs/PORTING.md`. Every supported version runs the full test plan before each release.
-- **Release cadence.** Later versions follow Mojang's release schedule. The goal is an Audio Zone release on the day of each official Minecraft release, or within 7 days. To make that possible, Audio Zone is tested against Mojang's preview builds (snapshots, pre-releases and release candidates) before the official release. Section 10.5 describes the process.
+- **Supported versions.** The first release supports Minecraft 26.2 and 26.3. Decided at M0: **each version gets its own jar**, built from one source tree with `-Pminecraft_version`. The code Sound Sculptor touches differs between 26.2 and 26.3 (the play path and range helper in `SoundEngine`, `SoundInstance.resolve` renamed, `InputConstants.Type` renamed, Screen narration and `LevelRenderer` changes); see `docs/PORTING.md`. Every supported version runs the full test plan before each release.
+- **Release cadence.** Later versions follow Mojang's release schedule. The goal is an Sound Sculptor release on the day of each official Minecraft release, or within 7 days. To make that possible, Sound Sculptor is tested against Mojang's preview builds (snapshots, pre-releases and release candidates) before the official release. Section 10.5 describes the process.
 
 ### 7.7 Where AI-written code is most likely to go wrong
 
@@ -648,7 +648,7 @@ Profile file sketch (field names final at M4):
 
 ## 8. Compatibility and fair play
 
-Audio Zone must coexist with common client mods and be defensible to server admins. Each compatibility item below gets a test in the release checklist; conflicts that cannot be fixed are documented on the mod page.
+Sound Sculptor must coexist with common client mods and be defensible to server admins. Each compatibility item below gets a test in the release checklist; conflicts that cannot be fixed are documented on the mod page.
 
 ### 8.1 Mod compatibility
 
@@ -675,7 +675,7 @@ Audio Zone must coexist with common client mods and be defensible to server admi
 ### 8.3 Servers with client-mod rules
 
 - The mod page and README include a "For server admins" section stating the core principle and the table above.
-- Audio Zone sends nothing to the server: no custom packets, no brand change, no plugin channel. Admins can verify with any packet logger.
+- Sound Sculptor sends nothing to the server: no custom packets, no brand change, no plugin channel. Admins can verify with any packet logger.
 - **Risk flag:** the distance band in the recently played list is the one feature an admin could still question. If feedback shows it, the default for "Show distance" flips to off.
 
 ## 9. Non-functional requirements
@@ -702,7 +702,7 @@ Audio Zone must coexist with common client mods and be defensible to server admi
 
 ### 9.3 Localization
 
-- Every visible string comes from the language file `assets/audiozone/lang/en_us.json`. No text is built by joining sentence fragments, so translators can reorder words.
+- Every visible string comes from the language file `assets/soundsculptor/lang/en_us.json`. No text is built by joining sentence fragments, so translators can reorder words.
 - Subtitle text and sound names use Minecraft's own translations in the player's language.
 - Layouts allow text 40% longer than English without clipping (tested with a pseudo-language).
 
@@ -752,7 +752,7 @@ Three releases: **MVP (0.1)** after milestones M0–M**8, v1 (1.0) after M9**–
 - Time-based rules (e.g. only at night) using the in-game clock.
 - Per-dimension global rules.
 - Translations contributed by the community.
-- **Server policy companion mod.** A separate server-side mod or plugin (Fabric server mod or Paper plugin) that tells Audio Zone how much it may do on that server: **Disabled**, **Strict vanilla** (also hides distance bands and the entity inspector), or **Vanilla+** (server opts in to extra options and information). Two delivery methods to evaluate: a custom network channel such as `audiozone:policy` (clean, but the server can then see the player has Audio Zone, which changes section 8.3), or a hidden code in the MOTD or join message (no plugin, works on vanilla servers, never reveals the mod). Notes: the policy is honor-based, because a modified client can ignore it. No policy means today's fair-play behavior. Vanilla+ would relax the core principle to "no advantage unless the server allows it", so it needs its own fair-play review before work starts.
+- **Server policy companion mod.** A separate server-side mod or plugin (Fabric server mod or Paper plugin) that tells Sound Sculptor how much it may do on that server: **Disabled**, **Strict vanilla** (also hides distance bands and the entity inspector), or **Vanilla+** (server opts in to extra options and information). Two delivery methods to evaluate: a custom network channel such as `soundsculptor:policy` (clean, but the server can then see the player has Sound Sculptor, which changes section 8.3), or a hidden code in the MOTD or join message (no plugin, works on vanilla servers, never reveals the mod). Notes: the policy is honor-based, because a modified client can ignore it. No policy means today's fair-play behavior. Vanilla+ would relax the core principle to "no advantage unless the server allows it", so it needs its own fair-play review before work starts.
 - Filled zone display (FR-10.7), moved from v1 in the feature review.
 - Regex search (FR-3), moved from v1 in the feature review.
 - Preview: play a search result once at 100% (FR-3.3), moved from v1 in the feature review.
@@ -766,7 +766,7 @@ Three releases: **MVP (0.1)** after milestones M0–M**8, v1 (1.0) after M9**–
 
 ### 10.5 Keeping up with Minecraft releases
 
-Audio Zone aims to ship on the day of each official Minecraft release, or within 7 days, which means testing against Mojang's preview builds before release. Mojang's previews come in three stages, from earliest to latest: snapshots, pre-releases and release candidates.
+Sound Sculptor aims to ship on the day of each official Minecraft release, or within 7 days, which means testing against Mojang's preview builds before release. Mojang's previews come in three stages, from earliest to latest: snapshots, pre-releases and release candidates.
 
 1. **Snapshots: watch.** Read the changelog for each snapshot and note anything touching sounds, subtitles, GUI drawing, world rendering or the options screen. Build against a snapshot only if a change clearly hits a file in the porting checklist (7.6).
 2. **First pre-release: port.** Wait for Fabric Loader, Fabric API and Loom to support the pre-release (usually within days). Then update the version-specific code, using the porting checklist, on a separate branch.
@@ -782,7 +782,7 @@ Every test runs in game without reading code. Use a dedicated creative test worl
 
 | Milestone | In-game test |
 | --- | --- |
-| M0 | Game launches with the mod; it appears in the mod list (or Mod Menu); ; opens an empty Audio Zone screen; log has no errors from Audio Zone |
+| M0 | Game launches with the mod; it appears in the mod list (or Mod Menu); ; opens an empty Sound Sculptor screen; log has no errors from Sound Sculptor |
 | M1 | Walk past animals: the log shows one line per sound with ID, category and range; sounds sound unchanged |
 | M2 | Demo screen: every component reachable with Tab; narrator reads each; correct at GUI scales 1–4 |
 | M3 | FR-1 AC rows 1, 2, 4, 5 |
@@ -799,9 +799,9 @@ Every test runs in game without reading code. Use a dedicated creative test worl
 
 1. Build a 9 × 9 pen with 40 villagers, 40 chickens and 20 cows, plus 8 hoppers on a fast redstone clock, and 4 iron golems. Aim for 300 or more sounds per second (diagnostics readout).
 2. Load the "stress" profile: 50 global rules (mix of exact and wildcard), 64 zones overlapping the pen (spheres, boxes, cylinders, some fade, some Outside).
-3. Record FPS (F3) with Audio Zone bypassed, then active, then active with Recently Played open.
+3. Record FPS (F3) with Sound Sculptor bypassed, then active, then active with Recently Played open.
 4. **Pass:** average cost under 5 µs per sound; added frame time under 1 ms; FPS with list open within 5% of closed; no stutters visible in the F3 frame graph beyond those present when bypassed.
-5. **Soak:** leave it running 30 minutes. **Pass:** no crash, memory readout stable (under 8 MB for Audio Zone data), no "AL error" lines in the log.
+5. **Soak:** leave it running 30 minutes. **Pass:** no crash, memory readout stable (under 8 MB for Sound Sculptor data), no "AL error" lines in the log.
 
 ### 11.3 "Boost does not increase range" test
 
@@ -880,10 +880,10 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 | Attenuation | How a sound gets quieter with distance. "Linear" sounds fade to silence at their range; "none" sounds (music, UI) do not fade. |
 | Category (sound source) | Vanilla's volume group for a sound, e.g. Hostile Creatures. Each has a slider in Options. |
 | Client-only mod | A mod installed only on the player's game; the server needs nothing. |
-| Cue | Audio Zone's on-screen note that a muted sound played. |
+| Cue | Sound Sculptor's on-screen note that a muted sound played. |
 | Dimension | Overworld, Nether, End, or a modded world layer. Coordinates are only meaningful within one. |
-| Fabric / Fabric Loader | The mod loader that loads Audio Zone into Minecraft. |
-| Fabric API | A shared library of hooks (events) that most Fabric mods use. Audio Zone's only required dependency. |
+| Fabric / Fabric Loader | The mod loader that loads Sound Sculptor into Minecraft. |
+| Fabric API | A shared library of hooks (events) that most Fabric mods use. Sound Sculptor's only required dependency. |
 | Fade weight (w) | How strongly a zone applies at a point, from 0 (not at all) to 1 (fully). |
 | Hot path | Code that runs for every sound and must be very cheap. |
 | Loom | The build tool plugin that compiles Fabric mods. |
@@ -895,10 +895,10 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 | Personal bubble | A zone that follows the local player. |
 | Positional sound | A sound with a location in the world that gets quieter with distance. |
 | Precedence | The rules that decide which setting wins when several apply (FR-9). |
-| Profile | The full set of Audio Zone rules, zones and settings for one server or world. |
+| Profile | The full set of Sound Sculptor rules, zones and settings for one server or world. |
 | Regex | "Regular expression": an advanced text pattern language. Used only in search, between slashes. |
 | Repeat limit | A cap on how many times a sound can start within a time window. |
-| Schema version | A number in each saved file that tells Audio Zone how to read or upgrade it. |
+| Schema version | A number in each saved file that tells Sound Sculptor how to read or upgrade it. |
 | Screen / widget | Minecraft's classes for menus and their buttons, sliders and fields. |
 | Sliding window | A time window that moves with now ("the last 1,000 ms"), rather than fixed blocks of time. |
 | Sound event / sound ID | The name of a sound, e.g. `minecraft:entity.villager.ambient`. One event may pick from several audio files. |
@@ -907,7 +907,7 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 | Tick | One step of game time; 20 per second. |
 | Vanilla | Unmodified Minecraft. |
 | Vanilla hearing range | The farthest distance at which vanilla would play a sound or show its subtitle. |
-| World key | Audio Zone's ID for a server, Realm or singleplayer world, used to identify each profile and its fixed zones. |
+| World key | Sound Sculptor's ID for a server, Realm or singleplayer world, used to identify each profile and its fixed zones. |
 | Zone | An area (sphere, box or cylinder) with its own rules, affecting sounds inside or outside it. |
 
 ## Open questions
@@ -917,7 +917,7 @@ In priority order. Answers will update the decisions log and the affected sectio
 - [ ] **Q1.** Resolved: cues move from MVP to v1; the sound trace stays in MVP as read-only, with inline editing in v1; filled zones, regex search and Preview move to Future (after 1.0). Every other feature stays where it was.
 - [ ] **Q2.** Resolved: distance bands (Close, Near, Far) are shown by default, with a setting to hide them (A5, FR-1.4).
 - [ ] **Q3.** Resolved: cues have their own master switch, "Show muted-sound cues", on by default and independent of vanilla Subtitles; per-rule Cue toggles apply underneath (FR-7.7).
-- [ ] **Q4.** Resolved: singleplayer worlds are identified by a small ID file (audiozone\_id.txt) in the save folder, with the folder name as fallback (FR-11.1).
+- [ ] **Q4.** Resolved: singleplayer worlds are identified by a small ID file (soundsculptor\_id.txt) in the save folder, with the folder name as fallback (FR-11.1).
 - [ ] **Q5.** Resolved: Outside zones measure distance from their center, the same as every other zone (FR-9 step 4).
 - [ ] **Q6.** Resolved: ; opens the screen by default (K clashed with Iris in the M0 check of popular mods' keys); Bypass is F10, which no checked mod uses (FR-12.2, FR-13.1).
 - [ ] **Q7.** Resolved: the initial build supports 26.2 and 26.3; later versions follow Mojang's release schedule with releases on or shortly after each official Minecraft release (sections 7.6 and 10.5).
@@ -936,7 +936,7 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-08 | Zones: fixed or personal bubble anchors; sphere, box, cylinder; Inside/Outside; hard edge or fade (per zone, global default); outlines toggle; per-zone color | Project brief |
 | 2026-11-08 | Precedence: zone overrides global; zones combine; closest anchor wins conflicts | Project brief |
 | 2026-11-08 | Profiles auto-linked per server and world; switch, duplicate, import/export | Project brief |
-| 2026-11-08 | Public on Modrinth and CurseForge, MIT, name Audio Zone, mod ID `audiozone`; accessibility is core | Project brief |
+| 2026-11-08 | Public on Modrinth and CurseForge, MIT, name Sound Sculptor, mod ID `soundsculptor`; accessibility is core | Project brief |
 | 2026-11-08 | Draft defaults A1–A8 (pending maxismagical's review) | This draft |
 | 2026-11-08 | Precedence details: anchor = center; ties by smaller volume then list order; fade blends volume, discrete properties switch at w ≥ 0.5 | This draft (FR-9) |
 | 2026-11-08 | Repeat limiting: sliding window, real time, block-rounded per-source keys, loops count once | This draft (FR-6) |
@@ -951,14 +951,14 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-08 | Muted-sound cues get their own master switch, on by default, independent of vanilla Subtitles (Q3, FR-7.7) | maxismagical, decision card |
 | 2026-11-08 | Singleplayer worlds identified by an ID file in the save folder; folder name as fallback; copies share a profile until split (Q4) | maxismagical, decision card |
 | 2026-11-08 | All zones, including Outside zones, measure conflict distance from their center (Q5) | maxismagical, decision card |
-| 2026-11-08 | Default key to open Audio Zone changes from J to K (J clashes with JourneyMap); confirmed against popular mods at M0 (Q6) | maxismagical, decision card |
+| 2026-11-08 | Default key to open Sound Sculptor changes from J to K (J clashes with JourneyMap); confirmed against popular mods at M0 (Q6) | maxismagical, decision card |
 | 2026-11-08 | Feature review: cues move from MVP to v1 (now milestone M9; MVP is M0–M8). Sound trace stays in MVP read-only; inline editing moves to v1. Filled zones, regex search and Preview move to Future (after 1.0). All other features unchanged (Q1) | maxismagical |
-| 2026-11-08 | Default key to open Audio Zone changes from K to ; (semicolon). The M0 check loaded vanilla and the 36 most-downloaded Fabric mods: Iris binds K to "Toggle shaders", every letter is taken by vanilla or some mod, and ; ' , . ` are the only free keys. F10 (Bypass) is free (Q6, FR-12.2) | maxismagical, M0 check |
-| 2026-11-08 | One jar per Minecraft version, built from one source tree; version-specific code goes in `audiozone.mc` and is tracked in docs/PORTING.md (section 7.6) | M0 check |
+| 2026-11-08 | Default key to open Sound Sculptor changes from K to ; (semicolon). The M0 check loaded vanilla and the 36 most-downloaded Fabric mods: Iris binds K to "Toggle shaders", every letter is taken by vanilla or some mod, and ; ' , . ` are the only free keys. F10 (Bypass) is free (Q6, FR-12.2) | maxismagical, M0 check |
+| 2026-11-08 | One jar per Minecraft version, built from one source tree; version-specific code goes in `soundsculptor.mc` and is tracked in docs/PORTING.md (section 7.6) | M0 check |
 | 2026-11-08 | Automated client game tests (Fabric client game-test API, `./gradlew runClientGameTest`) cover each milestone's in-game test where possible | M0 |
 | 2026-11-09 | Range gate measures distance from the audio listener (`SoundManager.getListenerTransform()`), the same position vanilla subtitles use, so the recent list and cues stop at exactly the subtitle distance in first and third person (section 7.7). The per-sound log is on in the dev client only | M1 |
 | 2026-11-09 | M2 is delivered in two parts: M2a (drawing adapter, screen base, button and icon button, toggle, slider, text field, tooltip, dialog, demo screen) and M2b (scrolling list and row, dropdown, color picker, toast) | M2 |
-| 2026-11-09 | UI kit widgets extend vanilla widget classes (button, slider, edit box), which supply focus, Enter/Space, Tab navigation and narration; Audio Zone draws its own tab bar because vanilla's 26.x tab button is abstract and tied to the vanilla menus | M2 |
+| 2026-11-09 | UI kit widgets extend vanilla widget classes (button, slider, edit box), which supply focus, Enter/Space, Tab navigation and narration; Sound Sculptor draws its own tab bar because vanilla's 26.x tab button is abstract and tied to the vanilla menus | M2 |
 | 2026-11-09 | Code whose source must differ per Minecraft version goes in `src/main/versions/<version>/java` (same class name and API in each); everything else stays shared. 26.3 switched keyboard input from GLFW to SDL3 codes, so code always uses `InputConstants` names, never numbers | M2 |
 | 2026-11-09 | Sliders have no Home/End jump to the ends; arrows (±step) and Shift+arrows (fine step) plus the typed value are enough | maxismagical, M2 review |
 | 2026-11-09 | A text field shows its validation error only after the player edits it (or presses Save), so new empty fields do not start out red; invalid fields still block Save | maxismagical, M2 review |
@@ -971,11 +971,11 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Read-only list rows (no buttons yet, M3) are still keyboard-reachable and narrated: the list gives each such row an invisible focus target | M3 |
 | 2026-11-09 | "Show distance" lives on a Settings tab and is kept in memory until the profile store (M4) saves settings | M3 |
 | 2026-11-09 | The recently played log is cleared when joining or leaving a world | M3 |
-| 2026-11-09 | Until per-server profiles (FR-11.1, M7), there is one profile: `config/audiozone/profiles/default.json`. Its format, atomic writes, `.bak` and `.broken` handling are already the FR-11.8 ones | M4 |
+| 2026-11-09 | Until per-server profiles (FR-11.1, M7), there is one profile: `config/soundsculptor/profiles/default.json`. Its format, atomic writes, `.bak` and `.broken` handling are already the FR-11.8 ones | M4 |
 | 2026-11-09 | A muted sound is stopped at the point where vanilla skips a sound whose volume is zero (no channel, `NOT_STARTED`), so subtitles behave exactly as with a zero volume slider | M4 |
 | 2026-11-09 | Mute quick actions edit one exact-ID rule per sound (rule ID `exact:<sound id>`); Unmute removes the rule if it sets nothing else | M4 |
 | 2026-11-09 | The Mute/Unmute button's icon shows the sound's current state (crossed-out speaker when muted, speaker with waves when not); its label, tooltip and narration say what pressing it does | maxismagical, M4 review |
-| 2026-11-09 | Bypass lasts for the session (not saved) and never changes a rule; turning it off gives the fail-open error budget a fresh start. Messages outside the Audio Zone screen (broken profile, too many errors) use game toasts | M4 |
+| 2026-11-09 | Bypass lasts for the session (not saved) and never changes a rule; turning it off gives the fail-open error budget a fresh start. Messages outside the Sound Sculptor screen (broken profile, too many errors) use game toasts | M4 |
 | 2026-11-09 | M5 is built in two parts, like M2: M5a = patterns, volume 0–100%, per-ID cache, Rules tab and rule editor (FR-4, FR-5.1–5.3); M5b = Diagnostics (FR-13.3) and the read-only sound trace (FR-14) | M5 |
 | 2026-11-09 | Rule volume multiplies vanilla's calculated volume (after the Master and category sliders) at sound start and wherever vanilla recalculates a playing sound's volume (moving sounds each tick, slider changes). A rule at 0% is then skipped by vanilla like a zero slider | M5 |
 | 2026-11-09 | In the rule editor, Mute has three choices (Not set, Muted, Not muted) and Volume can be left empty (not set), matching "unset properties are omitted" (7.5). "Not muted" lets a specific rule override a broader mute | M5 |
@@ -994,13 +994,13 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | The MVP zone editor offers sphere and box only; Outside mode, fade edges, cylinders and personal bubbles arrive with M13, and a zone's existing settings for them are kept. Zones have Move up/down buttons, because list order is the last tie-break (FR-9 step 5) | M7 |
 | 2026-11-09 | A zone's color shows as a square at the start of its row in the zone list; the row's text still says everything (A-5) | M7 |
 | 2026-11-09 | Outlines use vanilla's gizmo lines and billboard labels (the same API in 26.2 and 26.3), emitted at the end of level extraction; "through blocks" uses the gizmos' always-on-top mode. Labels are white for contrast (A-3); the zone's color is on its lines | M7 |
-| 2026-11-09 | "Show zone outlines" (a profile setting) and "Outlines visible through blocks" (app-wide, in `config/audiozone/settings.json`) are on a new Settings → Zones page. The optional outlines hotkey (unbound) cycles Always, Only while editing, Never | M7 |
+| 2026-11-09 | "Show zone outlines" (a profile setting) and "Outlines visible through blocks" (app-wide, in `config/soundsculptor/settings.json`) are on a new Settings → Zones page. The optional outlines hotkey (unbound) cycles Always, Only while editing, Never | M7 |
 | 2026-11-09 | The zone open in the zone editor is outlined from the editor's current values, so size and shape changes show before Save | M7 |
 | 2026-11-09 | M8 is built in two parts: M8a = performance (automated noisy-farm stress and soak test, optimizations, memory readout); M8b = Mod Menu, accessibility checklist, mod page and release preparation. Publishing on Modrinth and CurseForge is done by the maintainers | M8 |
 | 2026-11-09 | The stress test plays 300 sounds/s with the "stress" profile (50 rules, 64 zones that all cover the pen) after a warm-up, and checks the 9.1 budgets with Diagnostics' own timers. Measured on a desktop (26.2 and 26.3): per-tick re-check 48 to 80 µs (budget 200), outlines 100 to 140 µs for 64 zones (budget 300), memory 1.6 MB (budget 8), worst start 22 to 67 µs (budget 100) apart from occasional GC pauses, soak with no errors or growth | M8 |
 | 2026-11-09 | Average cost per sound start with the stress profile went from 14 to 15 µs down to 5.2 to 6.4 µs after two optimizations (one cache row per sound ID for all rule lists; zone data in flat arrays with a bounding-box reject). It stays just above the 5 µs budget in this worst case, where every zone covers every sound; the remaining time is evaluating 64 overlapping zones (about 2.2 µs) plus range, recently played log, limits and trace record. The worst-start budget is reported with a 1 ms ceiling, because a second's slowest start also catches GC and OS pauses | M8 |
 | 2026-11-09 | The per-sound budget is split (9.1): under 5 µs with a typical profile (20 rules, 8 zones, half of them around the player) and under 10 µs in the worst case (50 rules, 64 zones that all cover every sound). Both are enforced by the stress test. At 300 sounds/s even 10 µs is about 0.05 ms per frame, far inside the 1 ms frame-time budget, and the worst case is a test construction no player builds | maxismagical |
-| 2026-11-09 | Game tests run with M1's per-sound log off (`-Daudiozone.logSounds=false`), like a release build, so timings are not distorted | M8 |
+| 2026-11-09 | Game tests run with M1's per-sound log off (`-Dsoundsculptor.logSounds=false`), like a release build, so timings are not distorted | M8 |
 | 2026-11-09 | A sound without a vanilla subtitle is named from its ID where the subtitle would show (Recently Played, Search): "Basalt deltas: additions (ambient)" for `minecraft:ambient.basalt_deltas.additions`, with a mod's namespace added. The ID is always shown too. English word order only | maxismagical, M8 review |
 | 2026-11-09 | Settings pages are chosen with page tabs under the main tabs (replacing the "Page" dropdown) | maxismagical, M8 review |
 | 2026-11-09 | Rule rows show what the rule does in the Recently Played status style ("✖ Muted", "▶ Volume 30%", "○ Off"). The match count is shown only for wildcard patterns, and a pattern that matches no known sound says "⚠ No known sound matches"; an exact-ID rule always matches its one sound | maxismagical, M8 review |
@@ -1010,10 +1010,11 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-09 | Find sound (FR-4.8) moves into the alpha and works inside the pattern field instead of a separate "Find sound…" picker: words (no `:` or `*`) search, patterns stay patterns. Results offer This sound or Like this (the sound's families with their match counts). Apply to on Search (FR-3.7) stays in M16 | maxismagical, M8 review |
 | 2026-11-09 | M8b is built in two parts: M8b-1 = Mod Menu entry and the automated accessibility checks; M8b-2 = mod page, changelog and release guide | M8 |
 | 2026-11-09 | Mod Menu is compiled against but never bundled or required (Mod Menu 20.0.3 for 26.2, 21.0.0 for 26.3). Opened outside a world (Mod Menu on the title screen), the per-world tabs say to join a world, and Settings offers only app-wide settings, so no change is made that would be lost | M8 |
-| 2026-11-09 | The release checklist's layout and narration items (11.5) are automated: every Audio Zone screen at 854 × 480 and 1920 × 1080 and GUI scales 1 to 4 and Auto must have every control inside the window, no overlaps and no cut-off text; every control on the Rules and Zones tabs must have a label. Tabs are sized to their titles so "Recently Played" fits | M8 |
+| 2026-11-09 | The release checklist's layout and narration items (11.5) are automated: every Sound Sculptor screen at 854 × 480 and 1920 × 1080 and GUI scales 1 to 4 and Auto must have every control inside the window, no overlaps and no cut-off text; every control on the Rules and Zones tabs must have a label. Tabs are sized to their titles so "Recently Played" fits | M8 |
 | 2026-11-09 | The pseudo-language check (text about 40% longer) is reported, not enforced, until the localization pass (M16): fixed-width toggles (Bypass, Pause, outline settings) and one-line hints would need auto-sizing and wrapping, which only matters once there are translations | M8 |
 | 2026-11-09 | Release preparation lives in the repository: CHANGELOG.md, docs/MOD_PAGE.md (the Modrinth and CurseForge description, with the fair-play section) and docs/RELEASING.md. A version tag builds both jars and creates a draft GitHub release; uploading to Modrinth and CurseForge stays a manual maintainer step. The alpha's description promises only what ships; 1.0 features are listed as coming | M8 |
-| 2026-11-09 | Zones are drawn rather than typed: new zones are boxes made by marking two corners in the world (the Audio Zone key, then a cancel key) and adjusted side by side with Grow and Shrink, with the size and "inside/outside" shown on the outline while editing (FR-8.1a). Spheres are no longer offered for new zones: a box covers the real cases (rooms, farms, pens) and is far easier to get right; existing sphere zones keep working, and bubbles (v1) stay spheres | maxismagical |
-| 2026-11-09 | Zone corners are marked with left-click (the Audio Zone key still works, for keyboard use), which while marking is taken from vanilla so nothing is attacked or broken. The box's size shows in the on-screen hint instead of a label in the world, and there is no inside/outside text | maxismagical |
+| 2026-11-09 | Zones are drawn rather than typed: new zones are boxes made by marking two corners in the world (the Sound Sculptor key, then a cancel key) and adjusted side by side with Grow and Shrink, with the size and "inside/outside" shown on the outline while editing (FR-8.1a). Spheres are no longer offered for new zones: a box covers the real cases (rooms, farms, pens) and is far easier to get right; existing sphere zones keep working, and bubbles (v1) stay spheres | maxismagical |
+| 2026-11-09 | Zone corners are marked with left-click (the Sound Sculptor key still works, for keyboard use), which while marking is taken from vanilla so nothing is attacked or broken. The box's size shows in the on-screen hint instead of a label in the world, and there is no inside/outside text | maxismagical |
 | 2026-11-09 | Box zones snap to the block grid: whole-block sizes, and the center moves (by under half a block) so every edge is on a block boundary, whether set by marking, My position, Looking at or typing. Players think in blocks, outlines line up with the grid, and a sound from a block is never half inside | maxismagical |
 | 2026-11-09 | Confirmation dialogs run the chosen action before returning to the screen they came from, so that screen is rebuilt from the result (a deleted rule or zone is gone from its list at once) | M8 review |
+| 2026-11-11 | Renamed the mod from Audio Zone to **Sound Sculptor** before the first release (mod ID and namespace `soundsculptor`, config folder `config/soundsculptor/`, world file `soundsculptor_id.txt`, UI kit prefix `Sculpt`). "Sound Bounds" was taken on CurseForge. Data saved under the old, never-released name is not migrated | Project owner |

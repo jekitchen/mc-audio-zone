@@ -1,40 +1,40 @@
 {
 	"schemaVersion": 1,
-	"id": "audiozone-gametest",
+	"id": "soundsculptor-gametest",
 	"version": "1.0.0",
-	"name": "Audio Zone game tests",
+	"name": "Sound Sculptor game tests",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"audiozone.gametest.GameTestWatchdog"
+			"soundsculptor.gametest.GameTestWatchdog"
 		],
 		"fabric-client-gametest": [
-			"audiozone.gametest.M0ClientGameTest",
-			"audiozone.gametest.M1ClientGameTest",
-			"audiozone.gametest.M2ClientGameTest",
-			"audiozone.gametest.M2bClientGameTest",
-			"audiozone.gametest.M3ClientGameTest",
-			"audiozone.gametest.M4ClientGameTest",
-			"audiozone.gametest.M5ClientGameTest",
-			"audiozone.gametest.M5bClientGameTest",
-			"audiozone.gametest.M6ClientGameTest",
-			"audiozone.gametest.M7ClientGameTest",
-			"audiozone.gametest.M7bClientGameTest",
-			"audiozone.gametest.M7cClientGameTest",
-			"audiozone.gametest.M8ReviewClientGameTest",
-			"audiozone.gametest.CopyRuleClientGameTest",
-			"audiozone.gametest.ZoneToolsClientGameTest",
-			"audiozone.gametest.FindSoundClientGameTest",
-			"audiozone.gametest.ProfilesClientGameTest",
-			"audiozone.gametest.ImportExportClientGameTest",
-			"audiozone.gametest.UndoClientGameTest",
-			"audiozone.gametest.ApplyToClientGameTest",
-			"audiozone.gametest.TraceEditClientGameTest",
-			"audiozone.gametest.AccessibilityClientGameTest",
-			"audiozone.gametest.M8StressClientGameTest"
+			"soundsculptor.gametest.M0ClientGameTest",
+			"soundsculptor.gametest.M1ClientGameTest",
+			"soundsculptor.gametest.M2ClientGameTest",
+			"soundsculptor.gametest.M2bClientGameTest",
+			"soundsculptor.gametest.M3ClientGameTest",
+			"soundsculptor.gametest.M4ClientGameTest",
+			"soundsculptor.gametest.M5ClientGameTest",
+			"soundsculptor.gametest.M5bClientGameTest",
+			"soundsculptor.gametest.M6ClientGameTest",
+			"soundsculptor.gametest.M7ClientGameTest",
+			"soundsculptor.gametest.M7bClientGameTest",
+			"soundsculptor.gametest.M7cClientGameTest",
+			"soundsculptor.gametest.M8ReviewClientGameTest",
+			"soundsculptor.gametest.CopyRuleClientGameTest",
+			"soundsculptor.gametest.ZoneToolsClientGameTest",
+			"soundsculptor.gametest.FindSoundClientGameTest",
+			"soundsculptor.gametest.ProfilesClientGameTest",
+			"soundsculptor.gametest.ImportExportClientGameTest",
+			"soundsculptor.gametest.UndoClientGameTest",
+			"soundsculptor.gametest.ApplyToClientGameTest",
+			"soundsculptor.gametest.TraceEditClientGameTest",
+			"soundsculptor.gametest.AccessibilityClientGameTest",
+			"soundsculptor.gametest.M8StressClientGameTest"
 		]
 	},
 	"depends": {
-		"audiozone": "*"
+		"soundsculptor": "*"
 	}
 }
