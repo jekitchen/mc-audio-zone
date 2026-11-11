@@ -159,8 +159,31 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> ProfileManager.profile().zone("home").worldKey()).equals(newKey), "the fixed zone moves to the new key");
 			check(context.computeOnClient(mc -> stored(key)).globalRules().size() == 2, "the original profile is kept");
 
+			// Copying boosted rules into a profile that never confirmed boost asks first (FR-5.4), then saves it as confirmed.
+			String boostKey = "boost.example.net";
+			context.runOnClient(mc -> {
+				try {
+					ProfileManager.store().save(boostKey, Profile.empty("Boost server").putRule(Rule.of("b1", "*bell*").withVolume(150)));
+				} catch (java.io.IOException e) {
+					throw new AssertionError(e);
+				}
+				main(mc).selectTab(AudioZoneScreen.TAB_PROFILES);
+			});
+			check(!context.computeOnClient(mc -> ProfileManager.profile().boostConfirmed()), "this profile has not confirmed boost");
+			context.runOnClient(mc -> panel(mc).confirmCopy(panel(mc).find(boostKey)));
+			context.waitForScreen(AzDialog.class);
+			context.runOnClient(mc -> ((AzDialog) mc.gui.screen()).choose(0));
+			context.waitForScreen(AzDialog.class);
+			check(context.computeOnClient(mc -> mc.gui.screen().getTitle().getString()).equals("Louder than vanilla?"), "the boost question");
+			context.takeScreenshot("profiles-copy-boost");
+			context.runOnClient(mc -> ((AzDialog) mc.gui.screen()).choose(0));
+			context.waitForScreen(AudioZoneScreen.class);
+			check(context.computeOnClient(mc -> ProfileManager.profile().boostConfirmed()
+					&& ProfileManager.profile().rule("b1") != null), "the boosted rule is copied and boost is confirmed");
+
 			context.runOnClient(mc -> {
 				mc.gui.setScreen(null);
+				ProfileManager.delete(boostKey);
 				ProfileManager.delete(key);
 				ProfileManager.update(p -> Profile.empty(p.name()));
 				ProfileManager.flushSaves();

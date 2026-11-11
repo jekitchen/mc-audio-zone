@@ -69,12 +69,8 @@ public final class ProfileRenameScreen extends AzScreen {
 
 	/** The error under the field, in the player's language, or null. */
 	private static Component problem(String name) {
-		if (ProfileOps.nameProblem(name) == null) {
-			return null;
-		}
-		return name.isBlank()
-				? Component.translatable("audiozone.profiles.rename.empty")
-				: Component.translatable("audiozone.profiles.rename.too_long", ProfileOps.MAX_NAME_LENGTH);
+		audiozone.core.Message problem = ProfileOps.nameProblem(name);
+		return problem == null ? null : Component.literal(ProfileManager.text(problem));
 	}
 
 	public void setName(String name) {
