@@ -60,6 +60,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		context.setScreen(AudioZoneScreen::new);
 		context.waitForScreen(AudioZoneScreen.class);
 		check(!context.computeOnClient(mc -> ProfileManager.isLoaded()), "no profile is loaded on the title screen");
+		// The screen opens on the last used tab; this check is about Recently Played.
+		context.runOnClient(mc -> main(mc).selectTab(AudioZoneScreen.TAB_RECENT));
 		check(context.computeOnClient(mc -> labels(main(mc)).stream().anyMatch(t -> t.startsWith("Join a world or server"))),
 				"Recently Played should say to join a world");
 		context.takeScreenshot("a11y-no-world");
