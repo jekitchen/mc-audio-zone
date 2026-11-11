@@ -94,6 +94,16 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				});
 				check(silent.isEmpty(), "controls without a label on tab " + tab + ": " + silent);
 			}
+			// A-4 for the sound trace's inline controls (FR-14.4) and its Volume panel.
+			List<String> silentTrace = context.computeOnClient(mc -> {
+				TraceScreen trace = new TraceScreen(null, "minecraft:entity.villager.ambient");
+				mc.gui.setScreen(trace);
+				List<String> silent = new ArrayList<>(silentControls(trace));
+				trace.openVolume(audiozone.core.trace.RuleLocation.global("r2"), ProfileManager.profile().rule("r2"));
+				silent.addAll(silentControls(trace));
+				return silent;
+			});
+			check(silentTrace.isEmpty(), "controls without a label in the sound trace: " + silentTrace);
 			context.setScreen(() -> null);
 
 			// A-3: every screen at every window size and GUI scale.
@@ -180,7 +190,11 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		}),
 		ZONE_RULES(mc -> new ZoneRulesScreen(null, "z2"), null),
 		RULE_COPY(mc -> new RuleCopyScreen(null, RuleTarget.zone("z2")), null),
-		TRACE(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), null);
+		TRACE(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), null),
+		TRACE_VOLUME(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), s -> {
+			((TraceScreen) s).openVolume(audiozone.core.trace.RuleLocation.global("r2"), ProfileManager.profile().rule("r2"));
+			return null;
+		});
 
 		final Function<Minecraft, Screen> opener;
 		final Function<AzScreen, Void> after;

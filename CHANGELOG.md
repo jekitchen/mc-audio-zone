@@ -19,6 +19,9 @@ Each release ships one jar per supported Minecraft version.
   default.
 - **Apply to:** Recently Played and Search have an "Apply to" selector: Everywhere, or a zone you are standing in. With a
   zone chosen, Mute and Edit work on that zone's rule for the sound, so a zone rule can be made straight from a search.
+- **Edit from "Why?":** every rule line in the sound trace has On/Off, Mute and Volume, every zone line has On/Off,
+  and each opens its full editor. Where no rule matches, "Add rule" adds one for this exact sound, globally or in a
+  zone. Changes save at once, the trace updates straight away ("Predicted for next play") and a toast offers Undo.
 
 ## 0.1.0-alpha (unreleased)
 
