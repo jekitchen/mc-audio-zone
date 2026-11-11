@@ -180,8 +180,8 @@
 	"audiozone.rule_editor.title.new": "New rule",
 	"audiozone.rule_editor.title.edit": "Edit rule",
 	"audiozone.rule_editor.pattern": "Pattern",
-	"audiozone.rule_editor.pattern.tip": "A sound ID, or a pattern where * stands for any characters. Examples: minecraft:entity.villager.* or *:block.*.step",
-	"audiozone.rule_editor.pattern.hint": "minecraft:entity.villager.*",
+	"audiozone.rule_editor.pattern.tip": "Type words to find a sound (villager hurt, cow|sheep, -ambient), then pick one; or type a sound ID or a pattern where * stands for any characters, such as minecraft:entity.villager.*",
+	"audiozone.rule_editor.pattern.hint": "villager hurt, or minecraft:entity.villager.*",
 	"audiozone.rule_editor.preview": "Matches %s sounds",
 	"audiozone.rule_editor.preview.one": "Matches 1 sound",
 	"audiozone.rule_editor.enabled": "Active",
@@ -441,5 +441,13 @@
 	"audiozone.zone_editor.grow.tip": "Move the chosen side out by 1 block (Shift: 5 blocks)",
 	"audiozone.outline.size": "%1$s × %2$s × %3$s",
 	"audiozone.zone_editor.size_label": "Size in blocks: width (x), height (y), depth (z)",
-	"audiozone.marking.controls": "Left-click a block (or press %1$s) to mark it · %2$s cancels"
+	"audiozone.marking.controls": "Left-click a block (or press %1$s) to mark it · %2$s cancels",
+	"audiozone.rule_editor.search.many": "%1$s sounds match \"%2$s\" · pick This sound or Like this",
+	"audiozone.rule_editor.search.one": "1 sound matches \"%2$s\" · pick This sound or Like this",
+	"audiozone.rule_editor.search.none": "No sound matches \"%2$s\" · try other words",
+	"audiozone.rule_editor.this_sound": "This sound",
+	"audiozone.rule_editor.this_sound.tip": "Make the rule for exactly this sound",
+	"audiozone.rule_editor.like_this": "Like this",
+	"audiozone.rule_editor.like_this.tip": "Make the rule for a family of sounds like this one; choose how wide",
+	"audiozone.rule_editor.family": "%1$s · %2$s sounds"
 }

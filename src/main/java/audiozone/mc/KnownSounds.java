@@ -1,11 +1,15 @@
 package audiozone.mc;
 
+import audiozone.core.search.SoundEntry;
+import audiozone.core.search.SoundNames;
 import audiozone.core.search.SoundSearch;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.sounds.WeighedSoundEvents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 /**
@@ -41,6 +45,28 @@ public final class KnownSounds {
 			ids = List.copyOf(fresh);
 		}
 		return ids;
+	}
+
+	/**
+	 * Every known sound with its name for searching (FR-3.1, FR-4.8): the vanilla subtitle in the current language, or
+	 * the readable name made from the ID ("Basalt deltas: additions (ambient)") for a sound without one, so plain words
+	 * find those too. Built on each call (a few thousand sounds), so it follows the language and resource packs.
+	 */
+	public static List<SoundEntry> entries() {
+		List<String> ids = ids();
+		List<SoundEntry> entries = new ArrayList<>(ids.size());
+		for (String id : ids) {
+			entries.add(new SoundEntry(id, name(id)));
+		}
+		return entries;
+	}
+
+	/** The sound's subtitle in the current language, or its readable name if it has none. */
+	public static String name(String soundId) {
+		Identifier id = Identifier.tryParse(soundId);
+		WeighedSoundEvents events = id == null ? null : Minecraft.getInstance().getSoundManager().getSoundEvent(id);
+		Component subtitle = events == null ? null : events.getSubtitle();
+		return subtitle != null ? subtitle.getString() : SoundNames.readable(soundId);
 	}
 
 	/** IDs that played in a vanilla-covered category this session, which no rule matches either. */

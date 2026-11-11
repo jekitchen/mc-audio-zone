@@ -15,9 +15,10 @@ First public alpha, for Minecraft Java Edition 26.2 and 26.3 with Fabric.
   exclude, `"phrases"` and `*` wildcards. Same quick actions as Recently Played.
 - **Rules:** mute or turn down (0 to 100%) one sound or a whole family with wildcard patterns such as
   `minecraft:entity.villager.*`. More specific rules win. The editor previews the matching sounds and says when a rule
-  is partly overridden.
+  is partly overridden. Type plain words in the pattern field (`villager hurt`) to find a sound, then pick **This sound** or
+  **Like this** for its family.
 - **Zones:** boxes you draw by marking two corners in the world, then fine-tune side by side (Grow, Shrink), with the
-  size shown on the outline. Each zone has its own rules (new or copied from existing ones). Where zones overlap, the closest center wins. Outlines in the zone's color with its name, shown always,
+  size shown on screen while you mark. Each zone has its own rules (new or copied from existing ones). Where zones overlap, the closest center wins. Outlines in the zone's color with its name, shown always,
   only while editing, or never.
 - **Why does it sound like this?** For any sound: every rule and zone that touched it, which one won and why, and the
   final volume. Copy as text.
