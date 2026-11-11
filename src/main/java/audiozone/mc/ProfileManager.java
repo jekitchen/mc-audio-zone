@@ -1,13 +1,21 @@
 package audiozone.mc;
 
 import audiozone.AudioZoneClient;
+import audiozone.core.Message;
+import audiozone.core.Translator;
 import audiozone.core.profile.Profile;
+import audiozone.core.profile.ProfileCodec;
+import audiozone.core.profile.ProfileFormatException;
 import audiozone.core.profile.ProfileStore;
 import audiozone.core.rules.RuleResolver;
 import audiozone.core.zones.Precedence;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -141,6 +149,121 @@ public final class ProfileManager {
 		} catch (Exception e) {
 			throw new IllegalStateException("profile save did not finish", e);
 		}
+	}
+
+	// ---- Every stored profile (the Profiles tab, FR-11.3) ----
+
+	/**
+	 * One profile on disk, for the Profiles tab.
+	 *
+	 * @param key       the world key, or the file name without {@code .json} for a file that records no key
+	 * @param keyKnown  whether the file records its world key
+	 * @param profile   the profile, or null if the file cannot be read
+	 * @param problem   why the file cannot be read, or null
+	 * @param connected whether this is the profile of the world the player is in
+	 */
+	public record Stored(String key, boolean keyKnown, Profile profile, Message problem, boolean connected) {
+	}
+
+	/** Core text (a key and its arguments) in the player's language. */
+	public static String text(Message message) {
+		return message.text(TRANSLATOR);
+	}
+
+	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
+
+	/**
+	 * Every profile in the profiles folder, plus the current world's (from memory, so it is up to date even before its
+	 * first save). Waits for queued saves first, so the list shows what was last changed. Reading never changes a
+	 * file: a broken file is listed with its problem, and an older file is shown migrated without being rewritten.
+	 */
+	public static synchronized List<Stored> storedProfiles() {
+		flushSaves();
+		Snapshot snapshot = current;
+		List<Stored> out = new ArrayList<>();
+		boolean currentListed = false;
+		List<ProfileStore.Stored> files;
+		try {
+			files = store.list();
+		} catch (IOException e) {
+			AudioZoneClient.LOGGER.warn("Audio Zone could not list {}", store.directory(), e);
+			files = List.of();
+		}
+		Path currentFile = snapshot.key() == null ? null : store.fileFor(snapshot.key());
+		for (ProfileStore.Stored file : files) {
+			if (file.file().equals(currentFile)) {
+				out.add(new Stored(snapshot.key(), true, snapshot.profile(), null, true));
+				currentListed = true;
+				continue;
+			}
+			String name = file.file().getFileName().toString();
+			String key = file.worldKey() != null ? file.worldKey() : name.substring(0, name.length() - ".json".length());
+			Profile profile = null;
+			Message problem = null;
+			try {
+				if (Files.size(file.file()) > ProfileStore.MAX_FILE_BYTES) {
+					problem = Message.of("audiozone.profile.problem.too_large");
+				} else {
+					profile = ProfileCodec.read(Files.readString(file.file(), StandardCharsets.UTF_8), version -> { }).profile();
+				}
+			} catch (ProfileFormatException e) {
+				problem = e.problem();
+			} catch (IOException e) {
+				problem = Message.of("audiozone.profile.problem.unreadable", String.valueOf(e.getMessage()));
+			}
+			out.add(new Stored(key, file.worldKey() != null, profile, problem, false));
+		}
+		if (!currentListed && snapshot.key() != null) {
+			out.add(new Stored(snapshot.key(), true, snapshot.profile(), null, true));
+		}
+		return out;
+	}
+
+	/** The profile stored under {@code key} as it is now (after queued saves), or null if there is none or it cannot be read. */
+	public static Profile storedProfile(String key) {
+		for (Stored s : storedProfiles()) {
+			if (s.key().equals(key)) {
+				return s.profile();
+			}
+		}
+		return null;
+	}
+
+	/** Saves another world's profile in the background (Rename, Reset). For the current world, use {@link #update}. */
+	public static void saveOther(String key, Profile profile) {
+		if (key.equals(current.key())) {
+			update(p -> profile);
+			return;
+		}
+		SAVER.execute(() -> save(key, profile));
+	}
+
+	/**
+	 * Deletes another world's profile (FR-11.3); a new empty one is made when the player next joins it. The current
+	 * world's profile cannot be deleted, only reset.
+	 */
+	public static void delete(String key) {
+		if (key.equals(current.key())) {
+			throw new IllegalArgumentException("the current world's profile cannot be deleted");
+		}
+		SAVER.execute(() -> {
+			try {
+				store.delete(key);
+			} catch (IOException e) {
+				AudioZoneClient.LOGGER.error("Audio Zone could not delete {}", store.fileFor(key), e);
+				Notices.show(Component.translatable("audiozone.notice.save_failed.title"),
+						Component.translatable("audiozone.notice.save_failed.message", e.getMessage()));
+			}
+		});
+	}
+
+	/**
+	 * Switches this world to a new key with the given profile, saved under that key ("Give this copy its own profile",
+	 * FR-11.1). The old key's profile is left as it was.
+	 */
+	static synchronized void moveTo(String newKey, Profile profile) {
+		current = snapshot(newKey, profile);
+		SAVER.execute(() -> save(newKey, profile));
 	}
 
 	private static Snapshot snapshot(String key, Profile profile) {
