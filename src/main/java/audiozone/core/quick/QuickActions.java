@@ -38,9 +38,13 @@ public final class QuickActions {
 		return rule != null && rule.enabled() && Boolean.TRUE.equals(rule.mute());
 	}
 
-	/** The row's Mute/Unmute button: clears mute when {@link #isMuted}, else mutes. */
-	public static RuleEdit.Mute toggleMute(Profile profile, ApplyTarget target, String soundId) {
-		return new RuleEdit.Mute(isMuted(profile, target, soundId) ? null : Boolean.TRUE);
+	/**
+	 * The row's Mute/Unmute button: clears mute when {@link #isMuted}, else mutes. Muting starts a rule that does not
+	 * set Cue with the profile's Cue default (FR-7.6); unmuting takes that Cue away again.
+	 */
+	public static RuleEdit toggleMute(Profile profile, ApplyTarget target, String soundId) {
+		boolean cueDefault = profile.settings().cueDefault();
+		return isMuted(profile, target, soundId) ? new RuleEdit.UnmuteWithCue(cueDefault) : new RuleEdit.MuteWithCue(cueDefault);
 	}
 
 	/** Applies one quick action to the sound's exact-ID rule in the target's list. */

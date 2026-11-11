@@ -13,16 +13,20 @@ import java.util.List;
 import audiozone.core.rules.Rule;
 import audiozone.core.zones.Shape;
 
+import audiozone.core.TestEnglish;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** PRD FR-11.6: an import file is checked before anything changes; errors name the problem and the place. */
 class ProfileImportTest {
+	private static final TestEnglish EN = new TestEnglish();
+
 	@TempDir
 	Path dir;
 
 	private static String problem(String text) {
-		return assertThrows(ProfileFormatException.class, () -> ProfileImport.check(text)).getMessage();
+		return assertThrows(ProfileFormatException.class, () -> ProfileImport.check(text)).problem().text(EN);
 	}
 
 	private static String zoneFile(String shape) {
@@ -57,7 +61,7 @@ class ProfileImportTest {
 
 	@Test
 	void unknownShapeIsRefused() {
-		assertEquals("Zone 3, field shape type: \"cone\" is not sphere, box or cylinder.",
+		assertEquals("Zone 3, field shape type: \"cone\" is not one of: sphere, box, cylinder.",
 				problem(zoneFile("{\"type\": \"cone\"}")));
 	}
 
@@ -83,7 +87,7 @@ class ProfileImportTest {
 		String zone = "{\"id\": \"z1\", \"anchor\": {\"type\": \"bubble\"}, \"shape\": {\"type\": \"sphere\", \"radius\": 4},"
 				+ " \"rules\": [{\"id\": \"r\", \"pattern\": \"a:b:c\"}]}";
 		String message = problem("{\"schemaVersion\": 1, \"zones\": [" + zone + "]}");
-		assertTrue(message.startsWith("Zone 1, rule 1, field pattern: "), message);
+		assertEquals("Zone 1, rule 1, field pattern: Use at most one :.", message);
 	}
 
 	@Test
@@ -123,7 +127,7 @@ class ProfileImportTest {
 		ProfileImport.check(ProfileCodec.toJson(p));
 		Profile over = p.withZones(List.of(ProfileZonesTest.fixed("z1", new Shape.Sphere(3))));
 		assertEquals("The file has 1001 rules; the maximum is 1000.",
-				assertThrows(ProfileFormatException.class, () -> ProfileImport.check(ProfileCodec.toJson(over))).getMessage());
+				assertThrows(ProfileFormatException.class, () -> ProfileImport.check(ProfileCodec.toJson(over))).problem().text(EN));
 	}
 
 	@Test
@@ -163,7 +167,7 @@ class ProfileImportTest {
 		ProfileImport.Checked checked = ProfileImport.check("{\"schemaVersion\": 1, \"extra\": true,"
 				+ " \"globalRules\": [{\"id\": \"a\", \"pattern\": \"x:a\", \"loud\": 1}], \"zones\": [" + zone + "]}");
 		assertEquals(List.of("Unknown field \"extra\" was ignored.", "Rule 1: unknown field \"loud\" was ignored.",
-				"Zone 1: unknown field \"spin\" was ignored."), checked.warnings());
+				"Zone 1: unknown field \"spin\" was ignored."), checked.warnings().stream().map(w -> w.text(EN)).toList());
 	}
 
 	@Test
@@ -171,7 +175,7 @@ class ProfileImportTest {
 		Path big = dir.resolve("big.json");
 		Files.writeString(big, "{\"schemaVersion\": 1, \"name\": \"" + "x".repeat(1024 * 1024) + "\"}", StandardCharsets.UTF_8);
 		assertEquals("The file is larger than 1 MB.",
-				assertThrows(ProfileFormatException.class, () -> ProfileImport.check(big)).getMessage());
+				assertThrows(ProfileFormatException.class, () -> ProfileImport.check(big)).problem().text(EN));
 	}
 
 	@Test

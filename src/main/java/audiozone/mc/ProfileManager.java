@@ -1,6 +1,8 @@
 package audiozone.mc;
 
 import audiozone.AudioZoneClient;
+import audiozone.core.Message;
+import audiozone.core.Translator;
 import audiozone.core.profile.Profile;
 import audiozone.core.profile.ProfileCodec;
 import audiozone.core.profile.ProfileFormatException;
@@ -66,10 +68,11 @@ public final class ProfileManager {
 		ProfileStore.LoadResult result = store.load(worldKey, displayName);
 		current = snapshot(worldKey, result.profile());
 		if (result.failed()) {
+			String problem = result.problem().text((key, args) -> Component.translatable(key, args).getString());
 			AudioZoneClient.LOGGER.warn("Audio Zone profile {} could not be loaded ({}); using an empty profile. The file was renamed to {}",
-					store.fileFor(worldKey), result.problem(), result.brokenCopy());
+					store.fileFor(worldKey), problem, result.brokenCopy());
 			Notices.show(Component.translatable("audiozone.notice.profile_broken.title"),
-					Component.translatable("audiozone.notice.profile_broken.message", result.problem()));
+					Component.translatable("audiozone.notice.profile_broken.message", problem));
 		}
 		update(profile -> profile.withLastJoined(Instant.now()));
 	}
@@ -159,8 +162,15 @@ public final class ProfileManager {
 	 * @param problem   why the file cannot be read, or null
 	 * @param connected whether this is the profile of the world the player is in
 	 */
-	public record Stored(String key, boolean keyKnown, Profile profile, String problem, boolean connected) {
+	public record Stored(String key, boolean keyKnown, Profile profile, Message problem, boolean connected) {
 	}
+
+	/** Core text (a key and its arguments) in the player's language. */
+	public static String text(Message message) {
+		return message.text(TRANSLATOR);
+	}
+
+	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
 
 	/**
 	 * Every profile in the profiles folder, plus the current world's (from memory, so it is up to date even before its
@@ -189,17 +199,17 @@ public final class ProfileManager {
 			String name = file.file().getFileName().toString();
 			String key = file.worldKey() != null ? file.worldKey() : name.substring(0, name.length() - ".json".length());
 			Profile profile = null;
-			String problem = null;
+			Message problem = null;
 			try {
 				if (Files.size(file.file()) > ProfileStore.MAX_FILE_BYTES) {
-					problem = "The file is larger than 1 MB.";
+					problem = Message.of("audiozone.profile.problem.too_large");
 				} else {
 					profile = ProfileCodec.read(Files.readString(file.file(), StandardCharsets.UTF_8), version -> { }).profile();
 				}
 			} catch (ProfileFormatException e) {
-				problem = e.getMessage();
+				problem = e.problem();
 			} catch (IOException e) {
-				problem = "The file could not be read: " + e.getMessage();
+				problem = Message.of("audiozone.profile.problem.unreadable", String.valueOf(e.getMessage()));
 			}
 			out.add(new Stored(key, file.worldKey() != null, profile, problem, false));
 		}

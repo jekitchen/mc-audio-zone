@@ -124,18 +124,19 @@ public final class ProfileTransfer {
 		try {
 			checked = ProfileImport.check(file);
 		} catch (ProfileFormatException e) {
-			showProblem(host, name, e.getMessage());
+			showProblem(host, name, ProfileManager.text(e.problem()));
 			return;
 		}
 		ImportPlan plan = ImportPlan.of(ProfileManager.profile(), checked.profile(), ProfileManager.key());
 		if (plan.problem() != null) {
-			showProblem(host, name, plan.problem());
+			showProblem(host, name, ProfileManager.text(plan.problem()));
 			return;
 		}
 		Minecraft.getInstance().gui.setScreen(new AzDialog(host,
 				Component.translatable("audiozone.transfer.import.title", name),
 				planMessage(plan, checked.warnings().size()),
-				List.of(new AzDialog.Choice(Component.translatable("audiozone.transfer.import.confirm"), () -> apply(host, name, checked)),
+				List.of(new AzDialog.Choice(Component.translatable("audiozone.transfer.import.confirm"),
+						() -> ProfileListPanel.confirmBoostThen(host, plan.needsBoostConfirm(), () -> apply(host, name, checked))),
 						new AzDialog.Choice(Component.translatable("audiozone.ui.cancel"), () -> { })),
 				1, 1));
 	}
@@ -161,7 +162,11 @@ public final class ProfileTransfer {
 		ProfileManager.update(current -> {
 			ImportPlan plan = ImportPlan.of(current, checked.profile(), key);
 			skipped[0] = plan.fixedSkipped();
-			return plan.problem() == null ? plan.result() : current;
+			if (plan.problem() != null) {
+				return current;
+			}
+			// Boosted rules were confirmed in the boost dialog (FR-5.4) before this runs.
+			return plan.needsBoostConfirm() ? plan.result().withBoostConfirmed(true) : plan.result();
 		});
 		if (host instanceof AudioZoneScreen main && main.profilesPanel() != null) {
 			main.profilesPanel().refresh();

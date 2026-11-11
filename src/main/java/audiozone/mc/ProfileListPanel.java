@@ -100,7 +100,7 @@ public final class ProfileListPanel {
 		if (s.profile() == null) {
 			// A file that cannot be read: its problem, and Delete (it is kept as .bak).
 			String name = Component.translatable("audiozone.profiles.broken", keyText).getString();
-			String problem = s.problem();
+			String problem = ProfileManager.text(s.problem());
 			buttons.add(deleteButton(s, keyText));
 			return new AzList.Row(s.key(), List.of(
 					new AzList.Row.Column(() -> name, 0, 0),
@@ -166,13 +166,14 @@ public final class ProfileListPanel {
 	public void confirmCopy(ProfileManager.Stored source) {
 		ProfileOps.Copy copy = ProfileOps.copyFrom(source.profile(), ProfileManager.profile());
 		if (copy.problem() != null) {
-			host.showToast(Component.literal(copy.problem()), null);
+			host.showToast(Component.literal(ProfileManager.text(copy.problem())), null);
 			return;
 		}
 		setScreen(new AzDialog(host,
 				Component.translatable("audiozone.profiles.copy.title", source.profile().name()),
 				Component.translatable("audiozone.profiles.copy.message", copy.ruleCount(), copy.bubbleCount(), copy.fixedKept()),
-				List.of(new AzDialog.Choice(Component.translatable("audiozone.profiles.copy.confirm"), () -> copy(source)),
+				List.of(new AzDialog.Choice(Component.translatable("audiozone.profiles.copy.confirm"),
+						() -> confirmBoostThen(host, copy.needsBoostConfirm(), () -> copy(source))),
 						new AzDialog.Choice(Component.translatable("audiozone.ui.cancel"), () -> { })),
 				1, 1));
 	}
@@ -181,12 +182,33 @@ public final class ProfileListPanel {
 	public void copy(ProfileManager.Stored source) {
 		Profile latest = ProfileManager.storedProfile(source.key());
 		Profile from = latest != null ? latest : source.profile();
+		// A copy that brings boosted rules was confirmed in the boost dialog (FR-5.4), so it is saved as confirmed.
 		ProfileManager.update(target -> {
 			ProfileOps.Copy copy = ProfileOps.copyFrom(from, target);
-			return copy.problem() == null ? copy.result() : target;
+			if (copy.problem() != null) {
+				return target;
+			}
+			return copy.needsBoostConfirm() ? copy.result().withBoostConfirmed(true) : copy.result();
 		});
 		refresh();
 		host.showToast(Component.translatable("audiozone.profiles.copied", source.profile().name()), null);
+	}
+
+	/**
+	 * Runs {@code then}, first asking the boost question (FR-5.4) if the change brings rules above 100% into a profile
+	 * that has not confirmed boost yet. Used by Copy from… and Import.
+	 */
+	public static void confirmBoostThen(net.minecraft.client.gui.screens.Screen host, boolean needed, Runnable then) {
+		if (!needed) {
+			then.run();
+			return;
+		}
+		setScreen(new AzDialog(host,
+				Component.translatable("audiozone.boost.confirm.title"),
+				Component.translatable("audiozone.boost.confirm.body"),
+				List.of(new AzDialog.Choice(Component.translatable("audiozone.profiles.boost.confirm"), then),
+						new AzDialog.Choice(Component.translatable("audiozone.ui.cancel"), () -> { })),
+				1, 1));
 	}
 
 	// ---- Reset and delete (FR-11.3) ----
