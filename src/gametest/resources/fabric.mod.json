@@ -27,6 +27,7 @@
 			"audiozone.gametest.FindSoundClientGameTest",
 			"audiozone.gametest.ProfilesClientGameTest",
 			"audiozone.gametest.ImportExportClientGameTest",
+			"audiozone.gametest.TraceEditClientGameTest",
 			"audiozone.gametest.AccessibilityClientGameTest",
 			"audiozone.gametest.M8StressClientGameTest"
 		]

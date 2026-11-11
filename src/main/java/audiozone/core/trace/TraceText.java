@@ -1,5 +1,9 @@
 package audiozone.core.trace;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 import audiozone.core.Translator;
 import audiozone.core.lists.Numbers;
 import audiozone.core.lists.RuleSummary;
@@ -12,6 +16,9 @@ import audiozone.core.zones.Zone;
  * follow FR-14.2: notices, global rules (winner and reason per setting, "overridden by" for losers), zones considered
  * (mode, weight, distance to the anchor, their own rules), the deciding zone per setting, then the final result.
  * Every phrase comes from one translation key; only line breaks and indentation are added here.
+ *
+ * <p>{@link #lines} gives the same text line by line, each with what it is about, so the panel can put inline edit
+ * controls on rule, zone and "no rule" lines (FR-14.4).
  */
 public final class TraceText {
 	public static final String HEADER = "audiozone.trace.text.header";
@@ -35,18 +42,58 @@ public final class TraceText {
 
 	private static final String INDENT = "  ";
 
+	/**
+	 * One line of the trace.
+	 *
+	 * @param text   the line as "Copy trace" shows it, indentation included, without the line break
+	 * @param target what the line is about, or {@code null} for a line with nothing to edit
+	 */
+	public record Line(String text, Target target) {
+		public Line {
+			Objects.requireNonNull(text, "text");
+		}
+	}
+
+	/** What a trace line is about, for the panel's inline controls. */
+	public sealed interface Target {
+	}
+
+	/** A matched rule: in the global list ({@link RuleLocation#isGlobal()}) or in a zone's own list. */
+	public record RuleTarget(RuleLocation where, Rule rule) implements Target {
+	}
+
+	/** A zone that contains the sound. */
+	public record ZoneTarget(Zone zone) implements Target {
+	}
+
+	/**
+	 * "No rule matches this sound" in the global list ({@code zoneId} null) or in a zone: where "Add rule for this
+	 * sound" goes.
+	 */
+	public record NoRuleTarget(String zoneId) implements Target {
+	}
+
 	private TraceText() {
 	}
 
 	public static String of(SoundTrace trace, Translator tr) {
 		StringBuilder out = new StringBuilder();
+		for (Line line : lines(trace, tr)) {
+			out.append(line.text()).append('\n');
+		}
+		return out.toString();
+	}
+
+	/** The trace line by line, in the same order and wording as {@link #of}. */
+	public static List<Line> lines(SoundTrace trace, Translator tr) {
+		List<Line> out = new ArrayList<>();
 		line(out, 0, tr.translate(HEADER, trace.soundId()));
 		for (TraceNotice notice : trace.notices()) {
 			line(out, 1, tr.translate(notice.translationKey()));
 		}
 
 		line(out, 0, tr.translate(GLOBAL));
-		rules(out, 1, trace.global(), tr);
+		rules(out, 1, trace.global(), null, tr);
 
 		line(out, 0, tr.translate(ZONES));
 		if (trace.zones().isEmpty()) {
@@ -54,8 +101,8 @@ public final class TraceText {
 		}
 		for (ZoneLine zone : trace.zones()) {
 			line(out, 1, tr.translate(ZONE, name(zone.zone()), ZoneSummary.modePart(zone.zone().mode()).text(tr),
-					Numbers.plain(zone.weight() * 100), Numbers.plain(zone.distance())));
-			rules(out, 2, zone.rules(), tr);
+					Numbers.plain(zone.weight() * 100), Numbers.plain(zone.distance())), new ZoneTarget(zone.zone()));
+			rules(out, 2, zone.rules(), zone.zone().id(), tr);
 		}
 
 		if (!trace.zoneWinners().isEmpty()) {
@@ -79,17 +126,18 @@ public final class TraceText {
 		if (trace.cueShown() != null) {
 			line(out, 1, tr.translate(trace.cueShown() ? CUE_SHOWN : CUE_NOT_SHOWN));
 		}
-		return out.toString();
+		return out;
 	}
 
 	/** Each matched rule with its settings, then which settings it decided and which it lost, and to whom. */
-	private static void rules(StringBuilder out, int level, ListTrace list, Translator tr) {
+	private static void rules(List<Line> out, int level, ListTrace list, String zoneId, Translator tr) {
 		if (list.matched().isEmpty()) {
-			line(out, level, tr.translate(NO_RULES));
+			line(out, level, tr.translate(NO_RULES), new NoRuleTarget(zoneId));
 			return;
 		}
 		for (Rule rule : list.matched()) {
-			line(out, level, tr.translate(RULE, rule.pattern().text(), RuleSummary.text(rule, tr)));
+			RuleLocation where = zoneId == null ? RuleLocation.global(rule.id()) : RuleLocation.inZone(zoneId, rule.id());
+			line(out, level, tr.translate(RULE, rule.pattern().text(), RuleSummary.text(rule, tr)), new RuleTarget(where, rule));
 			for (TraceProperty property : TraceProperty.values()) {
 				RuleWinner winner = list.winners().get(property);
 				if (winner != null && winner.rule() == rule) {
@@ -117,7 +165,11 @@ public final class TraceText {
 		return zone.name() == null || zone.name().isBlank() ? zone.id() : zone.name();
 	}
 
-	private static void line(StringBuilder out, int level, String text) {
-		out.append(INDENT.repeat(level)).append(text).append('\n');
+	private static void line(List<Line> out, int level, String text) {
+		line(out, level, text, null);
+	}
+
+	private static void line(List<Line> out, int level, String text, Target target) {
+		out.add(new Line(INDENT.repeat(level) + text, target));
 	}
 }

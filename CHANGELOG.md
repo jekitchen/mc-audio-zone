@@ -13,6 +13,9 @@ Each release ships one jar per supported Minecraft version.
 - **Export and import:** Export saves a profile, fixed zones included, to `config/audiozone/exports/`. Import a file by
   dropping it on the Profiles tab or from `config/audiozone/imports/`. Files are checked first, and a dialog says what
   will change; fixed zones made for another server are skipped. A broken or out-of-range file changes nothing.
+- **Edit from "Why?":** every rule line in the sound trace has On/Off, Mute and Volume, every zone line has On/Off,
+  and each opens its full editor. Where no rule matches, "Add rule" adds one for this exact sound, globally or in a
+  zone. Changes save at once, the trace updates straight away ("Predicted for next play") and a toast offers Undo.
 
 ## 0.1.0-alpha (unreleased)
 
