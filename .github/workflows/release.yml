@@ -44,7 +44,7 @@ jobs:
         with:
           name: jar-mc${{ matrix.minecraft }}
           # The mod jar only, not the -sources jar.
-          path: build/libs/audiozone-*+${{ matrix.minecraft }}.jar
+          path: build/libs/soundsculptor-*+${{ matrix.minecraft }}.jar
 
   draft-release:
     needs: build
@@ -79,4 +79,4 @@ jobs:
           prerelease=""
           case "${GITHUB_REF_NAME}" in *-alpha*|*-beta*) prerelease="--prerelease" ;; esac
           gh release create "${GITHUB_REF_NAME}" jars/*.jar --draft ${prerelease} \
-            --title "Audio Zone ${GITHUB_REF_NAME#v}" --notes-file notes.md
+            --title "Sound Sculptor ${GITHUB_REF_NAME#v}" --notes-file notes.md

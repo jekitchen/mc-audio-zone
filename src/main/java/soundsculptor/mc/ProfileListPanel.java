@@ -1,0 +1,276 @@
+package soundsculptor.mc;
+
+import soundsculptor.core.profile.Profile;
+import soundsculptor.core.profile.ProfileOps;
+import soundsculptor.core.profile.ProfileSummary;
+import soundsculptor.mc.ui.SculptButton;
+import soundsculptor.mc.ui.SculptDialog;
+import soundsculptor.mc.ui.SculptList;
+import soundsculptor.mc.ui.SculptScreen;
+import soundsculptor.mc.ui.Tooltips;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+
+/**
+ * The Profiles tab (PRD FR-11.2, FR-11.3): every server and world with a profile, with its display name, world key,
+ * rule and zone counts and last joined date. Actions: Copy (into this world's profile), Rename, Reset and Delete; the
+ * profile of the world you are in can be reset but not deleted. In a singleplayer world, "Give this copy its own
+ * profile" (FR-11.1). Export on every row and Import for this world (FR-11.4, FR-11.5; files can also be dropped on
+ * the tab). Works outside a world too (from Mod Menu), without Copy and Import.
+ */
+public final class ProfileListPanel {
+	private static final int WHEN_WIDTH = 110;
+	private static final int COPY_WIDTH = 44;
+	private static final int EXPORT_WIDTH = 50;
+	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/edit");
+	private static final Identifier RESET_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/reset");
+	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/delete");
+
+	private final SculptScreen host;
+	public SculptList list;
+	public SculptButton ownProfileButton;
+	public SculptButton importButton;
+	private List<ProfileManager.Stored> stored = List.of();
+
+	public ProfileListPanel(SculptScreen host) {
+		this.host = host;
+	}
+
+	public void build(SculptScreen.Body body) {
+		Minecraft minecraft = Minecraft.getInstance();
+		ownProfileButton = null;
+		importButton = null;
+		List<SculptButton> top = new ArrayList<>();
+		if (ProfileManager.isLoaded()) {
+			// Imports always go into the profile of the world you are in (FR-11.5).
+			importButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.transfer.import_button"),
+					() -> setScreen(new ProfileImportScreen(host))), Component.translatable("soundsculptor.transfer.import_button.tip"));
+			top.add(importButton);
+		}
+		if (WorldSession.canGiveOwnProfile(minecraft)) {
+			ownProfileButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.profiles.own"), this::confirmOwnProfile),
+					Component.translatable("soundsculptor.profiles.own.tip"));
+			top.add(ownProfileButton);
+		}
+		if (!top.isEmpty()) {
+			body.row(top.toArray(new SculptButton[0]));
+		}
+		if (ProfileManager.isLoaded() && WorldSession.usesFolderFallback()) {
+			body.label(() -> Component.translatable("soundsculptor.profiles.folder_fallback"));
+		}
+		body.label(() -> Component.translatable("soundsculptor.profiles.hint"));
+		list = new SculptList(body.width(), 100, Component.translatable("soundsculptor.profiles.list"));
+		list.setEmptyText(() -> Component.translatable("soundsculptor.profiles.empty"));
+		body.fill(list);
+		refresh();
+	}
+
+	/** Reads the profiles folder again and rebuilds the rows. */
+	public void refresh() {
+		if (list == null) {
+			return;
+		}
+		stored = ProfileManager.storedProfiles();
+		String connected = ProfileManager.key();
+		List<ProfileManager.Stored> sorted = new ArrayList<>(stored);
+		sorted.sort(Comparator.comparing((ProfileManager.Stored s) -> s.profile() == null)
+				.thenComparing(s -> s.profile() == null ? null : summary(s, connected), Comparator.nullsLast(ProfileSummary.ORDER))
+				.thenComparing(ProfileManager.Stored::key));
+		List<SculptList.Row> rows = new ArrayList<>(sorted.size());
+		for (ProfileManager.Stored s : sorted) {
+			rows.add(row(s, connected));
+		}
+		list.setRows(rows);
+	}
+
+	private static ProfileSummary summary(ProfileManager.Stored s, String connected) {
+		return ProfileSummary.of(s.key(), s.profile(), connected);
+	}
+
+	private SculptList.Row row(ProfileManager.Stored s, String connected) {
+		List<SculptButton> buttons = new ArrayList<>();
+		String keyText = s.keyKnown() ? s.key()
+				: Component.translatable("soundsculptor.profiles.key_unknown", s.key()).getString();
+		if (s.profile() == null) {
+			// A file that cannot be read: its problem, and Delete (it is kept as .bak).
+			String name = Component.translatable("soundsculptor.profiles.broken", keyText).getString();
+			String problem = ProfileManager.text(s.problem());
+			buttons.add(deleteButton(s, keyText));
+			return new SculptList.Row(s.key(), List.of(
+					new SculptList.Row.Column(() -> name, 0, 0),
+					new SculptList.Row.Column(() -> problem, 0, 1)), buttons);
+		}
+		ProfileSummary summary = summary(s, connected);
+		String name = summary.connected()
+				? Component.translatable("soundsculptor.profiles.this_world", summary.displayName()).getString()
+				: summary.displayName();
+		String when = summary.lastJoined() == null
+				? Component.translatable("soundsculptor.profiles.never_joined").getString()
+				: Component.translatable("soundsculptor.profiles.joined",
+						LocalDate.ofInstant(summary.lastJoined(), ZoneId.systemDefault()).toString()).getString();
+		String counts = Component.translatable("soundsculptor.profiles.counts", summary.ruleCount(), summary.zoneCount()).getString();
+		Component rowName = Component.literal(summary.displayName());
+		if (ProfileManager.isLoaded() && !summary.connected() && s.keyKnown()) {
+			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.profiles.copy"), COPY_WIDTH, () -> confirmCopy(s))
+					.narrationContext(() -> rowName), Component.translatable("soundsculptor.profiles.copy.tip")));
+		}
+		if (s.keyKnown()) {
+			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.transfer.export"), EXPORT_WIDTH,
+					() -> ProfileTransfer.exportWithDialog(host, s.key(), s.profile())).narrationContext(() -> rowName),
+					Component.translatable("soundsculptor.transfer.export.tip")));
+			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.profiles.rename"),
+					() -> setScreen(new ProfileRenameScreen(host, s.key(), s.profile()))).narrationContext(() -> rowName));
+			buttons.add(SculptButton.icon(RESET_ICON, Component.translatable("soundsculptor.profiles.reset"), () -> confirmReset(s))
+					.narrationContext(() -> rowName));
+		}
+		SculptButton delete = deleteButton(s, summary.displayName());
+		if (!summary.canDelete()) {
+			delete.active = false;
+			delete.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable("soundsculptor.profiles.delete.current")));
+		}
+		buttons.add(delete);
+		return new SculptList.Row(s.key(), List.of(
+				new SculptList.Row.Column(() -> name, 0, 0),
+				new SculptList.Row.Column(() -> when, WHEN_WIDTH, 0),
+				new SculptList.Row.Column(() -> keyText, 0, 1),
+				new SculptList.Row.Column(() -> counts, WHEN_WIDTH, 1)), buttons);
+	}
+
+	private SculptButton deleteButton(ProfileManager.Stored s, String name) {
+		return SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.profiles.delete"), () -> confirmDelete(s, name))
+				.narrationContext(() -> Component.literal(name));
+	}
+
+	/** The profiles as last listed (tests). */
+	public List<ProfileManager.Stored> stored() {
+		return stored;
+	}
+
+	public ProfileManager.Stored find(String key) {
+		for (ProfileManager.Stored s : stored) {
+			if (s.key().equals(key)) {
+				return s;
+			}
+		}
+		return null;
+	}
+
+	// ---- Copy from another server (FR-11.2) ----
+
+	public void confirmCopy(ProfileManager.Stored source) {
+		ProfileOps.Copy copy = ProfileOps.copyFrom(source.profile(), ProfileManager.profile());
+		if (copy.problem() != null) {
+			host.showToast(Component.literal(ProfileManager.text(copy.problem())), null);
+			return;
+		}
+		setScreen(new SculptDialog(host,
+				Component.translatable("soundsculptor.profiles.copy.title", source.profile().name()),
+				Component.translatable("soundsculptor.profiles.copy.message", copy.ruleCount(), copy.bubbleCount(), copy.fixedKept()),
+				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.copy.confirm"),
+						() -> confirmBoostThen(host, copy.needsBoostConfirm(), () -> copy(source))),
+						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
+				1, 1));
+	}
+
+	/** Copies the source's global rules, bubbles and settings into this world's profile; fixed zones stay. */
+	public void copy(ProfileManager.Stored source) {
+		Profile latest = ProfileManager.storedProfile(source.key());
+		Profile from = latest != null ? latest : source.profile();
+		// A copy that brings boosted rules was confirmed in the boost dialog (FR-5.4), so it is saved as confirmed.
+		ProfileManager.update(target -> {
+			ProfileOps.Copy copy = ProfileOps.copyFrom(from, target);
+			if (copy.problem() != null) {
+				return target;
+			}
+			return copy.needsBoostConfirm() ? copy.result().withBoostConfirmed(true) : copy.result();
+		});
+		refresh();
+		host.showToast(Component.translatable("soundsculptor.profiles.copied", source.profile().name()), null);
+	}
+
+	/**
+	 * Runs {@code then}, first asking the boost question (FR-5.4) if the change brings rules above 100% into a profile
+	 * that has not confirmed boost yet. Used by Copy from… and Import.
+	 */
+	public static void confirmBoostThen(net.minecraft.client.gui.screens.Screen host, boolean needed, Runnable then) {
+		if (!needed) {
+			then.run();
+			return;
+		}
+		setScreen(new SculptDialog(host,
+				Component.translatable("soundsculptor.boost.confirm.title"),
+				Component.translatable("soundsculptor.boost.confirm.body"),
+				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.boost.confirm"), then),
+						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
+				1, 1));
+	}
+
+	// ---- Reset and delete (FR-11.3) ----
+
+	public void confirmReset(ProfileManager.Stored s) {
+		setScreen(new SculptDialog(host,
+				Component.translatable("soundsculptor.profiles.reset.title"),
+				Component.translatable("soundsculptor.profiles.reset.message", s.profile().name()),
+				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.reset.confirm"), () -> reset(s.key())),
+						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
+				1, 1));
+	}
+
+	public void reset(String key) {
+		ProfileManager.Stored s = find(key);
+		if (s == null || s.profile() == null) {
+			return;
+		}
+		if (s.connected()) {
+			ProfileManager.update(ProfileOps::reset);
+		} else {
+			ProfileManager.saveOther(key, ProfileOps.reset(s.profile()));
+		}
+		refresh();
+	}
+
+	public void confirmDelete(ProfileManager.Stored s, String name) {
+		setScreen(new SculptDialog(host,
+				Component.translatable("soundsculptor.profiles.delete.title"),
+				Component.translatable("soundsculptor.profiles.delete.message", name),
+				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.delete.confirm"), () -> delete(s.key())),
+						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
+				1, 1));
+	}
+
+	public void delete(String key) {
+		ProfileManager.Stored s = find(key);
+		if (s == null || s.connected()) {
+			return;
+		}
+		ProfileManager.delete(key);
+		refresh();
+	}
+
+	// ---- Give this copy its own profile (FR-11.1) ----
+
+	public void confirmOwnProfile() {
+		setScreen(new SculptDialog(host,
+				Component.translatable("soundsculptor.profiles.own.title"),
+				Component.translatable("soundsculptor.profiles.own.message"),
+				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.own.confirm"), this::giveOwnProfile),
+						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
+				1, 1));
+	}
+
+	public void giveOwnProfile() {
+		boolean done = WorldSession.giveOwnProfile(Minecraft.getInstance());
+		refresh();
+		host.showToast(Component.translatable(done ? "soundsculptor.profiles.own.done" : "soundsculptor.profiles.own.failed"), null);
+	}
+
+	private static void setScreen(net.minecraft.client.gui.screens.Screen screen) {
+		Minecraft.getInstance().gui.setScreen(screen);
+	}
+}

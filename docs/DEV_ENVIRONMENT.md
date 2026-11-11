@@ -1,6 +1,6 @@
 # Development environment
 
-This page lists everything needed to build, test and run Audio Zone from source. Update it whenever a tool or version is added or changed.
+This page lists everything needed to build, test and run Sound Sculptor from source. Update it whenever a tool or version is added or changed.
 
 Last verified: 2026-11-08 on Windows 11. Both Minecraft targets build, and the unit tests and client game tests pass on both.
 
@@ -37,7 +37,7 @@ All versions live in [`gradle.properties`](../gradle.properties), except the Gra
 | Fabric Loader | 0.20.1 | |
 | Fabric Loom (Gradle plugin) | 1.19.4 | Plugin id `net.fabricmc.fabric-loom`: the non-remapping Loom used for unobfuscated 26.x |
 | Fabric API | 0.165.2+26.3 / 0.161.0+26.2 | One build per Minecraft version |
-| Mixin | bundled with Fabric Loader | Config: `src/main/resources/audiozone.mixins.json`, package `audiozone.mc.mixin` |
+| Mixin | bundled with Fabric Loader | Config: `src/main/resources/soundsculptor.mixins.json`, package `soundsculptor.mc.mixin` |
 | JUnit Jupiter | 6.1.3 | Pure-logic tests that run without Minecraft (PRD 7.6) |
 | Gradle | 9.8.2 | Wrapper jar SHA-256 checked against Gradle's published checksum; CI re-validates it on every run |
 | Mod Menu | not added yet | Optional "suggests" dependency, added at M8 (repo `https://maven.terraformersmc.com/`) |
@@ -54,22 +54,22 @@ Run from the repo root. On Windows use `gradlew` (cmd/PowerShell) or `./gradlew`
 | Launch the game with the mod (dev client) | `./gradlew runClient` |
 | Run the in-game milestone tests (opens a game window, needs a display) | `./gradlew runClientGameTest` (add the `-P` flags above for 26.2) |
 | Same, on a machine without an audio device | Set the environment variable `ALSOFT_DRIVERS=null` first (OpenAL Soft's silent output), as CI does |
-| Turn the dev client's per-sound log off/on | JVM property `-Daudiozone.logSounds=false` / `true` (on by default in the dev client, off in release jars) |
+| Turn the dev client's per-sound log off/on | JVM property `-Dsoundsculptor.logSounds=false` / `true` (on by default in the dev client, off in release jars) |
 | Generate Minecraft sources for browsing | `./gradlew genSources` |
 | Clean | `./gradlew clean` |
 
-Output jars go to `build/libs/` as `audiozone-<version>+<minecraft>.jar`. Each world or server has its own profile file in `config/audiozone/profiles/` in the game folder (`run/` for the dev client), named after its world key: the server address, or `world_<id>.json` for a singleplayer world, whose ID is in `audiozone_id.txt` in the world's save folder. The files are plain JSON and safe to inspect.
+Output jars go to `build/libs/` as `soundsculptor-<version>+<minecraft>.jar`. Each world or server has its own profile file in `config/soundsculptor/profiles/` in the game folder (`run/` for the dev client), named after its world key: the server address, or `world_<id>.json` for a singleplayer world, whose ID is in `soundsculptor_id.txt` in the world's save folder. The files are plain JSON and safe to inspect.
 
 The first build downloads Minecraft and the dependencies (about 1–2 minutes). Later builds use the cache in `~/.gradle`.
 
 ### Checking layouts with the pseudo-language
 
-PRD 9.3 asks for layouts that fit text 40% longer than English. `audiozone.core.i18n.PseudoLocale` turns `en_us.json` into a pseudo-language: accented letters, padded to at least 40% longer, inside brackets ("Mute" becomes "[Ṁúţé]"). Placeholders such as `%s` and `%1$s` are kept as they are. Clipped text loses its closing `]`, and text joined from fragments shows up as several bracketed pieces.
+PRD 9.3 asks for layouts that fit text 40% longer than English. `soundsculptor.core.i18n.PseudoLocale` turns `en_us.json` into a pseudo-language: accented letters, padded to at least 40% longer, inside brackets ("Mute" becomes "[Ṁúţé]"). Placeholders such as `%s` and `%1$s` are kept as they are. Clipped text loses its closing `]`, and text joined from fragments shows up as several bracketed pieces.
 
 1. Run `./gradlew test` (or just `./gradlew test --tests '*PseudoLocaleTest*'`). It writes `build/pseudo/en_pseudo.json`.
-2. Copy that file over `src/main/resources/assets/audiozone/lang/en_us.json` in your local checkout. Using English's slot means no new language needs registering.
+2. Copy that file over `src/main/resources/assets/soundsculptor/lang/en_us.json` in your local checkout. Using English's slot means no new language needs registering.
 3. Run `./gradlew runClient` and go through every screen at GUI scales 1 to 4.
-4. Put English back with `git checkout src/main/resources/assets/audiozone/lang/en_us.json`. Never commit the pseudo text.
+4. Put English back with `git checkout src/main/resources/assets/soundsculptor/lang/en_us.json`. Never commit the pseudo text.
 
 ## Continuous integration
 
@@ -80,17 +80,17 @@ PRD 9.3 asks for layouts that fit text 40% longer than English. `audiozone.core.
 ```
 build.gradle, settings.gradle, gradle.properties   Gradle build (Loom)
 gradlew, gradlew.bat, gradle/wrapper/              Gradle wrapper (do not edit by hand)
-src/main/java/audiozone/                           Mod code; client entry point AudioZoneClient
-src/main/java/audiozone/mc/                        Version-sensitive code only (Mixins, adapters), PRD 7.6
-src/main/java/audiozone/mc/ui/                     UI kit (PRD 6.2); all drawing goes through Draw.java
-src/main/java/audiozone/core/                      Pure Java logic with unit tests (no Minecraft classes)
+src/main/java/soundsculptor/                           Mod code; client entry point SoundSculptorClient
+src/main/java/soundsculptor/mc/                        Version-sensitive code only (Mixins, adapters), PRD 7.6
+src/main/java/soundsculptor/mc/ui/                     UI kit (PRD 6.2); all drawing goes through Draw.java
+src/main/java/soundsculptor/core/                      Pure Java logic with unit tests (no Minecraft classes)
 src/main/versions/<minecraft_version>/java/        Classes whose source differs per Minecraft version (see PORTING.md)
-src/main/resources/assets/audiozone/textures/gui/sprites/icon/   GUI icons (generated by tools/make_icons.py)
+src/main/resources/assets/soundsculptor/textures/gui/sprites/icon/   GUI icons (generated by tools/make_icons.py)
 tools/                                             Developer scripts
 src/main/resources/fabric.mod.json                 Mod metadata (client-only, MIT)
-src/main/resources/audiozone.mixins.json           Mixin config
-src/main/resources/assets/audiozone/lang/          Translations (en_us.json)
-src/test/java/audiozone/                           JUnit tests for pure logic
+src/main/resources/soundsculptor.mixins.json           Mixin config
+src/main/resources/assets/soundsculptor/lang/          Translations (en_us.json)
+src/test/java/soundsculptor/                           JUnit tests for pure logic
 src/gametest/                                      Client game tests (Fabric client game-test API), one per milestone
 docs/PRD.md                                        Requirements (source of truth)
 docs/DEV_ENVIRONMENT.md                            This page
@@ -113,5 +113,5 @@ Your noreply address is listed in GitHub → Settings → Emails. Also turn on "
 
 1. `java -version` (with `JAVA_HOME` set) reports 25.
 2. `./gradlew build` ends with `BUILD SUCCESSFUL`, and `build/libs/` contains the jar.
-3. `./gradlew runClient` opens Minecraft, and the log shows `Loading N mods: - audiozone …` and `Audio Zone initialized` with no errors from Audio Zone. Press `;` in a world: the Audio Zone screen opens.
+3. `./gradlew runClient` opens Minecraft, and the log shows `Loading N mods: - soundsculptor …` and `Sound Sculptor initialized` with no errors from Sound Sculptor. Press `;` in a world: the Sound Sculptor screen opens.
 4. `./gradlew runClientGameTest` ends with `BUILD SUCCESSFUL`. Screenshots are saved to `build/run/clientGameTest/screenshots/`.

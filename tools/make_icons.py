@@ -1,6 +1,6 @@
-"""Writes Audio Zone's 16x16 GUI icon sprites as PNGs (white glyph, dark 1px shadow, transparent background).
+"""Writes Sound Sculptor's 16x16 GUI icon sprites as PNGs (white glyph, dark 1px shadow, transparent background).
 
-Usage (from the repo root): python tools/make_icons.py src/main/resources/assets/audiozone/textures/gui/sprites/icon
+Usage (from the repo root): python tools/make_icons.py src/main/resources/assets/soundsculptor/textures/gui/sprites/icon
 
 Edit the ASCII art below to change or add an icon, then rerun. Each icon is 16x16; "#" is a white pixel.
 """

@@ -38,7 +38,7 @@ sourceSets.main.java.srcDir versionSources
 fabricApi {
 	configureTests {
 		createSourceSet = true
-		modId = "audiozone-gametest"
+		modId = "soundsculptor-gametest"
 		enableGameTests = false
 		enableClientGameTests = true
 		eula = true
@@ -50,8 +50,8 @@ fabricApi {
 loom {
 	runs {
 		matching { it.name == 'clientGameTest' }.configureEach {
-			vmArg '-Daudiozone.logSounds=false'
-			vmArg "-Daudiozone.soakSeconds=${project.findProperty('soak') ?: '20'}"
+			vmArg '-Dsoundsculptor.logSounds=false'
+			vmArg "-Dsoundsculptor.soakSeconds=${project.findProperty('soak') ?: '20'}"
 		}
 	}
 }

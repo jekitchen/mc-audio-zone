@@ -32,7 +32,7 @@ jobs:
       - name: capture build artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: audiozone-mc${{ matrix.minecraft }}
+          name: soundsculptor-mc${{ matrix.minecraft }}
           path: build/libs/
 
   client-gametest:

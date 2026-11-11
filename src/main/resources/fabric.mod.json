@@ -1,32 +1,32 @@
 {
 	"schemaVersion": 1,
-	"id": "audiozone",
+	"id": "soundsculptor",
 	"version": "${version}",
-	"name": "Audio Zone",
+	"name": "Sound Sculptor",
 	"description": "Mute or turn down any sound, everywhere or only inside zones you draw, without ever hearing more than vanilla allows. Client-only: nothing is sent to servers.",
 	"authors": [
 		"maxismagical",
 		"Sciencode"
 	],
 	"contact": {
-		"homepage": "https://github.com/jekitchen/mc-audio-zone",
-		"sources": "https://github.com/jekitchen/mc-audio-zone",
-		"issues": "https://github.com/jekitchen/mc-audio-zone/issues"
+		"homepage": "https://github.com/jekitchen/mc-sound-sculptor",
+		"sources": "https://github.com/jekitchen/mc-sound-sculptor",
+		"issues": "https://github.com/jekitchen/mc-sound-sculptor/issues"
 	},
 	"license": "MIT",
-	"icon": "assets/audiozone/icon.png",
+	"icon": "assets/soundsculptor/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"audiozone.AudioZoneClient"
+			"soundsculptor.SoundSculptorClient"
 		],
 		"modmenu": [
-			"audiozone.mc.ModMenuEntry"
+			"soundsculptor.mc.ModMenuEntry"
 		]
 	},
 	"mixins": [
 		{
-			"config": "audiozone.mixins.json",
+			"config": "soundsculptor.mixins.json",
 			"environment": "client"
 		}
 	],
