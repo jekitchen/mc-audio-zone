@@ -140,16 +140,65 @@ class QuickActionsTest {
 	void toggleMuteFlipsBetweenMuteAndClear() {
 		Profile p = profile(List.of(), pen());
 		ApplyTarget pen = penTarget(p);
-		assertEquals(new RuleEdit.Mute(true), QuickActions.toggleMute(p, pen, AMBIENT));
+		assertEquals(new RuleEdit.MuteWithCue(true), QuickActions.toggleMute(p, pen, AMBIENT));
 		p = ok(QuickActions.apply(p, pen, AMBIENT, QuickActions.toggleMute(p, pen, AMBIENT))).after();
-		assertEquals(new RuleEdit.Mute(null), QuickActions.toggleMute(p, pen, AMBIENT));
+		assertTrue(QuickActions.isMuted(p, pen, AMBIENT));
+		assertEquals(new RuleEdit.UnmuteWithCue(true), QuickActions.toggleMute(p, pen, AMBIENT));
 	}
 
 	@Test
 	void aDisabledMutingRuleDoesNotCountAsMuted() {
 		Profile p = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withMute(true).withEnabled(false)));
 		assertFalse(QuickActions.isMuted(p, ApplyTarget.EVERYWHERE, AMBIENT));
-		assertEquals(new RuleEdit.Mute(true), QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE, AMBIENT));
+		assertEquals(new RuleEdit.MuteWithCue(true), QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE, AMBIENT));
+	}
+
+	@Test
+	void quickMuteStartsTheRuleWithTheProfilesCueDefault() {
+		// FR-7.6: new mute rules have Cue on by default; the default can be changed in Settings.
+		for (boolean cueDefault : new boolean[] {true, false}) {
+			Profile p = profile(List.of(), pen()).withSettings(ProfileSettings.DEFAULTS.withCueDefault(cueDefault));
+			p = ok(QuickActions.apply(p, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE,
+					AMBIENT))).after();
+			Rule rule = QuickActions.exactRule(p, ApplyTarget.EVERYWHERE, AMBIENT);
+			assertEquals(Boolean.TRUE, rule.mute());
+			assertEquals(cueDefault, rule.cue());
+		}
+	}
+
+	@Test
+	void quickMuteKeepsACueTheRuleAlreadySets() {
+		Profile p = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withCue(false).withVolume(50)));
+		p = ok(QuickActions.apply(p, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE,
+				AMBIENT))).after();
+		assertEquals(Boolean.FALSE, QuickActions.exactRule(p, ApplyTarget.EVERYWHERE, AMBIENT).cue());
+	}
+
+	@Test
+	void toggledMuteThenUnmuteLeavesTheProfileAsItWas() {
+		for (boolean inZone : new boolean[] {false, true}) {
+			Profile start = profile(List.of(Rule.of("r1", "*villager*").withVolume(40)), pen());
+			ApplyTarget target = inZone ? penTarget(start) : ApplyTarget.EVERYWHERE;
+			Profile muted = ok(QuickActions.apply(start, target, AMBIENT, QuickActions.toggleMute(start, target, AMBIENT))).after();
+			QuickActionResult unmuted = ok(QuickActions.apply(muted, target, AMBIENT, QuickActions.toggleMute(muted, target,
+					AMBIENT)));
+			assertEquals(start, unmuted.after(), "the cue the mute added goes with it");
+			assertEquals(QuickActions.TOAST_REMOVED, unmuted.toastKey());
+		}
+	}
+
+	@Test
+	void unmuteKeepsACueThatDiffersFromTheDefaultOrARuleThatSetsMore() {
+		Profile cueOff = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withMute(true).withCue(false)));
+		cueOff = ok(QuickActions.apply(cueOff, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(cueOff,
+				ApplyTarget.EVERYWHERE, AMBIENT))).after();
+		assertEquals(Rule.of("exact:" + AMBIENT, AMBIENT).withCue(false), QuickActions.exactRule(cueOff, ApplyTarget.EVERYWHERE,
+				AMBIENT), "the player turned Cue off on purpose");
+		Profile more = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withMute(true).withCue(true).withVolume(50)));
+		more = ok(QuickActions.apply(more, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(more,
+				ApplyTarget.EVERYWHERE, AMBIENT))).after();
+		assertEquals(Rule.of("exact:" + AMBIENT, AMBIENT).withCue(true).withVolume(50), QuickActions.exactRule(more,
+				ApplyTarget.EVERYWHERE, AMBIENT));
 	}
 
 	@Test
