@@ -18,10 +18,14 @@ import audiozone.core.zones.Point;
 import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
 
+import audiozone.core.TestEnglish;
+
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-11.2 copy settings from another server, FR-11.3 rename, reset and delete. */
 class ProfileOpsTest {
+	private static final TestEnglish EN = new TestEnglish();
+
 	private static Zone fixedOn(String id, String worldKey) {
 		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), List.of());
 	}
@@ -58,6 +62,15 @@ class ProfileOpsTest {
 	}
 
 	@Test
+	void copyingABoostAsksForTheBoostConfirmFirst() {
+		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
+		Profile loud = A.withGlobalRules(List.of(Rule.of("a1", "x:one").withVolume(200)));
+		assertTrue(ProfileOps.copyFrom(loud, B).needsBoostConfirm());
+		assertFalse(ProfileOps.copyFrom(loud, B.withBoostConfirmed(true)).needsBoostConfirm());
+		assertFalse(ProfileOps.copyFrom(A, B).needsBoostConfirm());
+	}
+
+	@Test
 	void copyIsOneTime() {
 		Profile copied = ProfileOps.copyFrom(A, B).result();
 		Profile aChanged = A.muteExact("x:new");
@@ -91,7 +104,7 @@ class ProfileOpsTest {
 			bubbles.add(bubble("b" + i));
 		}
 		ProfileOps.Copy copy = ProfileOps.copyFrom(Profile.empty("S").withZones(bubbles), target);
-		assertEquals("After copying this profile would have 65 zones; the maximum is 64.", copy.problem());
+		assertEquals("After copying this profile would have 65 zones; the maximum is 64.", copy.problem().text(EN));
 		assertEquals(target, copy.result(), "nothing changes");
 	}
 
@@ -104,8 +117,8 @@ class ProfileOpsTest {
 
 	@Test
 	void renameRefusesEmptyOrLongNames() {
-		assertEquals("Enter a name.", ProfileOps.nameProblem("   "));
-		assertEquals("The name can be at most 64 characters.", ProfileOps.nameProblem("x".repeat(65)));
+		assertEquals("Enter a name.", ProfileOps.nameProblem("   ").text(EN));
+		assertEquals("The name can be at most 64 characters.", ProfileOps.nameProblem("x".repeat(65)).text(EN));
 		assertNull(ProfileOps.nameProblem("x".repeat(64)));
 		assertThrows(IllegalArgumentException.class, () -> ProfileOps.rename(A, ""));
 	}

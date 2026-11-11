@@ -13,11 +13,15 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import audiozone.core.TestEnglish;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /** PRD FR-11.8 storage and section 7.5 file format. */
 class ProfileStoreTest {
+	private static final TestEnglish EN = new TestEnglish();
+
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
 
 	@TempDir
@@ -43,7 +47,7 @@ class ProfileStoreTest {
 				List.of(Rule.of("r1", VILLAGER).withMute(true), full));
 		store().save("default", profile);
 		ProfileStore.LoadResult result = store().load("default", "ignored");
-		assertFalse(result.failed(), result.problem());
+		assertFalse(result.failed(), String.valueOf(result.problem()));
 		assertEquals(profile, result.profile());
 	}
 
@@ -75,7 +79,7 @@ class ProfileStoreTest {
 		Files.writeString(file, "{ this is not json", StandardCharsets.UTF_8);
 		ProfileStore.LoadResult result = store().load("default", "Default");
 		assertTrue(result.failed());
-		assertEquals("The file is not valid JSON (line 1, column 9).", result.problem());
+		assertEquals("The file is not valid JSON (line 1, column 9).", result.problem().text(EN));
 		assertTrue(result.profile().globalRules().isEmpty());
 		assertNotNull(result.brokenCopy());
 		assertTrue(Files.exists(result.brokenCopy()));
@@ -88,7 +92,7 @@ class ProfileStoreTest {
 		Files.writeString(store().fileFor("default"), "{\"schemaVersion\": 99, \"globalRules\": []}");
 		ProfileStore.LoadResult result = store().load("default", "Default");
 		assertTrue(result.failed());
-		assertTrue(result.problem().contains("newer Audio Zone"), result.problem());
+		assertTrue(result.problem().text(EN).contains("newer Audio Zone"), result.problem().text(EN));
 	}
 
 	@Test
@@ -98,7 +102,7 @@ class ProfileStoreTest {
 				"{\"schemaVersion\": 1, \"globalRules\": [{\"id\": \"r1\", \"pattern\": \"minecraft:a\", \"volume\": 900}]}");
 		ProfileStore.LoadResult result = store().load("default", "Default");
 		assertTrue(result.failed());
-		assertTrue(result.problem().startsWith("Rule 1"), result.problem());
+		assertTrue(result.problem().text(EN).startsWith("Rule 1"), result.problem().text(EN));
 	}
 
 	@Test

@@ -4,6 +4,7 @@ import static audiozone.core.profile.ProfileZonesTest.SERVER;
 import static audiozone.core.profile.ProfileZonesTest.bubble;
 import static audiozone.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -13,10 +14,14 @@ import audiozone.core.zones.Point;
 import audiozone.core.zones.Shape;
 import audiozone.core.zones.Zone;
 
+import audiozone.core.TestEnglish;
+
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-11.5 and FR-11.7: what an import changes on the current server's profile. */
 class ImportPlanTest {
+	private static final TestEnglish EN = new TestEnglish();
+
 	private static Zone fixedOn(String id, String worldKey) {
 		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), List.of());
 	}
@@ -41,6 +46,20 @@ class ImportPlanTest {
 		assertEquals(1, plan.bubbleCount());
 		assertEquals(0, plan.fixedImported());
 		assertEquals(1, plan.fixedSkipped());
+	}
+
+	@Test
+	void importingABoostAsksForTheBoostConfirmFirst() {
+		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
+		Zone loudBubble = bubble("b1").withRules(List.of(Rule.of("z", "x:z").withVolume(150)));
+		Profile global = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("n", "x:n").withVolume(120)));
+		Profile inZone = new Profile("F", ProfileSettings.DEFAULTS, List.of()).withZones(List.of(loudBubble));
+		Profile quiet = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("n", "x:n").withVolume(100)));
+		assertTrue(ImportPlan.of(CURRENT, global, SERVER).needsBoostConfirm());
+		assertTrue(ImportPlan.of(CURRENT, inZone, SERVER).needsBoostConfirm());
+		assertFalse(ImportPlan.of(CURRENT, quiet, SERVER).needsBoostConfirm());
+		assertFalse(ImportPlan.of(CURRENT.withBoostConfirmed(true), global, SERVER).needsBoostConfirm(),
+				"this profile already confirmed");
 	}
 
 	@Test
@@ -91,7 +110,7 @@ class ImportPlanTest {
 		assertEquals(null, plan.problem());
 		many.add(fixedOn("f63", SERVER));
 		ImportPlan over = ImportPlan.of(CURRENT, new Profile("F", ProfileSettings.DEFAULTS, List.of(), many, java.util.Map.of()), SERVER);
-		assertEquals("After the import this profile would have 65 zones; the maximum is 64.", over.problem());
+		assertEquals("After the import this profile would have 65 zones; the maximum is 64.", over.problem().text(EN));
 	}
 
 	@Test

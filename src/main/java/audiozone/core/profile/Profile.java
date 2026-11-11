@@ -95,6 +95,30 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		return !boostConfirmed && volume != null && volume > 100;
 	}
 
+	/**
+	 * Whether any rule, global or in a zone, sets a volume above 100%: a profile that came in by import or copy with
+	 * such a rule must first show the boost dialog (FR-5.4) unless it was already confirmed.
+	 */
+	public boolean hasBoost() {
+		for (Rule rule : globalRules) {
+			if (needsConfirm(rule)) {
+				return true;
+			}
+		}
+		for (Zone zone : zones) {
+			for (Rule rule : zone.rules()) {
+				if (needsConfirm(rule)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	private static boolean needsConfirm(Rule rule) {
+		return rule.volume() != null && rule.volume() > 100;
+	}
+
 	/** Replaces the zones; colors of zones no longer present are dropped. */
 	public Profile withZones(List<Zone> value) {
 		Map<String, Integer> colors = new LinkedHashMap<>();

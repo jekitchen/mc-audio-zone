@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.Message;
 import audiozone.core.outline.OutlineMode;
 import audiozone.core.outline.ZoneColors;
 import audiozone.core.rules.InvalidPatternException;
@@ -68,7 +69,7 @@ public final class ProfileCodec {
 	}
 
 	/** A profile read from a file, and the unknown fields that were ignored. */
-	public record Read(Profile profile, List<String> warnings) {
+	public record Read(Profile profile, List<Message> warnings) {
 		public Read {
 			warnings = List.copyOf(warnings);
 		}
@@ -244,7 +245,7 @@ public final class ProfileCodec {
 		try {
 			JsonElement parsed = JsonParser.parseString(text);
 			if (!parsed.isJsonObject()) {
-				throw new ProfileFormatException("The file is not a profile (expected a JSON object).");
+				throw ProfileText.problem(ProfileText.NOT_PROFILE);
 			}
 			return parsed.getAsJsonObject();
 		} catch (JsonParseException e) {
@@ -257,40 +258,39 @@ public final class ProfileCodec {
 			return readChecked(original, backup);
 		} catch (IllegalArgumentException | IllegalStateException e) {
 			// Every value is checked above; this is a last guard so a bad file can never crash the game.
-			throw new ProfileFormatException("A value in the file is not allowed: " + e.getMessage(), e);
+			throw new ProfileFormatException(Message.of(ProfileText.NOT_ALLOWED), e);
 		}
 	}
 
 	private static Read readChecked(JsonObject original, ProfileMigrations.Backup backup) throws ProfileFormatException {
 		JsonObject root = ProfileMigrations.CURRENT.migrate(original, backup);
-		List<String> warnings = new ArrayList<>();
-		Fields top = new Fields(root, "", warnings, ROOT_FIELDS);
+		List<Message> warnings = new ArrayList<>();
+		Fields top = new Fields(root, null, warnings, ROOT_FIELDS);
 		String name = top.has("name") ? top.string("name") : "Default";
 		Instant lastJoined = top.has("lastJoined") ? top.instant("lastJoined") : null;
 		boolean boostConfirmed = top.has("boostConfirmed") && top.bool("boostConfirmed");
 		ProfileSettings settings = top.has("settings")
-				? readSettings(top.object("settings", "Settings", SETTINGS_FIELDS))
+				? readSettings(top.object("settings", Message.of(ProfileText.PLACE_SETTINGS), SETTINGS_FIELDS))
 				: ProfileSettings.DEFAULTS;
 		JsonArray ruleArray = top.has("globalRules") ? top.array("globalRules") : new JsonArray();
 		JsonArray zoneArray = top.has("zones") ? top.array("zones") : new JsonArray();
 		if (zoneArray.size() > Precedence.MAX_ZONES) {
-			throw new ProfileFormatException("The file has " + zoneArray.size() + " zones; the maximum is "
-					+ Precedence.MAX_ZONES + ".");
+			throw ProfileText.problem(ProfileText.TOO_MANY_ZONES, zoneArray.size(), Precedence.MAX_ZONES);
 		}
 		List<Rule> rules = new ArrayList<>();
 		for (int i = 0; i < ruleArray.size(); i++) {
-			rules.add(readRule(top.element(ruleArray, i, "Rule " + (i + 1), RULE_FIELDS)));
+			rules.add(readRule(top.element(ruleArray, i, Message.of(ProfileText.PLACE_RULE, i + 1), RULE_FIELDS)));
 		}
 		int ruleCount = rules.size();
 		List<Zone> zones = new ArrayList<>();
 		Map<String, Integer> colors = new LinkedHashMap<>();
 		Map<String, Integer> firstUse = new HashMap<>();
 		for (int i = 0; i < zoneArray.size(); i++) {
-			Fields z = top.element(zoneArray, i, "Zone " + (i + 1), ZONE_FIELDS);
+			Fields z = top.element(zoneArray, i, Message.of(ProfileText.PLACE_ZONE, i + 1), ZONE_FIELDS);
 			Zone zone = readZone(z);
 			Integer earlier = firstUse.putIfAbsent(zone.id(), i + 1);
 			if (earlier != null) {
-				throw z.problem("id", quote(zone.id()) + " is already used by zone " + earlier);
+				throw z.problem("id", Message.of(ProfileText.ID_USED, quote(zone.id()), earlier));
 			}
 			if (z.has("color")) {
 				colors.put(zone.id(), z.color("color"));
@@ -299,7 +299,7 @@ public final class ProfileCodec {
 			zones.add(zone);
 		}
 		if (ruleCount > MAX_RULES) {
-			throw new ProfileFormatException("The file has " + ruleCount + " rules; the maximum is " + MAX_RULES + ".");
+			throw ProfileText.problem(ProfileText.TOO_MANY_RULES, ruleCount, MAX_RULES);
 		}
 		return new Read(new Profile(name, settings, rules, zones, colors, lastJoined, boostConfirmed), warnings);
 	}
@@ -333,7 +333,7 @@ public final class ProfileCodec {
 		try {
 			pattern = SoundPattern.of(patternText);
 		} catch (InvalidPatternException e) {
-			throw new ProfileFormatException(r.where() + ", field pattern: " + e.getMessage(), e);
+			throw new ProfileFormatException(r.problem("pattern", Message.of(e.error().translationKey())).problem(), e);
 		}
 		boolean enabled = !r.has("enabled") || r.bool("enabled");
 		Boolean mute = r.has("mute") ? r.bool("mute") : null;
@@ -384,7 +384,8 @@ public final class ProfileCodec {
 		if (z.has("rules")) {
 			JsonArray array = z.array("rules");
 			for (int i = 0; i < array.size(); i++) {
-				rules.add(readRule(z.element(array, i, z.where() + ", rule " + (i + 1), RULE_FIELDS)));
+				rules.add(readRule(z.element(array, i, Message.of(ProfileText.PLACE_ZONE_RULE, z.where(), i + 1),
+						RULE_FIELDS)));
 			}
 		}
 		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, rules, mode, edge,
@@ -394,7 +395,7 @@ public final class ProfileCodec {
 	private static Shape readShape(Fields z) throws ProfileFormatException {
 		JsonElement raw = z.require("shape");
 		if (!raw.isJsonObject()) {
-			throw z.problem("shape", describe(raw) + " is not an object");
+			throw z.problem("shape", Message.of(ProfileText.NOT_OBJECT, describe(raw)));
 		}
 		JsonObject json = raw.getAsJsonObject();
 		Fields probe = new Fields(json, z.where(), null, null);
@@ -411,12 +412,12 @@ public final class ProfileCodec {
 	}
 
 	/** Plain words with a location, e.g. "The file is not valid JSON (line 1, column 44).", instead of parser jargon. */
-	static String jsonProblem(JsonParseException e) {
+	static Message jsonProblem(JsonParseException e) {
 		String detail = e.getMessage() == null ? "" : e.getMessage();
 		Matcher where = LOCATION.matcher(detail);
 		return where.find()
-				? "The file is not valid JSON (line " + where.group(1) + ", column " + where.group(2) + ")."
-				: "The file is not valid JSON.";
+				? Message.of(ProfileText.NOT_JSON_AT, where.group(1), where.group(2))
+				: Message.of(ProfileText.NOT_JSON);
 	}
 
 	private static final Pattern LOCATION = Pattern.compile("line ([0-9]+) column ([0-9]+)");
@@ -441,27 +442,27 @@ public final class ProfileCodec {
 		return text.length() > 40 ? text.substring(0, 37) + "..." : text;
 	}
 
-	/** One JSON object being read, with its place in the file for error messages ("Zone 3", "Rule 2"). */
+	/** One JSON object being read, with its place in the file for messages ("Zone 3", "Rule 2"; null at the top). */
 	private static final class Fields {
 		private final JsonObject json;
-		private final String where;
-		private final List<String> warnings;
+		private final Message where;
+		private final List<Message> warnings;
 
-		Fields(JsonObject json, String where, List<String> warnings, Set<String> known) {
+		Fields(JsonObject json, Message where, List<Message> warnings, Set<String> known) {
 			this.json = json;
 			this.where = where;
 			this.warnings = warnings;
 			if (warnings != null && known != null) {
 				for (String key : json.keySet()) {
 					if (!known.contains(key)) {
-						warnings.add(where.isEmpty() ? "Unknown field " + quote(key) + " was ignored."
-								: where + ": unknown field " + quote(key) + " was ignored.");
+						warnings.add(where == null ? Message.of(ProfileText.UNKNOWN_FIELD, quote(key))
+								: Message.of(ProfileText.UNKNOWN_FIELD_AT, where, quote(key)));
 					}
 				}
 			}
 		}
 
-		String where() {
+		Message where() {
 			return where;
 		}
 
@@ -469,13 +470,19 @@ public final class ProfileCodec {
 			return json.has(field) && !json.get(field).isJsonNull();
 		}
 
-		ProfileFormatException problem(String field, String text) {
-			return new ProfileFormatException((where.isEmpty() ? "Field " : where + ", field ") + field + ": " + text + ".");
+		/** {@code field}'s problem at this place; the field is named as in the file (or a short label). */
+		ProfileFormatException problem(String field, Message what) {
+			return new ProfileFormatException(where == null ? Message.of(ProfileText.TOP_FIELD, field, what)
+					: Message.of(ProfileText.FIELD, where, field, what));
+		}
+
+		private ProfileFormatException problem(String field, String key, Object... args) {
+			return problem(field, Message.of(key, args));
 		}
 
 		JsonElement require(String field) throws ProfileFormatException {
 			if (!has(field)) {
-				throw problem(field, "missing");
+				throw problem(field, ProfileText.MISSING);
 			}
 			return json.get(field);
 		}
@@ -488,7 +495,7 @@ public final class ProfileCodec {
 		String string(String field) throws ProfileFormatException {
 			JsonPrimitive p = primitive(field);
 			if (p == null || !p.isString()) {
-				throw problem(field, describe(json.get(field)) + " is not text");
+				throw problem(field, ProfileText.NOT_TEXT, describe(json.get(field)));
 			}
 			return p.getAsString();
 		}
@@ -499,14 +506,14 @@ public final class ProfileCodec {
 			try {
 				return Instant.parse(text);
 			} catch (DateTimeParseException e) {
-				throw problem(field, quote(text) + " is not a date and time like 2026-11-09T13:37:46Z");
+				throw problem(field, ProfileText.NOT_DATE, quote(text));
 			}
 		}
 
 		boolean bool(String field) throws ProfileFormatException {
 			JsonPrimitive p = primitive(field);
 			if (p == null || !p.isBoolean()) {
-				throw problem(field, describe(json.get(field)) + " is not true or false");
+				throw problem(field, ProfileText.NOT_BOOLEAN, describe(json.get(field)));
 			}
 			return p.getAsBoolean();
 		}
@@ -514,17 +521,17 @@ public final class ProfileCodec {
 		double number(String field, double min, double max) throws ProfileFormatException {
 			JsonPrimitive p = primitive(field);
 			if (p == null || !p.isNumber()) {
-				throw problem(field, describe(json.get(field)) + " is not a number");
+				throw problem(field, ProfileText.NOT_NUMBER, describe(json.get(field)));
 			}
 			double value = p.getAsDouble();
 			if (!Double.isFinite(value)) {
-				throw problem(field, describe(p) + " is not a number");
+				throw problem(field, ProfileText.NOT_NUMBER, describe(p));
 			}
 			if (value > max) {
-				throw problem(field, format(value) + " is above the maximum " + format(max));
+				throw problem(field, ProfileText.ABOVE_MAX, format(value), format(max));
 			}
 			if (value < min) {
-				throw problem(field, format(value) + " is below the minimum " + format(min));
+				throw problem(field, ProfileText.BELOW_MIN, format(value), format(min));
 			}
 			return value;
 		}
@@ -532,7 +539,7 @@ public final class ProfileCodec {
 		int integer(String field, int min, int max) throws ProfileFormatException {
 			double value = number(field, min, max);
 			if (value != Math.rint(value)) {
-				throw problem(field, format(value) + " is not a whole number");
+				throw problem(field, ProfileText.NOT_WHOLE, format(value));
 			}
 			return (int) value;
 		}
@@ -540,7 +547,7 @@ public final class ProfileCodec {
 		/** One of the allowed words, e.g. "sphere"; {@code label} names the field in the message ("shape type"). */
 		String choice(String field, String label, String... allowed) throws ProfileFormatException {
 			if (!has(field)) {
-				throw problem(label, "missing");
+				throw problem(label, ProfileText.MISSING);
 			}
 			JsonPrimitive p = primitive(field);
 			if (p != null && p.isString()) {
@@ -550,24 +557,23 @@ public final class ProfileCodec {
 					}
 				}
 			}
-			String list = allowed.length == 2 ? allowed[0] + " or " + allowed[1]
-					: String.join(", ", java.util.Arrays.copyOf(allowed, allowed.length - 1)) + " or " + allowed[allowed.length - 1];
-			throw problem(label, describe(json.get(field)) + " is not " + list);
+			// The allowed values are words in the file, so they are listed as written.
+			throw problem(label, ProfileText.NOT_CHOICE, describe(json.get(field)), String.join(", ", allowed));
 		}
 
 		int color(String field) throws ProfileFormatException {
 			String text = string(field);
 			ZoneColors.Parsed parsed = ZoneColors.parseHex(text);
 			if (parsed.error() != null) {
-				throw problem(field, quote(text) + " is not a color like #E69F00");
+				throw problem(field, ProfileText.NOT_COLOR, quote(text));
 			}
 			return parsed.rgb();
 		}
 
-		Fields object(String field, String childWhere, Set<String> known) throws ProfileFormatException {
+		Fields object(String field, Message childWhere, Set<String> known) throws ProfileFormatException {
 			JsonElement value = require(field);
 			if (!value.isJsonObject()) {
-				throw problem(field, describe(value) + " is not an object");
+				throw problem(field, ProfileText.NOT_OBJECT, describe(value));
 			}
 			return new Fields(value.getAsJsonObject(), childWhere, warnings, known);
 		}
@@ -575,16 +581,16 @@ public final class ProfileCodec {
 		JsonArray array(String field) throws ProfileFormatException {
 			JsonElement value = require(field);
 			if (!value.isJsonArray()) {
-				throw problem(field, describe(value) + " is not a list");
+				throw problem(field, ProfileText.NOT_LIST, describe(value));
 			}
 			return value.getAsJsonArray();
 		}
 
 		/** Item {@code i} of a list, which must be an object; {@code itemWhere} is its place ("Rule 3"). */
-		Fields element(JsonArray array, int i, String itemWhere, Set<String> known) throws ProfileFormatException {
+		Fields element(JsonArray array, int i, Message itemWhere, Set<String> known) throws ProfileFormatException {
 			JsonElement value = array.get(i);
 			if (!value.isJsonObject()) {
-				throw new ProfileFormatException(itemWhere + ": " + describe(value) + " is not an object.");
+				throw ProfileText.problem(ProfileText.ITEM_NOT_OBJECT, itemWhere, describe(value));
 			}
 			return new Fields(value.getAsJsonObject(), itemWhere, warnings, known);
 		}

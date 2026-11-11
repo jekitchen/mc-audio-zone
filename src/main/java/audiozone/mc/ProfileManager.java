@@ -60,10 +60,11 @@ public final class ProfileManager {
 		ProfileStore.LoadResult result = store.load(worldKey, displayName);
 		current = snapshot(worldKey, result.profile());
 		if (result.failed()) {
+			String problem = result.problem().text((key, args) -> Component.translatable(key, args).getString());
 			AudioZoneClient.LOGGER.warn("Audio Zone profile {} could not be loaded ({}); using an empty profile. The file was renamed to {}",
-					store.fileFor(worldKey), result.problem(), result.brokenCopy());
+					store.fileFor(worldKey), problem, result.brokenCopy());
 			Notices.show(Component.translatable("audiozone.notice.profile_broken.title"),
-					Component.translatable("audiozone.notice.profile_broken.message", result.problem()));
+					Component.translatable("audiozone.notice.profile_broken.message", problem));
 		}
 		update(profile -> profile.withLastJoined(Instant.now()));
 	}

@@ -108,6 +108,30 @@ class RuleDraftTest {
 	}
 
 	@Test
+	void mutingARuleWithNoCueSetStartsItWithTheCueDefault() {
+		// FR-7.6: new mute rules have Cue on by default; the default can be changed in Settings.
+		for (boolean cueDefault : new boolean[] {true, false}) {
+			RuleDraft d = RuleDraft.blank("r1", true).useCueDefault(cueDefault);
+			d.setMute(true);
+			assertEquals(cueDefault, d.cue());
+		}
+	}
+
+	@Test
+	void theCueDefaultLeavesAChosenCueAndOtherEditsAlone() {
+		RuleDraft chosen = RuleDraft.blank("r1", true).useCueDefault(true);
+		chosen.setCue(false);
+		chosen.setMute(true);
+		assertEquals(Boolean.FALSE, chosen.cue(), "a Cue the player set is kept");
+		RuleDraft notMuting = RuleDraft.blank("r1", true).useCueDefault(true);
+		notMuting.setMute(false);
+		assertNull(notMuting.cue(), "only muting brings the default");
+		RuleDraft without = RuleDraft.blank("r1", true);
+		without.setMute(true);
+		assertNull(without.cue(), "without useCueDefault (the alpha, before cues) nothing changes");
+	}
+
+	@Test
 	void anExistingRuleRoundTrips() {
 		Rule rule = new Rule("r7", false, audiozone.core.rules.SoundPattern.of("*:block.*.step"), false, 40,
 				new Limit(2, 500, true), true);

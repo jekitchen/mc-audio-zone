@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.Message;
 import audiozone.core.zones.Precedence;
 import audiozone.core.zones.Zone;
 import java.util.ArrayList;
@@ -30,7 +31,15 @@ import java.util.Set;
  * @param problem       why the import cannot be done (too many zones), or null
  */
 public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fixedImported, int fixedSkipped,
-		String problem) {
+		Message problem) {
+	/**
+	 * Whether the boost dialog (FR-5.4) must be confirmed before this is done: the result sets a volume above 100%
+	 * and this profile has not confirmed boost yet. After the confirm, save {@code result().withBoostConfirmed(true)}.
+	 */
+	public boolean needsBoostConfirm() {
+		return problem == null && !result.boostConfirmed() && result.hasBoost();
+	}
+
 	public static ImportPlan of(Profile current, Profile file, String currentWorldKey) {
 		String here = currentWorldKey.toLowerCase(Locale.ROOT);
 		List<Zone> imported = new ArrayList<>();
@@ -74,8 +83,7 @@ public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fix
 		}
 		if (zones.size() > Precedence.MAX_ZONES) {
 			return new ImportPlan(current, file.globalRules().size(), bubbles, fixedIn, skipped,
-					"After the import this profile would have " + zones.size() + " zones; the maximum is "
-							+ Precedence.MAX_ZONES + ".");
+					Message.of(ProfileText.IMPORT_TOO_MANY_ZONES, zones.size(), Precedence.MAX_ZONES));
 		}
 		Profile result = new Profile(current.name(), file.settings(), file.globalRules(), zones, colors, current.lastJoined(),
 				current.boostConfirmed());

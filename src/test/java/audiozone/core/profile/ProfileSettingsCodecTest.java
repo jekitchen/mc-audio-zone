@@ -16,10 +16,14 @@ import audiozone.core.zones.ZoneEdge;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import audiozone.core.TestEnglish;
+
 import org.junit.jupiter.api.Test;
 
 /** PRD 7.5 file format for the profile settings, last joined and the boost confirm; 7.6 the v1 → v2 migration. */
 class ProfileSettingsCodecTest {
+	private static final TestEnglish EN = new TestEnglish();
+
 	private static final Instant JOINED = Instant.parse("2026-11-09T13:37:46.250Z");
 
 	private static Profile read(String json) throws ProfileFormatException {
@@ -27,7 +31,7 @@ class ProfileSettingsCodecTest {
 	}
 
 	private static String problem(String json) {
-		return assertThrows(ProfileFormatException.class, () -> read(json)).getMessage();
+		return assertThrows(ProfileFormatException.class, () -> read(json)).problem().text(EN);
 	}
 
 	private static JsonObject written(Profile p) {
@@ -74,9 +78,9 @@ class ProfileSettingsCodecTest {
 
 	@Test
 	void badSettingsNameTheFieldInPlainWords() {
-		assertEquals("Settings, field outlines: \"sometimes\" is not always, editing or never.",
+		assertEquals("Settings, field outlines: \"sometimes\" is not one of: always, editing, never.",
 				problem("{\"schemaVersion\": 2, \"settings\": {\"outlines\": \"sometimes\"}}"));
-		assertEquals("Settings, field edge mode: \"default\" is not hard or fade.",
+		assertEquals("Settings, field edge mode: \"default\" is not one of: hard, fade.",
 				problem("{\"schemaVersion\": 2, \"settings\": {\"edge\": {\"mode\": \"default\"}}}"));
 		assertEquals("Settings, field fade: 40 is above the maximum 32.",
 				problem("{\"schemaVersion\": 2, \"settings\": {\"edge\": {\"mode\": \"fade\", \"fade\": 40}}}"));

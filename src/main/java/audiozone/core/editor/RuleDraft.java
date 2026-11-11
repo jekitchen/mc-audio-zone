@@ -46,6 +46,8 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 
 	private final String id;
 	private final int maxVolume;
+	/** FR-7.6: the Cue a rule gets when it is set to mute with no Cue chosen, or null to leave Cue alone. */
+	private Boolean cueDefault;
 
 	private RuleDraft(String id, boolean boostAvailable, EnumMap<Field, String> original, EnumMap<Field, String> defaults) {
 		super(Field.class, original, defaults);
@@ -111,6 +113,20 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 
 	public void setMute(Boolean value) {
 		put(Field.MUTE, flag(value));
+		if (Boolean.TRUE.equals(value) && cueDefault != null && cue() == null) {
+			put(Field.CUE, flag(cueDefault));
+		}
+	}
+
+	/**
+	 * FR-7.6: from now on, setting Mute on while Cue is not set also sets Cue to the profile's Cue default ("new mute
+	 * rules have Cue on by default"). For the editor once it shows Cue (M9); without it, Cue is never changed.
+	 *
+	 * @return this draft
+	 */
+	public RuleDraft useCueDefault(boolean value) {
+		this.cueDefault = value;
+		return this;
 	}
 
 	/** Cue on, off, or null for "not set". */

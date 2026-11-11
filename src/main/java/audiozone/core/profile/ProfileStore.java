@@ -1,5 +1,6 @@
 package audiozone.core.profile;
 
+import audiozone.core.Message;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -34,7 +35,7 @@ public final class ProfileStore {
 	}
 
 	/** The outcome of loading: the profile to use, and, if the file was unusable, why and where it was moved. */
-	public record LoadResult(Profile profile, String problem, Path brokenCopy) {
+	public record LoadResult(Profile profile, Message problem, Path brokenCopy) {
 		public boolean failed() {
 			return problem != null;
 		}
@@ -102,10 +103,10 @@ public final class ProfileStore {
 		if (!Files.exists(file)) {
 			return new LoadResult(Profile.empty(defaultName), null, null);
 		}
-		String problem;
+		Message problem;
 		try {
 			if (Files.size(file) > MAX_FILE_BYTES) {
-				problem = "The file is larger than 1 MB.";
+				problem = Message.of(ProfileText.TOO_LARGE);
 			} else {
 				// An older file is saved as <name>.v<n>.bak before it is migrated (PRD 7.6).
 				String text = Files.readString(file, StandardCharsets.UTF_8);
@@ -113,9 +114,9 @@ public final class ProfileStore {
 						null, null);
 			}
 		} catch (ProfileFormatException e) {
-			problem = e.getMessage();
+			problem = e.problem();
 		} catch (IOException e) {
-			problem = "The file could not be read: " + e.getMessage();
+			problem = Message.of(ProfileText.UNREADABLE, String.valueOf(e.getMessage()));
 		}
 		Path broken = file.resolveSibling(file.getFileName() + ".broken");
 		try {
