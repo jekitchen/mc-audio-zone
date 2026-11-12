@@ -3,16 +3,18 @@ package soundsculptor.core.quick;
 import java.util.List;
 import java.util.Objects;
 
+import soundsculptor.core.sets.PlaceRef;
+
 /**
- * One choice in the Recently Played "Apply to" selector (PRD FR-1.5): Everywhere (the global rule list) or one zone's
- * rule list. Quick actions on a row create or edit the sound's exact-ID rule in that list.
+ * One choice in the Recently Played "Apply to" selector (PRD FR-1.5): Everywhere or one zone. Quick actions on a row
+ * edit the sound's single-sound entry in that place's Quick changes set (FR-4.10).
  *
  * @param zoneId   the zone's ID, or {@code null} for Everywhere
  * @param zoneName the zone's name for the label, or {@code null} for Everywhere
  * @param bubble   whether the zone is a personal bubble, which gets its own label
  */
 public record ApplyTarget(String zoneId, String zoneName, boolean bubble) {
-	/** The global rule list. */
+	/** Everywhere. */
 	public static final ApplyTarget EVERYWHERE = new ApplyTarget(null, null, false);
 
 	public ApplyTarget {
@@ -26,6 +28,11 @@ public record ApplyTarget(String zoneId, String zoneName, boolean bubble) {
 
 	public boolean isEverywhere() {
 		return zoneId == null;
+	}
+
+	/** The place whose Quick changes the quick actions edit (FR-4.10). */
+	public PlaceRef place() {
+		return isEverywhere() ? PlaceRef.EVERYWHERE : PlaceRef.zone(zoneId);
 	}
 
 	/** Key in {@code assets/soundsculptor/lang/en_us.json} for the selector entry; takes {@link #args()}. */

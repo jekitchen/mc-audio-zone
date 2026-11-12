@@ -1,5 +1,6 @@
 package soundsculptor.core.trace;
 
+import soundsculptor.core.Message;
 import soundsculptor.core.sets.Limit;
 import soundsculptor.core.sets.SetEntry;
 
@@ -37,6 +38,11 @@ public enum TraceEditError {
 	 */
 	public String translationKey() {
 		return "soundsculptor.trace.edit.error." + key;
+	}
+
+	/** The text to show: {@link #translationKey()} with the arguments it takes. */
+	public Message message() {
+		return this == TOO_MANY_RULES ? Message.of(translationKey(), max) : Message.of(translationKey(), min, max);
 	}
 
 	/** The smallest allowed value, for the message. */

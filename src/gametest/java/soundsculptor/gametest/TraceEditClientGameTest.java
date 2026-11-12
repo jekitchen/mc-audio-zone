@@ -2,7 +2,7 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
-import soundsculptor.core.quick.ApplyTarget;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetEntry;
@@ -119,12 +119,12 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 				SculptList.Row none = t.row(new TraceText.NoRuleTarget(null));
 				check(none != null && none.buttons().get(0).getMessage().getString().equals("Add rule"), "the global list should offer Add rule");
 				none.buttons().get(0).onPress(null);
-				SetEntry added = QuickActions.exactRule(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER);
+				SetEntry added = QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER);
 				check(added != null, "an exact-ID rule should be added");
 				SculptList.Row row = t.row(new TraceText.RuleTarget(RuleLocation.global(added.id()), added));
 				check(row != null && row.buttons().get(1).getMessage().getString().equals("Mute"), "the new rule's line should offer Mute");
 				row.buttons().get(1).onPress(null);
-				check(QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER), "Mute should mute the new rule");
+				check(QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER), "Mute should mute the new rule");
 				check(t.trace().volumePercent() == 0, "the trace should show it muted");
 			});
 			closeTrace(context);
@@ -134,7 +134,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				SoundSculptorScreen main = (SoundSculptorScreen) mc.gui.screen();
 				main.selectTab(SoundSculptorScreen.TAB_RULES);
-				String id = QuickActions.exactRule(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER).id();
+				String id = QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER).id();
 				check(main.bodyWidgets().stream().anyMatch(w -> w instanceof SculptList list && list.findRow(id) != null),
 						"the new rule should be on the Rules tab");
 			});

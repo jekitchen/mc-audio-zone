@@ -158,7 +158,6 @@
 	"soundsculptor.recent.apply_to.everywhere": "Everywhere",
 	"soundsculptor.recent.apply_to.zone": "Zone: %s",
 	"soundsculptor.recent.apply_to.bubble": "Bubble: %s",
-	"soundsculptor.recent.toast.removed": "Removed the rule for %s",
 	"soundsculptor.recent.toast.muted": "Muted %s",
 	"soundsculptor.recent.toast.unmuted": "Unmuted %s",
 	"soundsculptor.recent.toast.muted_in": "Muted %1$s in %2$s",

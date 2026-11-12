@@ -6,16 +6,16 @@ import soundsculptor.core.diag.TimingWindow;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.recent.RecentRow;
 import soundsculptor.core.recent.SortOrder;
-import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.ApplyTo;
 import soundsculptor.core.quick.QuickActionResult;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.trace.EntryEdit;
-import soundsculptor.core.trace.TraceEditError;
 import soundsculptor.core.zones.Point;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundNames;
@@ -313,12 +313,13 @@ public final class SoundSculptorScreen extends SculptScreen {
 	}
 
 	/**
-	 * Quick action Mute / Unmute: sets mute on the sound's exact-ID rule (FR-1.5). The icon shows the sound's current
-	 * state (crossed-out speaker when muted, speaker with waves when not); the label, tooltip and narration say what
-	 * pressing it does.
+	 * Quick action Mute / Unmute (FR-1.5, FR-4.10): edits the sound's single-sound entry in the Quick changes of the
+	 * place "Apply to" chose. The icon shows the sound's actual state at that place, whichever set decides it
+	 * (crossed-out speaker when muted, speaker with waves when not); the label, tooltip and narration say what pressing
+	 * it does.
 	 */
 	private SculptButton muteButton(String soundId) {
-		boolean muted = QuickActions.isMuted(ProfileManager.profile(), applyTarget(), soundId);
+		boolean muted = QuickActions.isMuted(ProfileManager.workspace(), applyTarget().place(), soundId);
 		return SculptButton.icon(
 				Identifier.fromNamespaceAndPath("soundsculptor", muted ? "icon/mute" : "icon/volume"),
 				Component.translatable(muted ? "soundsculptor.recent.unmute" : "soundsculptor.recent.mute"),
@@ -338,24 +339,29 @@ public final class SoundSculptorScreen extends SculptScreen {
 	}
 
 	/**
-	 * Mute/Unmute on a Recently Played or Search row (FR-1.5): edits the sound's exact-ID rule in the list "Apply to"
-	 * chose, saves at once and shows a 5-second toast with Undo (FR-12.5). A new mute takes the profile's Cue default.
+	 * Mute/Unmute on a Recently Played or Search row (FR-1.5, FR-4.10): edits the sound's single-sound entry in the
+	 * Quick changes of the place "Apply to" chose, saves at once and shows a 5-second toast with Undo (FR-12.5), which
+	 * puts back the profile and the library together. A new mute takes the profile's Cue default; Unmute on a sound
+	 * another set mutes writes "Not muted".
 	 */
 	public void toggleMute(String soundId) {
 		ApplyTarget target = applyTarget();
-		Profile profile = ProfileManager.profile();
-		EntryEdit edit = QuickActions.toggleMute(profile, target, soundId);
-		QuickActionResult result = QuickActions.apply(profile, target, soundId, edit);
+		PlaceRef where = target.place();
+		Workspace ws = ProfileManager.workspace();
+		EntryEdit edit = QuickActions.toggleMute(ws, where, soundId, ws.profile().settings().cueDefault());
+		QuickActionResult result = QuickActions.apply(ws, where, soundId, edit);
 		if (!result.ok()) {
-			showToast(errorText(result.error()), null);
+			showToast(ProfileManager.component(result.error()), null);
 			return;
 		}
 		if (result.changed()) {
-			ProfileManager.update(current -> result.after());
 			String toastKey = (edit instanceof EntryEdit.MuteWithCue ? "soundsculptor.recent.toast.muted" : "soundsculptor.recent.toast.unmuted")
 					+ (target.isEverywhere() ? "" : "_in");
-			List<String> args = target.isEverywhere() ? List.of(soundName(soundId)) : List.of(soundName(soundId), target.zoneName());
-			QuickUndo.offer(this, this::refreshLists, result.before(), result.after(), toastKey, args);
+			String[] args = target.isEverywhere()
+					? new String[] {soundName(soundId)}
+					: new String[] {soundName(soundId), target.zoneName()};
+			QuickUndo.applyWorkspace(this, this::refreshLists, current -> QuickActions.apply(current, where, soundId, edit).after(),
+					toastKey, args);
 		}
 		refreshLists();
 	}
@@ -416,12 +422,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 	private String soundName(String soundId) {
 		String name = subtitle(soundId);
 		return name == null ? SoundNames.readable(soundId) : name;
-	}
-
-	static Component errorText(TraceEditError error) {
-		return error == TraceEditError.TOO_MANY_RULES
-				? Component.translatable(error.translationKey(), error.max())
-				: Component.translatable(error.translationKey(), error.min(), error.max());
 	}
 
 	private static String ago(long millis) {
