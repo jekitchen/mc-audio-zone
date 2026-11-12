@@ -49,7 +49,7 @@ public final class SetUsageClientGameTest implements FabricClientGameTest {
 			boolean seen = false;
 			for (int i = 0; i < 100 && !seen; i++) {
 				context.waitTicks(2);
-				seen = context.computeOnClient(mc -> SetUsageIndex.current().otherCount(farm.id(), key) == 1);
+				seen = context.computeOnClient(mc -> SetUsageIndex.current() != null && SetUsageIndex.current().otherCount(farm.id(), key) == 1);
 			}
 			check(seen, "the index should see the other world's profile");
 			check(context.computeOnClient(mc -> SetUsageIndex.current().otherProfileNames(farm.id(), key)).equals(List.of("Other server")),
