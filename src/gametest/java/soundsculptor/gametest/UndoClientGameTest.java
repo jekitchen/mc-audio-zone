@@ -5,7 +5,10 @@ import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
+import soundsculptor.core.sets.SetCodec;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundSet;
+import soundsculptor.mc.QuickUndo;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -14,6 +17,7 @@ import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptScreen;
 import com.mojang.blaze3d.platform.InputConstants;
+import java.nio.file.Files;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -152,12 +156,56 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow("z1")) != null, "the restored zone is listed again");
 			context.takeScreenshot("undo-toast-zone");
 
+			// Library Sound Sets: Undo puts a set edit back in memory and in its file.
+			context.runOnClient(mc -> {
+				main(mc).selectTab(SoundSculptorScreen.TAB_RULES);
+				ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(ws.profile(), ws.library().put(
+						new SoundSet("farm-animals", "Farm animals", List.of(SetEntry.of("cow", "minecraft:entity.cow.ambient").withVolume(30))))));
+				ProfileManager.flushSaves();
+			});
+			context.runOnClient(mc -> QuickUndo.applyWorkspace(main(mc), () -> { }, ws -> new soundsculptor.core.sets.Workspace(ws.profile(),
+					ws.library().put(ws.library().get("farm-animals").putEntry(ws.library().get("farm-animals").entry("cow").withVolume(60)))),
+					"soundsculptor.zones.toast.deleted", "Farm animals"));
+			check(setVolume(context) == 60, "the set edit applies at once");
+			context.runOnClient(mc -> main(mc).pressUndo());
+			check(setVolume(context) == 30, "Undo puts the set's level back to 30 in the library");
+			check(fileVolume(context) == 30, "after a flush the set file says 30 again");
+
+			// A set added by the action is deleted by Undo; a set removed by it is saved again.
+			context.runOnClient(mc -> QuickUndo.applyWorkspace(main(mc), () -> { }, ws -> new soundsculptor.core.sets.Workspace(ws.profile(),
+					ws.library().remove("farm-animals")), "soundsculptor.zones.toast.deleted", "Farm animals"));
+			context.runOnClient(mc -> ProfileManager.flushSaves());
+			check(!context.computeOnClient(mc -> Files.exists(ProfileManager.setStore().fileFor("farm-animals"))), "the removed set's file is gone");
+			context.runOnClient(mc -> main(mc).pressUndo());
+			context.runOnClient(mc -> ProfileManager.flushSaves());
+			check(context.computeOnClient(mc -> Files.exists(ProfileManager.setStore().fileFor("farm-animals"))), "Undo saves the removed set again");
+			context.runOnClient(mc -> {
+				ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(ws.profile(), ws.library().remove("farm-animals")));
+				ProfileManager.flushSaves();
+			});
+
 			context.setScreen(() -> null);
 			context.runOnClient(mc -> {
 				ProfileManager.update(p -> Profile.empty(p.name()));
 				ProfileManager.flushSaves();
 			});
 		}
+	}
+
+	private static int setVolume(ClientGameTestContext context) {
+		return context.computeOnClient(mc -> ProfileManager.library().get("farm-animals").entry("cow").volume());
+	}
+
+	/** The level in the set file on disk, after queued saves. */
+	private static int fileVolume(ClientGameTestContext context) {
+		return context.computeOnClient(mc -> {
+			ProfileManager.flushSaves();
+			try {
+				return SetCodec.read(Files.readString(ProfileManager.setStore().fileFor("farm-animals"))).entry("cow").volume();
+			} catch (Exception e) {
+				throw new AssertionError("could not read the set file", e);
+			}
+		});
 	}
 
 	/** Ctrl+Z, or Cmd+Z on Mac. */
