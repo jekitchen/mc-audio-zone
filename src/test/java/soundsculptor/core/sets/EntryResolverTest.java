@@ -19,7 +19,7 @@ class EntryResolverTest {
 	private static final String TRADER_AMBIENT = "minecraft:entity.wandering_trader.ambient";
 
 	private static EntryResolver resolver(SetEntry... rules) {
-		return new EntryResolver(List.of(rules));
+		return EntryResolver.of(List.of(rules));
 	}
 
 	// --- FR-4 acceptance checks ---
@@ -99,6 +99,15 @@ class EntryResolverTest {
 		SetEntry second = SetEntry.of("second", "minecraft:entity.villager.*").withVolume(80);
 		assertEquals(30, resolver(first, second).resolve(VILLAGER_AMBIENT).volumePercent());
 		assertEquals(80, resolver(second, first).resolve(VILLAGER_AMBIENT).volumePercent());
+	}
+
+	@Test
+	void ofIsOneLayerWithoutASetId() {
+		SetEntry mute = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
+		EntryResolver r = resolver(mute);
+		assertEquals(List.of(new Layer("", List.of(mute))), r.layers());
+		assertEquals("", r.resolve(VILLAGER_AMBIENT).loudnessSet());
+		assertNull(r.resolve(VILLAGER_AMBIENT).limitSet(), "no winner, no set");
 	}
 
 	// --- Per-property resolution (FR-4.5) ---

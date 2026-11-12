@@ -358,7 +358,7 @@ public final class EntryEditorScreen extends SculptScreen {
 		}
 		SetEntry candidate = draft.build();
 		Profile withCandidate = target.put(ProfileManager.profile(), candidate);
-		Set<SetEntry> winners = new EntryResolver(target.rules(withCandidate)).overriddenBy(candidate, preview.matches());
+		Set<SetEntry> winners = EntryResolver.of(target.rules(withCandidate)).overriddenBy(candidate, preview.matches());
 		if (!winners.isEmpty()) {
 			List<String> patterns = new ArrayList<>();
 			for (SetEntry winner : winners) {
@@ -392,7 +392,7 @@ public final class EntryEditorScreen extends SculptScreen {
 				others.add(rule);
 			}
 		}
-		soundsculptor.core.sets.EntryResolution resolution = new EntryResolver(others).resolve(pattern);
+		soundsculptor.core.sets.EntryResolution resolution = EntryResolver.of(others).resolve(pattern);
 		inheritedMuted = resolution.muted();
 		inheritedVolume = resolution.volumePercent();
 	}

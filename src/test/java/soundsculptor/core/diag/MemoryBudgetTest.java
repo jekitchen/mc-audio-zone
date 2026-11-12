@@ -91,7 +91,7 @@ class MemoryBudgetTest {
 			rules.add(new SetEntry("r" + i, true, SoundPattern.of("minecraft:entity.test_sound.number_" + i + "*"), null, 50,
 					null, null));
 		}
-		EntryResolver resolver = new EntryResolver(rules);
+		EntryResolver resolver = EntryResolver.of(rules);
 		for (int i = 0; i < 4096; i++) { // the cache's cap
 			resolver.resolve(id(i));
 		}
@@ -256,7 +256,7 @@ class MemoryBudgetTest {
 		IntFunction<String> fail = bytes -> "an empty structure should be well under 1 MB, was " + bytes;
 		long empty = new RecentSounds().estimatedBytes() + new EntitySounds().estimatedBytes()
 				+ new LastPlays().estimatedBytes() + new RepeatLimiter().estimatedBytes()
-				+ new EntryResolver(List.of()).estimatedBytes();
+				+ EntryResolver.of(List.of()).estimatedBytes();
 		assertTrue(empty < 200_000, fail.apply((int) empty));
 	}
 }

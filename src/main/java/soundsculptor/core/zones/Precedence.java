@@ -9,6 +9,7 @@ import soundsculptor.core.sets.CacheBudget;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.EntryResolution;
 import soundsculptor.core.sets.EntryResolver;
+import soundsculptor.core.sets.Layer;
 
 /**
  * Combines the global rule list and the zones into one decision per sound (PRD FR-9), separately for loudness,
@@ -92,7 +93,7 @@ public final class Precedence {
 		if (zones.size() > MAX_ZONES) {
 			throw new IllegalArgumentException(zones.size() + " zones is more than the maximum " + MAX_ZONES);
 		}
-		this.global = new EntryResolver(globalRules);
+		this.global = EntryResolver.of(globalRules);
 		this.zones = zones.toArray(new Zone[0]);
 		this.zoneRules = new EntryResolver[this.zones.length];
 		int n = this.zones.length;
@@ -109,7 +110,7 @@ public final class Precedence {
 		CacheBudget zoneCaches = new CacheBudget(ZONE_CACHE_IDS);
 		for (int i = 0; i < n; i++) {
 			Zone zone = this.zones[i];
-			zoneRules[i] = new EntryResolver(zone.rules(), zoneCaches);
+			zoneRules[i] = new EntryResolver(List.of(new Layer("", zone.rules())), zoneCaches);
 			volumes[i] = zone.shape().volume();
 			enabled[i] = zone.enabled();
 			bubble[i] = zone.isBubble();

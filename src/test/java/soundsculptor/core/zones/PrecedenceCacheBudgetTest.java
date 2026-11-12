@@ -93,7 +93,7 @@ class PrecedenceCacheBudgetTest {
 
 	@Test
 	void sameWinnersShareOneResult() {
-		EntryResolver resolver = new EntryResolver(List.of(SetEntry.of("r", "minecraft:*").withMute(true)));
+		EntryResolver resolver = EntryResolver.of(List.of(SetEntry.of("r", "minecraft:*").withMute(true)));
 		assertSame(resolver.resolve(id(1)), resolver.resolve(id(2)), "both IDs are decided by the same rule");
 	}
 
@@ -111,7 +111,7 @@ class PrecedenceCacheBudgetTest {
 
 	@Test
 	void aListWithNoEnabledRulesCachesNothing() {
-		EntryResolver empty = new EntryResolver(List.of(SetEntry.of("r", "minecraft:*").withMute(true).withEnabled(false)));
+		EntryResolver empty = EntryResolver.of(List.of(SetEntry.of("r", "minecraft:*").withMute(true).withEnabled(false)));
 		for (int i = 0; i < 100; i++) {
 			assertSame(EntryResolution.NONE, empty.resolve(id(i)));
 		}
@@ -126,9 +126,9 @@ class PrecedenceCacheBudgetTest {
 		for (int i = 0; i < 500; i++) {
 			p.resolve(id(i), out);
 		}
-		long cachesOnly = p.globalRules().estimatedBytes() - new EntryResolver(List.of()).estimatedBytes();
+		long cachesOnly = p.globalRules().estimatedBytes() - EntryResolver.of(List.of()).estimatedBytes();
 		for (int z = 0; z < p.zoneCount(); z++) {
-			cachesOnly += p.zoneRules(z).estimatedBytes() - new EntryResolver(List.of()).estimatedBytes();
+			cachesOnly += p.zoneRules(z).estimatedBytes() - EntryResolver.of(List.of()).estimatedBytes();
 		}
 		assertEquals(before + cachesOnly, p.estimatedBytes());
 	}
