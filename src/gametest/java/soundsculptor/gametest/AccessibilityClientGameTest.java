@@ -16,7 +16,9 @@ import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RuleCopyScreen;
+import soundsculptor.core.editor.SetDraft;
 import soundsculptor.mc.SetDeleteDialog;
+import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.SetLibraryPanel;
 import soundsculptor.mc.SetNameScreen;
 import soundsculptor.mc.EntryEditorScreen;
@@ -94,11 +96,12 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
-			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
+			// SET is attached to the first zone, so the set editor's Attached to panel has a line and Attach to… has choices.
+			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
 					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
 							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))))
-					.withZones(List.of(zone("z1", "Trading hall", key), zone("z2", "Very long zone name for the bee farm by the river", key)))));
-			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().put(SET))));
+					.withZones(List.of(attached(zone("z1", "Trading hall", key), SET.id()),
+							zone("z2", "Very long zone name for the bee farm by the river", key))), ws.library().put(SET))));
 
 			// A-4: every control on the Rules and Zones tabs has something to read out.
 			for (int tab : new int[] {SoundSculptorScreen.TAB_RULES, SoundSculptorScreen.TAB_SETS, SoundSculptorScreen.TAB_ZONES,
@@ -121,6 +124,22 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentTrace.isEmpty(), "controls without a label in the sound trace: " + silentTrace);
+			// A-4 for the set editor, its Attach to… menu, the Quick changes editor and the entry editor.
+			List<String> silentEditors = context.computeOnClient(mc -> {
+				SetEditorScreen editor = SetEditorScreen.edit(null, SET.id());
+				mc.gui.setScreen(editor);
+				List<String> silent = new ArrayList<>(silentControls(editor));
+				editor.attachedPanel().openAttachMenu();
+				silent.addAll(silentControls(editor));
+				SetEditorScreen quick = SetEditorScreen.forQuickChanges(null, PlaceRef.EVERYWHERE);
+				mc.gui.setScreen(quick);
+				silent.addAll(silentControls(quick));
+				EntryEditorScreen entry = EntryEditorScreen.edit(null, SetDraft.of(SET), "e1");
+				mc.gui.setScreen(entry);
+				silent.addAll(silentControls(entry));
+				return silent;
+			});
+			check(silentEditors.isEmpty(), "controls without a label in the set and entry editors: " + silentEditors);
 			context.setScreen(() -> null);
 
 			// A-3: every screen at every window size and GUI scale.
@@ -205,6 +224,13 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		SETTINGS_ZONES(mc -> settings(SoundSculptorScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(SoundSculptorScreen.SettingsPage.DIAGNOSTICS), null),
 		RULE_EDITOR(mc -> EntryEditorScreen.edit(null, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r1")), null),
+		SET_EDITOR(mc -> SetEditorScreen.edit(null, SET.id()), null),
+		SET_EDITOR_ATTACH(mc -> SetEditorScreen.edit(null, SET.id()), s -> {
+			((SetEditorScreen) s).attachedPanel().openAttachMenu();
+			return null;
+		}),
+		SET_EDITOR_QUICK(mc -> SetEditorScreen.forQuickChanges(null, PlaceRef.EVERYWHERE), null),
+		ENTRY_EDITOR(mc -> EntryEditorScreen.edit(null, SetDraft.of(SET), "e1"), null),
 		ZONE_EDITOR_NEW(mc -> ZoneEditorScreen.create(null), null),
 		ZONE_EDITOR(mc -> ZoneEditorScreen.edit(null, ProfileManager.profile().zone("z1")), null),
 		ZONE_EDITOR_BOX(mc -> ZoneEditorScreen.edit(null, ProfileManager.profile().zone("z1")), s -> {
@@ -345,6 +371,10 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static Zone zone(String id, String name, String key) {
 		return new Zone(id, name, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8),
 				PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "*cow*").withVolume(40))));
+	}
+
+	private static Zone attached(Zone zone, String setId) {
+		return zone.withSets(zone.sets().attach(setId));
 	}
 
 	/** Every Sound Sculptor text through {@link PseudoLocale#pseudo}; everything else unchanged. */

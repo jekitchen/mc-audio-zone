@@ -17,7 +17,8 @@ import soundsculptor.core.sets.SoundPattern;
 public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 	/** The rule editor's fields, for mapping them to widgets. */
 	public enum Field implements DraftField {
-		PATTERN(true),
+		/** The sound ID or group pattern the entry targets (FR-4.1, FR-4.2). */
+		TARGET(true),
 		ENABLED(false),
 		MUTE(false),
 		/** Percent; empty means not set. */
@@ -71,7 +72,7 @@ public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 
 	private static EntryDraft of(SetEntry rule, boolean boostAvailable, String pattern) {
 		EnumMap<Field, String> values = new EnumMap<>(Field.class);
-		values.put(Field.PATTERN, pattern);
+		values.put(Field.TARGET, pattern);
 		values.put(Field.ENABLED, Boolean.toString(rule.enabled()));
 		values.put(Field.MUTE, flag(rule.mute()));
 		values.put(Field.VOLUME, rule.volume() == null ? "" : rule.volume().toString());
@@ -82,7 +83,7 @@ public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 		values.put(Field.CUE, flag(rule.cue()));
 
 		EnumMap<Field, String> defaults = new EnumMap<>(Field.class);
-		defaults.put(Field.PATTERN, pattern);
+		defaults.put(Field.TARGET, pattern);
 		defaults.put(Field.ENABLED, "true");
 		defaults.put(Field.MUTE, "");
 		defaults.put(Field.VOLUME, "");
@@ -154,7 +155,7 @@ public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 	@Override
 	protected FieldError validate(Field field, String text) {
 		return switch (field) {
-			case PATTERN -> {
+			case TARGET -> {
 				PatternError error = SoundPattern.validate(text);
 				yield error == null ? null : FieldError.of(error.translationKey());
 			}
@@ -176,7 +177,7 @@ public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 	@Override
 	protected boolean same(Field field, String a, String b) {
 		return switch (field) {
-			case PATTERN -> SoundPattern.validate(a) == null && SoundPattern.validate(b) == null
+			case TARGET -> SoundPattern.validate(a) == null && SoundPattern.validate(b) == null
 					? SoundPattern.of(a).equals(SoundPattern.of(b))
 					: a.trim().toLowerCase(Locale.ROOT).equals(b.trim().toLowerCase(Locale.ROOT));
 			case VOLUME, LIMIT_COUNT, LIMIT_WINDOW -> Numbers.same(a, b);
@@ -190,7 +191,7 @@ public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 				? new Limit(Numbers.whole(text(Field.LIMIT_COUNT)), Numbers.whole(text(Field.LIMIT_WINDOW)), perSource())
 				: null;
 		Integer volume = hasVolume() ? Numbers.whole(text(Field.VOLUME)) : null;
-		return new SetEntry(id, enabled(), SoundPattern.of(text(Field.PATTERN)), mute(), volume, limit, cue());
+		return new SetEntry(id, enabled(), SoundPattern.of(text(Field.TARGET)), mute(), volume, limit, cue());
 	}
 
 	private boolean hasVolume() {

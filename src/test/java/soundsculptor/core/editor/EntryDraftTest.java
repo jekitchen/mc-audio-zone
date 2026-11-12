@@ -24,24 +24,24 @@ class EntryDraftTest {
 		// 6.2: Save stays disabled from the start; the error shows once the field has been edited, or Save is pressed.
 		EntryDraft d = EntryDraft.blank("r1", BOOST);
 		assertFalse(d.canSave());
-		assertEquals(PatternError.EMPTY.translationKey(), d.error(Field.PATTERN).translationKey());
-		assertNull(d.shownError(Field.PATTERN));
+		assertEquals(PatternError.EMPTY.translationKey(), d.error(Field.TARGET).translationKey());
+		assertNull(d.shownError(Field.TARGET));
 		assertFalse(d.attemptSave());
-		assertEquals(PatternError.EMPTY.translationKey(), d.shownError(Field.PATTERN).translationKey());
+		assertEquals(PatternError.EMPTY.translationKey(), d.shownError(Field.TARGET).translationKey());
 	}
 
 	@Test
 	void editingAFieldShowsItsErrorAtOnce() {
 		EntryDraft d = EntryDraft.blank("r1", BOOST);
-		d.set(Field.PATTERN, "entity.cow.#");
-		assertEquals(PatternError.INVALID_CHARACTER.translationKey(), d.shownError(Field.PATTERN).translationKey());
+		d.set(Field.TARGET, "entity.cow.#");
+		assertEquals(PatternError.INVALID_CHARACTER.translationKey(), d.shownError(Field.TARGET).translationKey());
 		assertNull(d.shownError(Field.VOLUME), "untouched fields stay quiet");
 	}
 
 	@Test
 	void uppercasePatternIsAcceptedAndSavedLowercase() {
 		EntryDraft d = EntryDraft.blank("r1", BOOST);
-		d.set(Field.PATTERN, "Minecraft:Entity.Cow.*");
+		d.set(Field.TARGET, "Minecraft:Entity.Cow.*");
 		d.setMute(true);
 		assertTrue(d.canSave());
 		SetEntry rule = d.build();
@@ -60,7 +60,7 @@ class EntryDraftTest {
 		assertTrue(d.showsBoostWarning());
 
 		EntryDraft noBoost = EntryDraft.blank("r2", false);
-		noBoost.set(Field.PATTERN, "*");
+		noBoost.set(Field.TARGET, "*");
 		noBoost.set(Field.VOLUME, "150");
 		assertEquals(new FieldError(FieldError.OUT_OF_RANGE, List.of("0", "100")), noBoost.error(Field.VOLUME));
 	}
@@ -158,7 +158,7 @@ class EntryDraftTest {
 		assertFalse(d.isDirty());
 		d.set(Field.LIMIT_WINDOW, "2000");
 		assertFalse(d.isDirty(), "the window does nothing without a count");
-		d.set(Field.PATTERN, "*VILLAGER*");
+		d.set(Field.TARGET, "*VILLAGER*");
 		assertFalse(d.isDirty(), "same pattern after lowercasing");
 		d.setCue(false);
 		assertTrue(d.isDirty());
@@ -169,9 +169,9 @@ class EntryDraftTest {
 		// FR-12.6. Values with no app-wide default (the pattern) go back to what they were when the editor opened.
 		EntryDraft d = EntryDraft.of(new SetEntry("r1", true, soundsculptor.core.sets.SoundPattern.of("*cow*"), true, 30,
 				new Limit(4, 2000, true), true), BOOST);
-		d.set(Field.PATTERN, "*pig*");
-		d.resetToDefault(Field.PATTERN);
-		assertEquals("*:*cow*", d.text(Field.PATTERN));
+		d.set(Field.TARGET, "*pig*");
+		d.resetToDefault(Field.TARGET);
+		assertEquals("*:*cow*", d.text(Field.TARGET));
 		for (Field f : List.of(Field.MUTE, Field.VOLUME, Field.LIMIT_COUNT, Field.LIMIT_WINDOW, Field.PER_SOURCE, Field.CUE)) {
 			assertFalse(d.isDefault(f), f.name());
 			d.resetToDefault(f);
@@ -205,7 +205,7 @@ class EntryDraftTest {
 
 	private static EntryDraft draft(String pattern) {
 		EntryDraft d = EntryDraft.blank("r1", BOOST);
-		d.set(Field.PATTERN, pattern);
+		d.set(Field.TARGET, pattern);
 		return d;
 	}
 }

@@ -118,8 +118,11 @@ public final class SetLibraryPanel {
 
 	// ---- Actions ----
 
-	/** Edit: opens the set editor (FR-4.3). The editor comes in a later task; until then this does nothing. */
+	/** Edit: opens the set editor (FR-4.3). */
 	public void openEditor(String setId) {
+		if (ProfileManager.library().get(setId) != null) {
+			setScreen(SetEditorScreen.edit(host, setId));
+		}
 	}
 
 	/** New set: asks for a name, unless the library is full. */

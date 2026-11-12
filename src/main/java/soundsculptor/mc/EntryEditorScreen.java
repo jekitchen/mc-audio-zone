@@ -9,15 +9,16 @@ import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.editor.EntryDraft;
 import soundsculptor.core.editor.EntryDraft.Field;
+import soundsculptor.core.editor.SetDraft;
 import soundsculptor.core.Message;
-import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.QuickActions;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.EntryResolver;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.ui.SliderModel;
-import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptDropdown;
 import soundsculptor.mc.ui.SculptList;
@@ -37,10 +38,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 
 /**
- * The rule editor (PRD 6.1 Rules, FR-4, FR-5 MVP): pattern with a live "Matches N sounds" preview and the matching
- * IDs (FR-4.3), "Partly overridden by" (FR-4.6), enabled (FR-4.7), Mute and Volume 0–100% (FR-5.1–5.2). Save and
+ * The entry editor (PRD FR-4.3): one entry of a Sound Set being edited in the set editor. Target (a sound ID or a
+ * group pattern) with a live "Matches N sounds" preview and the matching IDs, "Partly overridden by" a more specific
+ * entry of the same set (FR-4.6), On/Off, Mute (Unchanged, Muted, Not muted) and Level 0–100% (FR-5.1–5.2). Save and
  * Cancel, with the unsaved-changes dialog (FR-12.4), a reset button per value (FR-12.6) and inline errors that disable
- * Save (FR-12.7). Limit and Cue arrive with their milestones (M11, M9); a rule's existing limit and cue are kept.
+ * Save (FR-12.7). Save puts the entry into the set's draft only; nothing changes in game until the set editor saves.
+ * Limit and Cue arrive with their milestones (M11, M9); an entry's existing limit and cue are kept.
  */
 public final class EntryEditorScreen extends SculptScreen {
 	private static final Identifier RESET_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/reset");
@@ -49,8 +52,10 @@ public final class EntryEditorScreen extends SculptScreen {
 	private static final int SLIDER_WIDTH = 200;
 	private static final int VOLUME_FIELD_WIDTH = 50;
 	private static final int PICK_WIDTH = 70;
+	/** Where the slider rests while the entry leaves the level unchanged. */
+	private static final int UNCHANGED_VOLUME = 100;
 
-	/** Mute is "not set" unless the rule sets it, so a rule can also say "do not mute" over a broader one. */
+	/** Mute is "Unchanged" unless the entry sets it, so an entry can also say "Not muted" over a broader one. */
 	public enum MuteChoice {
 		NOT_SET(null), MUTE(true), DO_NOT_MUTE(false);
 
@@ -66,18 +71,16 @@ public final class EntryEditorScreen extends SculptScreen {
 	}
 
 	private final EntryDraft draft;
-	/** The global list, or one zone's list. */
-	private final RuleTarget target;
+	/** The set the entry belongs to; Save puts the entry into it. */
+	private final SetDraft set;
+	private final Component subtitle;
+	// M8c shim: removed in Task 13
+	/** For the old RuleTarget callers: the place whose Quick changes {@link #set} is, written back on Save; else null. */
+	private final PlaceRef quickPlace;
 	private PatternPreview preview;
 	private Component overridden = Component.empty();
-	/**
-	 * What the sound gets when this rule leaves volume or mute unset (M8 review: show the current value instead of
-	 * "Not set"). For an exact sound ID, the other rules of the same list decide; otherwise 100% and not muted.
-	 */
-	private int inheritedVolume = 100;
-	private boolean inheritedMuted;
-	/** True while the slider is moved to show the unchanged value, so that move does not set a volume. */
-	private boolean showingInherited;
+	/** True while the slider is moved to its resting place for "Unchanged", so that move does not set a level. */
+	private boolean showingUnchanged;
 
 	public SculptTextField patternField;
 	public SculptToggle enabledToggle;
@@ -87,34 +90,61 @@ public final class EntryEditorScreen extends SculptScreen {
 	public SculptList matchList;
 	public SculptButton saveButton;
 
-	private EntryEditorScreen(Screen parent, RuleTarget target, EntryDraft draft, boolean isNew) {
+	private EntryEditorScreen(Screen parent, SetDraft set, EntryDraft draft, boolean isNew, Component subtitle, PlaceRef quickPlace) {
 		super(Component.translatable(isNew ? "soundsculptor.rule_editor.title.new" : "soundsculptor.rule_editor.title.edit"), parent);
-		this.target = target;
+		this.set = set;
 		this.draft = draft;
+		this.subtitle = subtitle;
+		this.quickPlace = quickPlace;
 		updatePreview();
 	}
 
-	/** Opens the editor for a new rule. */
+	/** Opens the editor on an entry of the set being edited. */
+	public static EntryEditorScreen edit(Screen parent, SetDraft set, String entryId) {
+		SetEntry entry = set.entry(entryId);
+		if (entry == null) {
+			throw new IllegalArgumentException("the set has no entry " + entryId);
+		}
+		return new EntryEditorScreen(parent, set, EntryDraft.of(entry, false), false, setSubtitle(set), null);
+	}
+
+	/** Opens the editor for a new entry of the set being edited (Add sounds…, until the Sounds picker replaces it). */
+	public static EntryEditorScreen add(Screen parent, SetDraft set) {
+		return new EntryEditorScreen(parent, set, EntryDraft.blank(set.newEntryId(), false), true, setSubtitle(set), null);
+	}
+
+	private static Component setSubtitle(SetDraft set) {
+		return Component.translatable("soundsculptor.set_editor.entry_subtitle", SoundSet.QUICK_ID.equals(set.id())
+				? Component.translatable("soundsculptor.set_editor.quick.title") : Component.literal(set.name()));
+	}
+
+	// ---- M8c shim: removed in Task 13. The Rules tab, a zone's Rules screen, the sound rows' Edit… and the trace open
+	// the editor on a place's Quick changes through a RuleTarget: the editor gets a draft of that Quick changes set, and
+	// Save writes it back (SetEditorScreen.withQuickChanges). ----
+
+	/** Opens the editor for a new entry in Everywhere's Quick changes. */
 	public static EntryEditorScreen create(Screen parent) {
 		return create(parent, RuleTarget.GLOBAL);
 	}
 
-	/** Opens the editor for a new rule in a zone's list or the global list (FR-8.6). */
+	/** Opens the editor for a new entry in the Quick changes of Everywhere or a zone. */
 	public static EntryEditorScreen create(Screen parent, RuleTarget target) {
-		return new EntryEditorScreen(parent, target, EntryDraft.blank(target.newRuleId(ProfileManager.profile()), false), true);
+		SetDraft quick = SetEditorScreen.quickDraft(target.place());
+		return new EntryEditorScreen(parent, quick, EntryDraft.blank(quick.newEntryId(), false), true, targetSubtitle(target), target.place());
 	}
 
-	/** Opens the editor for an existing rule. */
+	/** Opens the editor on an entry of Everywhere's Quick changes. */
 	public static EntryEditorScreen edit(Screen parent, SetEntry rule) {
 		return edit(parent, RuleTarget.GLOBAL, rule);
 	}
 
-	/** Opens the editor for an existing rule of a zone's list or the global list. */
+	/** Opens the editor on an entry of the Quick changes of Everywhere or a zone. */
 	public static EntryEditorScreen edit(Screen parent, RuleTarget target, SetEntry rule) {
-		return new EntryEditorScreen(parent, target, EntryDraft.of(rule, false), false);
+		return new EntryEditorScreen(parent, SetEditorScreen.quickDraft(target.place()), EntryDraft.of(rule, false), false,
+				targetSubtitle(target), target.place());
 	}
 
-	/** Opens the editor on a sound's exact-ID rule, or a new exact-ID rule for it. */
+	/** Opens the editor on a sound's single-sound entry in Everywhere's Quick changes, or a new one for it. */
 	public static EntryEditorScreen forSound(Screen parent, String soundId) {
 		return forSound(parent, ApplyTarget.EVERYWHERE, soundId);
 	}
@@ -130,18 +160,35 @@ public final class EntryEditorScreen extends SculptScreen {
 			return edit(parent, target, exact);
 		}
 		EntryEditorScreen screen = create(parent, target);
-		screen.draft.set(Field.PATTERN, soundId);
+		screen.draft.set(Field.TARGET, soundId);
 		screen.updatePreview();
 		return screen;
 	}
+
+	private static Component targetSubtitle(RuleTarget target) {
+		if (!target.isGlobal()) {
+			return Component.translatable("soundsculptor.rule_editor.zone", SetDeleteDialog.placeName(ProfileManager.profile(), target.place()));
+		}
+		return Component.translatable("soundsculptor.header.profile", ProfileManager.profile().name());
+	}
+
+	/** The Quick changes list the entry is saved in, for the old RuleTarget callers; null when editing a set's entry. */
+	public RuleTarget target() {
+		if (quickPlace == null) {
+			return null;
+		}
+		return quickPlace.isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(quickPlace.zoneId());
+	}
+
+	// ---- End of the M8c shim ----
 
 	public EntryDraft draft() {
 		return draft;
 	}
 
-	/** The list the rule is saved in: the global rules or a zone's. */
-	public RuleTarget target() {
-		return target;
+	/** The set the entry belongs to. */
+	public SetDraft set() {
+		return set;
 	}
 
 	public PatternPreview preview() {
@@ -160,12 +207,7 @@ public final class EntryEditorScreen extends SculptScreen {
 
 	@Override
 	protected Component headerSubtitle() {
-		if (!target.isGlobal()) {
-			Zone zone = ProfileManager.profile().zone(target.zoneId());
-			String name = zone == null || zone.name() == null || zone.name().isBlank() ? target.zoneId() : zone.name();
-			return Component.translatable("soundsculptor.rule_editor.zone", name);
-		}
-		return Component.translatable("soundsculptor.header.profile", ProfileManager.profile().name());
+		return subtitle;
 	}
 
 	@Override
@@ -184,11 +226,11 @@ public final class EntryEditorScreen extends SculptScreen {
 				Component.translatable("soundsculptor.rule_editor.pattern")), Component.translatable("soundsculptor.rule_editor.pattern.tip"));
 		patternField.placeholder(Component.translatable("soundsculptor.rule_editor.pattern.hint"));
 		patternField.setMaxLength(200);
-		patternField.setValue(draft.text(Field.PATTERN));
+		patternField.setValue(draft.text(Field.TARGET));
 		patternField.validator(text -> {
-			setText(Field.PATTERN, text);
+			setText(Field.TARGET, text);
 			// Plain words search for sounds (FR-4.8); they are not a pattern, so they show no pattern error.
-			return isSearch(text) ? null : message(draft.error(Field.PATTERN));
+			return isSearch(text) ? null : message(draft.error(Field.TARGET));
 		});
 		patternField.onChange(text -> {
 			// FR-4.2: uppercase becomes lowercase as it is typed.
@@ -199,7 +241,7 @@ public final class EntryEditorScreen extends SculptScreen {
 			}
 			changed();
 		});
-		body.row(patternField, resetButton(Field.PATTERN, () -> patternField.setValue(draft.text(Field.PATTERN))));
+		body.row(patternField, resetButton(Field.TARGET, () -> patternField.setValue(draft.text(Field.TARGET))));
 		body.label(this::previewText);
 
 		enabledToggle = Tooltips.describe(new SculptToggle(ENABLED_WIDTH, Component.translatable("soundsculptor.rule_editor.enabled"),
@@ -214,22 +256,21 @@ public final class EntryEditorScreen extends SculptScreen {
 		body.row(enabledToggle, muteDropdown, resetButton(Field.MUTE, () -> muteDropdown.setValue(MuteChoice.of(draft.mute()))));
 
 		String volumeText = draft.text(Field.VOLUME);
-		double initialVolume = draft.error(Field.VOLUME) == null && !volumeText.isBlank() ? Double.parseDouble(volumeText.trim()) : inheritedVolume;
+		double initialVolume = draft.error(Field.VOLUME) == null && !volumeText.isBlank() ? Double.parseDouble(volumeText.trim()) : UNCHANGED_VOLUME;
 		volumeSlider = Tooltips.describe(new SculptSlider(SLIDER_WIDTH, Component.translatable("soundsculptor.rule_editor.volume"),
 				new SliderModel(SetEntry.MIN_VOLUME, 100, 5, 1, 100, initialVolume),
 				value -> draft.text(Field.VOLUME).isBlank()
-						? Component.translatable("soundsculptor.rule_editor.volume.not_set", inheritedText())
+						? Component.translatable("soundsculptor.rule_editor.volume.not_set")
 						: Component.literal((int) value + "%"),
 				null,
 				value -> {
-					// Only the player's slider moves set a volume; showing the unchanged value must not.
-					if (volumeField != null && !volumeField.isFocused() && !showingInherited) {
+					// Only the player's slider moves set a level; resting the slider for "Unchanged" must not.
+					if (volumeField != null && !volumeField.isFocused() && !showingUnchanged) {
 						volumeField.setValue(Integer.toString((int) value));
 					}
 				}), Component.translatable("soundsculptor.rule_editor.volume.tip"));
 		volumeField = Tooltips.describe(new SculptTextField(font, VOLUME_FIELD_WIDTH, Component.translatable("soundsculptor.rule_editor.volume_typed")),
 				Component.translatable("soundsculptor.rule_editor.volume_typed.tip"));
-		volumeField.placeholder(Component.literal(Integer.toString(inheritedVolume)));
 		volumeField.setMaxLength(3);
 		volumeField.setValue(volumeText);
 		volumeField.validator(text -> {
@@ -239,7 +280,7 @@ public final class EntryEditorScreen extends SculptScreen {
 		volumeField.onChange(text -> {
 			if (draft.error(Field.VOLUME) == null) {
 				if (text.isBlank()) {
-					showInheritedOnSlider();
+					showUnchangedOnSlider();
 				} else {
 					volumeSlider.setTypedValue(Double.parseDouble(text.trim()));
 				}
@@ -256,7 +297,7 @@ public final class EntryEditorScreen extends SculptScreen {
 		fillMatches();
 
 		// After Save was refused (for example from the unsaved-changes dialog), keep every error visible.
-		if (draft.shownError(Field.PATTERN) != null) {
+		if (draft.shownError(Field.TARGET) != null) {
 			patternField.revealError();
 		}
 		if (draft.shownError(Field.VOLUME) != null) {
@@ -291,7 +332,7 @@ public final class EntryEditorScreen extends SculptScreen {
 
 	private Component previewText() {
 		if (searching()) {
-			String words = draft.text(Field.PATTERN).strip();
+			String words = draft.text(Field.TARGET).strip();
 			return Component.translatable(searchResults.isEmpty() ? "soundsculptor.rule_editor.search.none"
 					: searchResults.size() == 1 ? "soundsculptor.rule_editor.search.one" : "soundsculptor.rule_editor.search.many",
 					searchResults.size(), words);
@@ -303,18 +344,7 @@ public final class EntryEditorScreen extends SculptScreen {
 	}
 
 	private Component muteChoiceName(MuteChoice choice) {
-		if (choice == MuteChoice.NOT_SET) {
-			return Component.translatable("soundsculptor.rule_editor.mute.not_set",
-					Component.translatable(inheritedMuted ? "soundsculptor.rule_editor.inherited.muted" : "soundsculptor.rule_editor.inherited.not_muted"));
-		}
 		return Component.translatable("soundsculptor.rule_editor.mute." + choice.name().toLowerCase(Locale.ROOT));
-	}
-
-	/** "100%" or "muted": what the sound gets now where this rule leaves loudness unset. */
-	private Component inheritedText() {
-		return inheritedMuted
-				? Component.translatable("soundsculptor.rule_editor.inherited.muted")
-				: Component.literal(inheritedVolume + "%");
 	}
 
 	private static Component message(FieldError error) {
@@ -330,36 +360,33 @@ public final class EntryEditorScreen extends SculptScreen {
 		if (saveButton != null) {
 			saveButton.active = draft.canSave() && !searching();
 		}
-		// The "unchanged" values follow the pattern (an exact ID can inherit from other rules).
-		if (muteDropdown != null) {
-			muteDropdown.setValue(muteDropdown.value());
-		}
-		if (volumeField != null) {
-			volumeField.placeholder(Component.literal(Integer.toString(inheritedVolume)));
-			if (draft.text(Field.VOLUME).isBlank()) {
-				showInheritedOnSlider();
-			}
+		if (volumeField != null && draft.text(Field.VOLUME).isBlank()) {
+			showUnchangedOnSlider();
 		}
 	}
 
 	private void updatePreview() {
-		preview = PatternPreview.of(draft.text(Field.PATTERN), KnownSounds.ids(), KnownSounds.seenExcluded());
+		preview = PatternPreview.of(draft.text(Field.TARGET), KnownSounds.ids(), KnownSounds.seenExcluded());
 		overridden = Component.empty();
 		if (searching()) {
-			inheritedVolume = 100;
-			inheritedMuted = false;
 			if (matchList != null && searchEntries != null) {
-				searchResults = SoundSearch.search(searchEntries, SearchQuery.parse(draft.text(Field.PATTERN)), KnownSounds.seenExcluded());
+				searchResults = SoundSearch.search(searchEntries, SearchQuery.parse(draft.text(Field.TARGET)), KnownSounds.seenExcluded());
 			}
 			return;
 		}
-		updateInherited();
 		if (!draft.canSave()) {
 			return;
 		}
+		// FR-4.6: overrides within this set only; the trace shows the ones between sets and places.
 		SetEntry candidate = draft.build();
-		Profile withCandidate = target.put(ProfileManager.profile(), candidate);
-		Set<SetEntry> winners = EntryResolver.of(target.rules(withCandidate)).overriddenBy(candidate, preview.matches());
+		List<SetEntry> entries = new ArrayList<>(set.entries());
+		int at = indexOf(entries, candidate.id());
+		if (at >= 0) {
+			entries.set(at, candidate);
+		} else {
+			entries.add(candidate);
+		}
+		Set<SetEntry> winners = EntryResolver.of(entries).overriddenBy(candidate, preview.matches());
 		if (!winners.isEmpty()) {
 			List<String> patterns = new ArrayList<>();
 			for (SetEntry winner : winners) {
@@ -369,33 +396,22 @@ public final class EntryEditorScreen extends SculptScreen {
 		}
 	}
 
-	private void showInheritedOnSlider() {
-		showingInherited = true;
-		try {
-			volumeSlider.setTypedValue(inheritedVolume);
-		} finally {
-			showingInherited = false;
-		}
-	}
-
-	/** For an exact sound ID: what the list's other rules give it; for a wildcard, 100% and not muted. */
-	private void updateInherited() {
-		inheritedVolume = 100;
-		inheritedMuted = false;
-		String pattern = preview.normalizedPattern();
-		if (pattern == null || pattern.contains("*")) {
-			return;
-		}
-		String id = draft.id();
-		List<SetEntry> others = new ArrayList<>();
-		for (SetEntry rule : target.rules(ProfileManager.profile())) {
-			if (!rule.id().equals(id)) {
-				others.add(rule);
+	private static int indexOf(List<SetEntry> entries, String id) {
+		for (int i = 0; i < entries.size(); i++) {
+			if (entries.get(i).id().equals(id)) {
+				return i;
 			}
 		}
-		soundsculptor.core.sets.EntryResolution resolution = EntryResolver.of(others).resolve(pattern);
-		inheritedMuted = resolution.muted();
-		inheritedVolume = resolution.volumePercent();
+		return -1;
+	}
+
+	private void showUnchangedOnSlider() {
+		showingUnchanged = true;
+		try {
+			volumeSlider.setTypedValue(UNCHANGED_VOLUME);
+		} finally {
+			showingUnchanged = false;
+		}
 	}
 
 	private void fillMatches() {
@@ -424,13 +440,13 @@ public final class EntryEditorScreen extends SculptScreen {
 	}
 
 	public boolean searching() {
-		return isSearch(draft.text(Field.PATTERN));
+		return isSearch(draft.text(Field.TARGET));
 	}
 
 	/** What the list shows: the search words, or the pattern being previewed. */
 	private String listKey() {
 		if (searching()) {
-			return "search:" + draft.text(Field.PATTERN).strip();
+			return "search:" + draft.text(Field.TARGET).strip();
 		}
 		return preview == null ? null : preview.normalizedPattern();
 	}
@@ -445,7 +461,7 @@ public final class EntryEditorScreen extends SculptScreen {
 		if (searchEntries == null) {
 			searchEntries = KnownSounds.entries();
 		}
-		searchResults = SoundSearch.search(searchEntries, SearchQuery.parse(draft.text(Field.PATTERN)), KnownSounds.seenExcluded());
+		searchResults = SoundSearch.search(searchEntries, SearchQuery.parse(draft.text(Field.TARGET)), KnownSounds.seenExcluded());
 		List<SculptList.Row> rows = new ArrayList<>(searchResults.size());
 		for (SoundEntry entry : searchResults) {
 			String id = entry.id();
@@ -534,14 +550,18 @@ public final class EntryEditorScreen extends SculptScreen {
 			volumeField.revealError();
 			return false;
 		}
-		SetEntry rule = draft.build();
-		Message full = target.canPut(ProfileManager.profile(), rule);
+		SetEntry entry = draft.build();
+		Message full = set.canPut(entry);
 		if (full != null) {
-			// Quick changes is full: say so and keep the editor open, so nothing typed is lost.
+			// The set is full: say so and keep the editor open, so nothing typed is lost.
 			showToast(ProfileManager.component(full), null);
 			return false;
 		}
-		ProfileManager.update(profile -> target.put(profile, rule));
+		set.putEntry(entry);
+		if (quickPlace != null) { // M8c shim: removed in Task 13
+			SoundSet quick = set.build();
+			ProfileManager.update(profile -> SetEditorScreen.withQuickChanges(profile, quickPlace, quick));
+		}
 		return true;
 	}
 }

@@ -62,11 +62,11 @@ public final class RuleCopyScreen extends SculptScreen {
 			RuleTarget.Sourced sourced = others.get(i);
 			SetEntry rule = sourced.rule();
 			String pattern = rule.pattern().text();
-			String status = RuleListPanel.status(rule);
+			String status = SetEditorScreen.status(rule);
 			String from = sourced.source().isGlobal()
 					? Component.translatable("soundsculptor.rule_copy.from_global").getString()
 					: Component.translatable("soundsculptor.rule_copy.from_zone", zoneName(profile, sourced.source())).getString();
-			String details = RuleListPanel.details(rule, known);
+			String details = SetEditorScreen.details(rule, known);
 			String second = details.isEmpty() ? from : from + " · " + details;
 			boolean duplicate = target.hasPattern(profile, rule.pattern());
 			SculptButton copy = SculptButton.text(Component.translatable("soundsculptor.rule_copy.copy"), COPY_WIDTH, () -> copy(rule));
