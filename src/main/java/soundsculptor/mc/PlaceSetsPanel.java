@@ -10,6 +10,7 @@ import soundsculptor.core.Message;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.Attachment;
 import soundsculptor.core.sets.LibraryOps;
+import soundsculptor.core.sets.NewSet;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.QuickChanges;
@@ -168,7 +169,8 @@ public final class PlaceSetsPanel {
 		return enabled ? "" : Component.translatable("soundsculptor.place_sets.status.off").getString();
 	}
 
-	private static String entriesText(int size) {
+	/** "1 entry", "N entries". */
+	static String entriesText(int size) {
 		return Component.translatable(size == 1 ? "soundsculptor.sets.entries.one" : "soundsculptor.sets.entries", size).getString();
 	}
 
@@ -244,33 +246,7 @@ public final class PlaceSetsPanel {
 	 */
 	public boolean createAndAttach(String name) {
 		Workspace ws = ProfileManager.workspace();
-		Message problem = createProblem(ws, where, name);
-		if (problem != null) {
-			showProblem(problem);
-			return false;
-		}
-		String madeName = addedSet(ws, createAndAttach(ws, where, name)).name();
-		return apply(current -> createAndAttach(current, where, name), "soundsculptor.place_sets.toast.created", madeName);
-	}
-
-	/** The library set, made and attached in one workspace; unchanged if either step cannot go ahead. */
-	private static Workspace createAndAttach(Workspace ws, PlaceRef where, String name) {
-		if (createProblem(ws, where, name) != null) {
-			return ws;
-		}
-		Workspace made = LibraryOps.create(ws, name);
-		PlaceSets place = made.profile().place(where);
-		return new Workspace(made.profile().withPlace(where, place.attach(addedSet(ws, made).id())), made.library());
-	}
-
-	/** The set {@code after}'s library has and {@code before}'s lacks: the one a create or save just added. */
-	private static SoundSet addedSet(Workspace before, Workspace after) {
-		for (SoundSet set : after.library().sets()) {
-			if (!before.library().contains(set.id())) {
-				return set;
-			}
-		}
-		throw new IllegalStateException("no set was added");
+		return applyNewSet(ws, LibraryOps.createAttached(ws, where, name), "soundsculptor.place_sets.toast.created");
 	}
 
 	/** Save to library: asks for a name (default "Quick changes"), unless there is a problem to show first. */
@@ -295,8 +271,18 @@ public final class PlaceSetsPanel {
 			showProblem(problem);
 			return false;
 		}
-		String savedName = addedSet(ws, QuickChanges.saveToLibrary(ws, where, name.strip())).name();
-		return apply(current -> QuickChanges.saveToLibrary(current, where, name.strip()), "soundsculptor.place_sets.toast.saved", savedName);
+		return applyNewSet(ws, QuickChanges.saveToLibrary(ws, where, name.strip()), "soundsculptor.place_sets.toast.saved");
+	}
+
+	/** Applies an operation that added a library set, worked out once from {@code before}; or shows its problem. */
+	private boolean applyNewSet(Workspace before, NewSet result, String toastKey) {
+		if (!result.ok()) {
+			showProblem(result.problem());
+			return false;
+		}
+		boolean changed = QuickUndo.applyResult(host, this::refreshAfterUndo, before, result.workspace(), toastKey, result.name());
+		refresh();
+		return changed;
 	}
 
 	/**
@@ -309,20 +295,7 @@ public final class PlaceSetsPanel {
 		if (place == null) {
 			return null;
 		}
-		if (setId == null) {
-			return place.librarySetCount() >= PlaceSets.MAX_SETS ? Message.of("soundsculptor.sets.error.place_full", PlaceSets.MAX_SETS) : null;
-		}
-		return place.canAttach(setId);
-	}
-
-	/** The problem with New set here: a bad name, a full library, or a full place. */
-	static Message createProblem(Workspace ws, PlaceRef where, String name) {
-		Message problem = LibraryOps.canCreate(ws, name);
-		if (problem != null) {
-			return problem;
-		}
-		PlaceSets place = ws.profile().place(where);
-		return place == null ? Message.of("soundsculptor.place_sets.zone_gone") : place.canAttach(ws.library().newId());
+		return setId == null ? place.canAttachAnother() : place.canAttach(setId);
 	}
 
 	private static Message saveProblem(Workspace ws, PlaceRef where, String name) {

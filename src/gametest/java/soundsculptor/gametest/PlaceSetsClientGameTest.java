@@ -30,6 +30,7 @@ import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.SetNameScreen;
 import soundsculptor.mc.SoundHook;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.ZoneListPanel;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
@@ -93,6 +94,20 @@ public final class PlaceSetsClientGameTest implements FabricClientGameTest {
 			check(toast(context).equals("Turned off 'Quick changes' here"), "the Off toast, was " + toast(context));
 			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, COW)),
 					"with Quick changes off, its mute does not apply");
+			// Detach on the Quick changes line removes its entries; Undo puts them back, still pinned and still off.
+			List<SetEntry> quickEntries = context.computeOnClient(mc -> ProfileManager.profile().everywhere().quickEntries());
+			context.runOnClient(mc -> button(row(mc, SoundSet.QUICK_ID), "Detach").onPress(null));
+			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().quickChanges()) == null, "Detach removes Quick changes");
+			check(context.computeOnClient(mc -> places(mc).panel.list.findRow(SoundSet.QUICK_ID)) == null, "and its line");
+			check(toast(context).equals("Detached 'Quick changes'"), "the Detach toast, was " + toast(context));
+			context.runOnClient(mc -> places(mc).pressUndo());
+			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().quickEntries()).equals(quickEntries)
+					&& context.computeOnClient(mc -> ids(ProfileManager.profile().everywhere()))
+							.equals(List.of(SoundSet.QUICK_ID, LOUD.id(), QUIET.id()))
+					&& !context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().get(0).enabled()),
+					"Undo restores Quick changes' entries, pinned first and still off");
+			check(context.computeOnClient(mc -> places(mc).panel.list.findRow(SoundSet.QUICK_ID)) != null, "the line is listed again");
+
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 			context.runOnClient(mc -> ((SoundSculptorScreen) mc.gui.screen()).toggleMute(COW));
@@ -151,6 +166,19 @@ public final class PlaceSetsClientGameTest implements FabricClientGameTest {
 			check(saved != null && saved.name().equals("Quick changes") && saved.entries().size() == 1, "the library has the set, was " + saved);
 			check(toast(context).equals("Saved Quick changes as 'Quick changes'"), "the Save toast, was " + toast(context));
 			check(context.computeOnClient(mc -> places(mc).panel.list.findRow(savedId[0])) != null, "the saved set is listed");
+
+			// Undo after Save to library: Quick changes is back in its slot and the saved set leaves the library.
+			context.runOnClient(mc -> places(mc).pressUndo());
+			check(context.computeOnClient(mc -> ProfileManager.library().get(savedId[0])) == null, "Undo removes the saved set");
+			check(context.computeOnClient(mc -> ids(ProfileManager.profile().everywhere())).equals(List.of(SoundSet.QUICK_ID, LOUD.id()))
+					&& context.computeOnClient(mc -> ProfileManager.profile().everywhere().quickEntries().size()) == 1,
+					"Undo brings Quick changes back, pinned first, with its entry");
+			check(context.computeOnClient(mc -> places(mc).panel.list.findRow(SoundSet.QUICK_ID)) != null, "the Quick changes line is back");
+			// Save again, to go on.
+			context.runOnClient(mc -> places(mc).panel.saveToLibrary("Quick changes"));
+			savedId[0] = context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().get(0).setId());
+			check(!savedId[0].equals(SoundSet.QUICK_ID) && context.computeOnClient(mc -> ProfileManager.library().contains(savedId[0])),
+					"saved again");
 
 			// The next quick action makes a new Quick changes, pinned above the saved set.
 			context.runOnClient(mc -> ProfileManager.change(ws -> QuickActions.apply(ws, PlaceRef.EVERYWHERE, PIG,
@@ -220,6 +248,16 @@ public final class PlaceSetsClientGameTest implements FabricClientGameTest {
 	private static void everywhereRowFirstAndNotEditable(ClientGameTestContext context, String key) {
 		Workspace before = context.computeOnClient(mc -> ProfileManager.workspace());
 		try {
+			// With no zones, a hint row under Everywhere says how to make one (it has no buttons, so it takes focus itself).
+			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library())));
+			context.setScreen(SoundSculptorScreen::new);
+			context.waitForScreen(SoundSculptorScreen.class);
+			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_ZONES));
+			List<SculptList.Row> empty = context.computeOnClient(mc -> List.copyOf(main(mc).zonesPanel().list.children()));
+			check(empty.size() == 2 && empty.get(1).key() == ZoneListPanel.NO_ZONES_ROW
+					&& empty.get(1).narrationText().getString().startsWith("No zones yet"), "the no-zones hint follows Everywhere");
+			context.setScreen(() -> null);
+
 			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
 					.withEverywhere(PlaceSets.EMPTY.attach(LOUD.id()))
 					.withZones(List.of(new Zone("pen", "Pen", true, key, "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(8),
@@ -233,6 +271,8 @@ public final class PlaceSetsClientGameTest implements FabricClientGameTest {
 			check(labels(first).equals(List.of("Sound Sets")), "Everywhere's only control is Sound Sets, was " + labels(first));
 			check(first.columnTexts().get(0).equals("Everywhere") && first.columnTexts().contains("1 Sound Set"),
 					"Everywhere's row, was " + first.columnTexts());
+			check(context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow(ZoneListPanel.NO_ZONES_ROW)) == null,
+					"with a zone, the hint is gone");
 			SculptList.Row pen = context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow("pen"));
 			check(pen.columnTexts().contains("2 Sound Sets"), "a zone row counts its sets, was " + pen.columnTexts());
 			check(labels(pen).contains("Sound Sets") && !button(pen, "Move up").active, "the first zone still cannot move above Everywhere");

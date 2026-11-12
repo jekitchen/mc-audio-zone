@@ -18,25 +18,26 @@ public final class QuickChanges {
 	 */
 	public static Message canSave(Workspace ws, PlaceRef where) {
 		PlaceSets place = ws.profile().place(where);
-		if (place == null) {
+		if (place == null || place.quickChanges() == null) {
 			return Message.of("soundsculptor.sets.error.no_quick_changes");
 		}
-		Message problem = place.canSaveQuickAs(ws.library().newId());
+		Message problem = place.canAttachAnother();
 		return problem != null ? problem : ws.library().canCreate();
 	}
 
 	/**
 	 * Saves the place's Quick changes as a new library set with its entries, named {@code name} or, if another set has
-	 * that name, the first free "name (2)", "name (3)" and so on. Returns {@code ws} unchanged if {@link #canSave}
-	 * reports a problem.
+	 * that name, the first free "name (2)", "name (3)" and so on; the result carries the new set's ID. Refused with
+	 * {@link #canSave}'s problem.
 	 */
-	public static Workspace saveToLibrary(Workspace ws, PlaceRef where, String name) {
-		if (canSave(ws, where) != null) {
-			return ws;
+	public static NewSet saveToLibrary(Workspace ws, PlaceRef where, String name) {
+		Message problem = canSave(ws, where);
+		if (problem != null) {
+			return NewSet.refused(ws, problem);
 		}
 		PlaceSets place = ws.profile().place(where);
 		String id = ws.library().newId();
 		SoundSet saved = new SoundSet(id, ws.library().uniqueName(name, null), place.quickEntries());
-		return new Workspace(ws.profile().withPlace(where, place.quickSavedAs(id)), ws.library().put(saved));
+		return NewSet.added(new Workspace(ws.profile().withPlace(where, place.quickSavedAs(id)), ws.library().put(saved)), id);
 	}
 }

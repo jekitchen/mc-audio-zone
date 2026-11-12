@@ -16,6 +16,7 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileSettings;
 import soundsculptor.core.sets.Attachment;
 import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.NewSet;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.QuickChanges;
@@ -74,6 +75,13 @@ class QuickChangesTest {
 
 	private static List<String> ids(PlaceSets place) {
 		return place.attached().stream().map(Attachment::setId).toList();
+	}
+
+	private static void assertRefused(Workspace start, NewSet result, String key) {
+		assertFalse(result.ok());
+		assertSame(start, result.workspace(), "a refusal changes nothing");
+		assertNull(result.setId());
+		assertEquals(key, result.problem().key());
 	}
 
 	private static SetEntry quickEntry(Workspace ws, PlaceRef where, String soundId) {
@@ -198,10 +206,14 @@ class QuickChangesTest {
 		List<SetEntry> quick = start.profile().everywhere().quickEntries();
 		assertNull(QuickChanges.canSave(start, EVERYWHERE));
 
-		Workspace saved = QuickChanges.saveToLibrary(start, EVERYWHERE, "Cow fixes");
+		NewSet result = QuickChanges.saveToLibrary(start, EVERYWHERE, "Cow fixes");
+		assertTrue(result.ok());
+		Workspace saved = result.workspace();
 		PlaceSets everywhere = saved.profile().everywhere();
 		assertNull(everywhere.quickChanges());
 		String newId = everywhere.attached().get(0).setId();
+		assertEquals(newId, result.setId(), "the result names the new set");
+		assertEquals("Cow fixes", result.name());
 		assertEquals(List.of(newId, QUIET_PIGS.id()), ids(everywhere));
 		SoundSet set = saved.library().get(newId);
 		assertNotNull(set, "the saved set is in the library");
@@ -219,7 +231,7 @@ class QuickChangesTest {
 	void saveToLibraryUniqueName() {
 		SoundSet existing = new SoundSet("set-old", "Quick changes", List.of(SetEntry.of("e1", PIG).withVolume(10)));
 		Workspace start = toggle(ws(PlaceSets.EMPTY, existing), EVERYWHERE, COW);
-		Workspace saved = QuickChanges.saveToLibrary(start, EVERYWHERE, "Quick changes");
+		Workspace saved = QuickChanges.saveToLibrary(start, EVERYWHERE, "Quick changes").workspace();
 		SoundSet set = saved.library().get(saved.profile().everywhere().attached().get(0).setId());
 		assertEquals("Quick changes (2)", set.name());
 		assertEquals(existing, saved.library().get("set-old"));
@@ -228,7 +240,7 @@ class QuickChangesTest {
 	@Test
 	void saveToLibraryInAZoneLeavesEverywhereAlone() {
 		Workspace start = toggle(toggle(ws(PlaceSets.EMPTY, PlaceSets.EMPTY), EVERYWHERE, PIG), PEN, COW);
-		Workspace saved = QuickChanges.saveToLibrary(start, PEN, "Pen");
+		Workspace saved = QuickChanges.saveToLibrary(start, PEN, "Pen").workspace();
 		assertEquals(start.profile().everywhere(), saved.profile().everywhere());
 		assertNull(saved.profile().zone("pen").sets().quickChanges());
 		assertEquals(1, saved.library().size());
@@ -238,10 +250,10 @@ class QuickChangesTest {
 	void nothingToSaveIsAProblemAndChangesNothing() {
 		Workspace start = ws(PlaceSets.EMPTY.attach(QUIET_PIGS.id()), QUIET_PIGS);
 		assertEquals("soundsculptor.sets.error.no_quick_changes", QuickChanges.canSave(start, EVERYWHERE).key());
-		assertSame(start, QuickChanges.saveToLibrary(start, EVERYWHERE, "Nothing"));
+		assertRefused(start, QuickChanges.saveToLibrary(start, EVERYWHERE, "Nothing"), "soundsculptor.sets.error.no_quick_changes");
 		assertEquals("soundsculptor.sets.error.no_quick_changes", QuickChanges.canSave(start, PlaceRef.zone("gone")).key(),
 				"a zone deleted since the dialog opened has nothing to save");
-		assertSame(start, QuickChanges.saveToLibrary(start, PlaceRef.zone("gone"), "Nothing"));
+		assertRefused(start, QuickChanges.saveToLibrary(start, PlaceRef.zone("gone"), "Nothing"), "soundsculptor.sets.error.no_quick_changes");
 	}
 
 	@Test
@@ -254,7 +266,7 @@ class QuickChangesTest {
 		Message problem = QuickChanges.canSave(start, EVERYWHERE);
 		assertEquals("soundsculptor.sets.error.library_full", problem.key());
 		assertEquals(List.of(SetLibrary.MAX_SETS), problem.args());
-		assertSame(start, QuickChanges.saveToLibrary(start, EVERYWHERE, "One too many"));
+		assertRefused(start, QuickChanges.saveToLibrary(start, EVERYWHERE, "One too many"), "soundsculptor.sets.error.library_full");
 	}
 
 	@Test
@@ -269,7 +281,7 @@ class QuickChangesTest {
 		assertEquals(PlaceSets.MAX_SETS + 1, start.profile().everywhere().attached().size(), "Quick changes is not counted");
 		Message problem = QuickChanges.canSave(start, EVERYWHERE);
 		assertEquals("soundsculptor.sets.error.place_full", problem.key());
-		assertSame(start, QuickChanges.saveToLibrary(start, EVERYWHERE, "One too many"));
+		assertRefused(start, QuickChanges.saveToLibrary(start, EVERYWHERE, "One too many"), "soundsculptor.sets.error.place_full");
 	}
 
 	// ---- Editing the single-sound entry (FR-1.5) ----
@@ -443,11 +455,15 @@ class QuickChangesTest {
 	void putQuickEntryChangesNothingForAGoneZoneOrAFullSet() {
 		Workspace start = ws(PlaceSets.EMPTY);
 		assertSame(start, QuickActions.putQuickEntry(start, PlaceRef.zone("gone"), SetEntry.of("e1", COW).withMute(true)));
+		assertEquals(TraceEditError.ZONE_NOT_FOUND.message(), QuickActions.canPutQuickEntry(start, PlaceRef.zone("gone"), SetEntry.of("e1", COW)));
+		assertNull(QuickActions.canPutQuickEntry(start, EVERYWHERE, SetEntry.of("e1", COW)));
 		List<SetEntry> entries = new ArrayList<>();
 		for (int i = 0; i < SoundSet.MAX_ENTRIES; i++) {
 			entries.add(SetEntry.of("g" + i, "minecraft:sound." + i).withVolume(50));
 		}
 		Workspace full = ws(PlaceSets.EMPTY.withQuickEntries(entries));
 		assertSame(full, QuickActions.putQuickEntry(full, EVERYWHERE, SetEntry.of("new", COW).withMute(true)));
+		assertEquals("soundsculptor.sets.error.entries_full", QuickActions.canPutQuickEntry(full, EVERYWHERE, SetEntry.of("new", COW)).key());
+		assertNull(QuickActions.canPutQuickEntry(full, EVERYWHERE, SetEntry.of("g7", COW)), "an existing entry can still change");
 	}
 }

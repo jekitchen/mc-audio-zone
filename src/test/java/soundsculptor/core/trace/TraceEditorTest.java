@@ -463,4 +463,21 @@ class TraceEditorTest {
 		TraceEditResult off = ok(TraceEditor.edit(context(PLAY), start, inQuick(PlaceRef.EVERYWHERE, "e1"), new EntryEdit.Enabled(false)));
 		assertFalse(quickOn(off.after().profile().everywhere()), "turning an entry off leaves Quick changes as it was");
 	}
+
+	@Test
+	void settingAValueOnAQuickLineWhoseEntryIsOffTurnsTheEntryOnToo() {
+		SetEntry off = SetEntry.of("e1", AMBIENT).withVolume(40).withEnabled(false);
+		Workspace start = ws(List.of(), quickOff(off));
+		TraceEditResult louder = ok(TraceEditor.edit(context(PLAY), start, inQuick(PlaceRef.EVERYWHERE, "e1"), new EntryEdit.Volume(70)));
+		assertEquals(List.of(off.withEnabled(true).withVolume(70)), louder.after().profile().everywhere().quickEntries(),
+				"Volume on an Off entry turns it on, as the Sounds tab's quick actions do");
+		assertTrue(quickOn(louder.after().profile().everywhere()));
+		assertEquals(70, louder.predicted().volumePercent(), 1e-6, "and the edit takes effect at once");
+
+		TraceEditResult muted = ok(TraceEditor.edit(context(PLAY), start, inQuick(PlaceRef.EVERYWHERE, "e1"), new EntryEdit.Mute(true)));
+		assertTrue(muted.after().profile().everywhere().quickEntries().get(0).enabled(), "Mute turns the entry on too");
+
+		TraceEditResult cleared = ok(TraceEditor.edit(context(PLAY), start, inQuick(PlaceRef.EVERYWHERE, "e1"), new EntryEdit.Mute(null)));
+		assertFalse(cleared.after().profile().everywhere().quickEntries().get(0).enabled(), "clearing a value leaves the entry off");
+	}
 }

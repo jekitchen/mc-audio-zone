@@ -6,6 +6,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import soundsculptor.core.Message;
+import soundsculptor.core.sets.LibraryOps;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetUsage;
@@ -86,8 +87,7 @@ public final class AttachSetScreen extends SculptScreen {
 			}
 			String id = set.id();
 			String name = set.name();
-			int size = set.entries().size();
-			String entries = Component.translatable(size == 1 ? "soundsculptor.sets.entries.one" : "soundsculptor.sets.entries", size).getString();
+			String entries = PlaceSetsPanel.entriesText(set.entries().size());
 			String used = SetLibraryPanel.usageText(ws.profile().placesUsing(id).size(), usage == null ? 0 : usage.otherCount(id, key), usage != null);
 			Component rowName = Component.literal(name);
 			SculptButton attach = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.attach_set.attach"), ATTACH_WIDTH,
@@ -123,6 +123,6 @@ public final class AttachSetScreen extends SculptScreen {
 			return;
 		}
 		minecraft.gui.setScreen(SetNameScreen.ask(this, parent, Component.translatable("soundsculptor.sets.new.title"), "",
-				name -> PlaceSetsPanel.createProblem(ProfileManager.workspace(), where, name), actions::createAndAttach));
+				name -> LibraryOps.canCreateAttached(ProfileManager.workspace(), where, name), actions::createAndAttach));
 	}
 }

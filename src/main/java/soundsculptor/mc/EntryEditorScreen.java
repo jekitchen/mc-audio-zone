@@ -528,8 +528,12 @@ public final class EntryEditorScreen extends SculptScreen {
 		}
 		SetEntry entry = draft.build();
 		Message full = set.canPut(entry);
+		if (full == null && quickPlace != null) {
+			Workspace ws = ProfileManager.workspace();
+			full = QuickActions.canPutQuickEntry(ws, quickPlace, withFreeId(ws, entry));
+		}
 		if (full != null) {
-			// The set is full: say so and keep the editor open, so nothing typed is lost.
+			// The set is full, or the zone is gone: say so and keep the editor open, so nothing typed is lost.
 			showToast(ProfileManager.component(full), null);
 			return false;
 		}

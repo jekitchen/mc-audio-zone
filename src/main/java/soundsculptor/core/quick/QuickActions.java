@@ -101,20 +101,30 @@ public final class QuickActions {
 	}
 
 	/**
-	 * Saves an entry from the entry editor (Edit… on a sound row, FR-1.5) into the place's Quick changes: it replaces
-	 * the entry with the same ID or is added at the end, creating the set if needed. An entry that is on and sets
-	 * something switches Quick changes back on, like a quick action. Returns {@code ws} unchanged for a zone that no
-	 * longer exists, or for a new entry when Quick changes already holds {@value SoundSet#MAX_ENTRIES}.
+	 * {@code null} if {@link #putQuickEntry} can save the entry, else the problem to show: the zone no longer exists, or
+	 * the entry is new and the place's Quick changes already holds {@value SoundSet#MAX_ENTRIES} entries.
 	 */
-	public static Workspace putQuickEntry(Workspace ws, PlaceRef where, SetEntry entry) {
+	public static Message canPutQuickEntry(Workspace ws, PlaceRef where, SetEntry entry) {
 		PlaceSets place = ws.profile().place(where);
 		if (place == null) {
-			return ws;
+			return TraceEditError.ZONE_NOT_FOUND.message();
 		}
 		SoundSet quick = quickOf(place);
-		if (quick.entry(entry.id()) == null && quick.canAdd(1) != null) {
+		return quick.entry(entry.id()) == null ? quick.canAdd(1) : null;
+	}
+
+	/**
+	 * Saves an entry from the entry editor (Edit… on a sound row, FR-1.5) into the place's Quick changes: it replaces
+	 * the entry with the same ID or is added at the end, creating the set if needed. An entry that is on and sets
+	 * something switches Quick changes back on, like a quick action. Returns {@code ws} unchanged when
+	 * {@link #canPutQuickEntry} reports a problem.
+	 */
+	public static Workspace putQuickEntry(Workspace ws, PlaceRef where, SetEntry entry) {
+		if (canPutQuickEntry(ws, where, entry) != null) {
 			return ws;
 		}
+		PlaceSets place = ws.profile().place(where);
+		SoundSet quick = quickOf(place);
 		PlaceSets after = place.withQuickChanges(quick.putEntry(entry));
 		if (entry.enabled() && setsAnything(entry)) {
 			after = after.setEnabled(SoundSet.QUICK_ID, true);

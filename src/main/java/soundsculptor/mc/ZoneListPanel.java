@@ -34,6 +34,8 @@ public final class ZoneListPanel {
 	private static final int RULE_COUNT_WIDTH = 45;
 	private static final int ON_OFF_WIDTH = 30;
 	private static final int SETS_PADDING = 12;
+	/** The key of the "No zones yet" row; not a zone ID, so it can never clash with one. */
+	public static final Object NO_ZONES_ROW = new Object();
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/edit");
 	private static final Identifier UP_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/up");
 	private static final Identifier DOWN_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/down");
@@ -54,7 +56,6 @@ public final class ZoneListPanel {
 		body.row(newZoneButton);
 		body.label(() -> Component.translatable("soundsculptor.zones.hint"));
 		list = new SculptList(body.width(), 100, Component.translatable("soundsculptor.zones.list"));
-		list.setEmptyText(() -> Component.translatable("soundsculptor.zones.empty"));
 		body.fill(list);
 		refresh();
 	}
@@ -72,6 +73,9 @@ public final class ZoneListPanel {
 		List<Zone> zones = profile.zones();
 		List<SculptList.Row> rows = new ArrayList<>(zones.size() + 1);
 		rows.add(everywhereRow(profile));
+		if (zones.isEmpty()) {
+			rows.add(noZonesRow());
+		}
 		for (int i = 0; i < zones.size(); i++) {
 			Zone zone = zones.get(i);
 			String name = zone.name() == null || zone.name().isBlank() ? zone.id() : zone.name();
@@ -120,6 +124,15 @@ public final class ZoneListPanel {
 				new SculptList.Row.Column(() -> nameText, 0, 0),
 				new SculptList.Row.Column(() -> scope, 0, 1),
 				new SculptList.Row.Column(() -> sets, RULE_COUNT_WIDTH, 1)), List.of(setsButton(PlaceRef.EVERYWHERE, name)));
+	}
+
+	/**
+	 * Under Everywhere while the profile has no zones: "No zones yet. Use New zone…". The list is never empty (Everywhere
+	 * is always there), so this hint is a row of its own; a row without buttons can still take focus, so it is read out.
+	 */
+	private static SculptList.Row noZonesRow() {
+		String text = Component.translatable("soundsculptor.zones.empty").getString();
+		return new SculptList.Row(NO_ZONES_ROW, List.of(new SculptList.Row.Column(() -> text, 0, 0)), List.of());
 	}
 
 	/** "Sound Sets": the place's attached sets (FR-8.6). */

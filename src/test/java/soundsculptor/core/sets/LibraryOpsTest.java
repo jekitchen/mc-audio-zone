@@ -36,16 +36,19 @@ class LibraryOpsTest {
 	void duplicateIsIndependentAndUnattached() {
 		PlaceSets farm = PlaceSets.EMPTY.attach("set-farm");
 		Workspace start = ws(farm, SetLibrary.EMPTY.put(FARM));
-		Workspace after = LibraryOps.duplicate(start, "set-farm");
+		NewSet result = LibraryOps.duplicate(start, "set-farm");
+		Workspace after = result.workspace();
 		assertEquals(2, after.library().size());
 		SoundSet copy = after.library().sets().stream().filter(s -> !s.id().equals("set-farm")).findFirst().orElseThrow();
 		assertEquals("Farm animals (copy)", copy.name());
+		assertEquals(copy.id(), result.setId(), "the result names the copy");
+		assertEquals("Farm animals (copy)", result.name());
 		assertNotEquals("set-farm", copy.id());
 		assertEquals(FARM.entries(), copy.entries());
 		assertEquals(List.of(PlaceRef.EVERYWHERE), after.profile().placesUsing("set-farm"));
 		assertEquals(List.of(), after.profile().placesUsing(copy.id()), "attached nowhere");
 		assertSame(FARM, after.library().get("set-farm"), "the original is untouched");
-		Workspace twice = LibraryOps.duplicate(after, "set-farm");
+		Workspace twice = LibraryOps.duplicate(after, "set-farm").workspace();
 		assertTrue(twice.library().sets().stream().anyMatch(s -> s.name().equals("Farm animals (copy) (2)")));
 	}
 
@@ -53,8 +56,8 @@ class LibraryOpsTest {
 	void duplicateOfA64CharacterNameStillFits() {
 		String name = "x".repeat(64);
 		Workspace start = ws(PlaceSets.EMPTY, SetLibrary.EMPTY.put(new SoundSet("a", name, List.of())));
-		Workspace after = LibraryOps.duplicate(start, "a");
-		Workspace third = LibraryOps.duplicate(after, "a");
+		Workspace after = LibraryOps.duplicate(start, "a").workspace();
+		Workspace third = LibraryOps.duplicate(after, "a").workspace();
 		for (SoundSet s : third.library().sets()) {
 			assertTrue(s.name().length() <= SoundSet.MAX_NAME_LENGTH, s.name());
 		}
@@ -138,9 +141,12 @@ class LibraryOpsTest {
 	@Test
 	void createMakesAnEmptyUnattachedSet() {
 		Workspace start = ws(PlaceSets.EMPTY, SetLibrary.EMPTY.put(FARM));
-		Workspace after = LibraryOps.create(start, " farm animals ");
+		NewSet result = LibraryOps.create(start, " farm animals ");
+		Workspace after = result.workspace();
 		assertEquals(2, after.library().size());
-		assertTrue(after.library().sets().stream().anyMatch(s -> s.name().equals("farm animals (2)") && s.entries().isEmpty()));
+		assertEquals("farm animals (2)", result.name());
+		assertTrue(after.library().get(result.setId()).entries().isEmpty());
+		assertEquals(List.of(), after.profile().placesUsing(result.setId()), "attached nowhere");
 	}
 
 	@Test
@@ -150,10 +156,49 @@ class LibraryOpsTest {
 			sets.add(new SoundSet("s" + i, "N" + i, List.of()));
 		}
 		Workspace full = ws(PlaceSets.EMPTY, new SetLibrary(sets));
-		assertSame(full, LibraryOps.create(full, "One more"));
+		assertSame(full, LibraryOps.create(full, "One more").workspace());
+		assertEquals("soundsculptor.sets.error.library_full", LibraryOps.create(full, "One more").problem().key());
 		assertEquals("soundsculptor.sets.error.library_full", LibraryOps.canCreate(full, "One more").key());
-		assertSame(full, LibraryOps.duplicate(full, "s0"));
+		assertSame(full, LibraryOps.duplicate(full, "s0").workspace());
+		assertNull(LibraryOps.duplicate(full, "s0").setId());
 		assertEquals("soundsculptor.sets.error.library_full", LibraryOps.canDuplicate(full, "s0").key());
 		assertNotNull(LibraryOps.canCreate(ws(PlaceSets.EMPTY, SetLibrary.EMPTY), ""));
+	}
+
+	@Test
+	void duplicateOfAMissingSetIsRefused() {
+		Workspace start = ws(PlaceSets.EMPTY, SetLibrary.EMPTY);
+		NewSet result = LibraryOps.duplicate(start, "gone");
+		assertSame(start, result.workspace());
+		assertEquals("soundsculptor.sets.error.not_found", result.problem().key());
+	}
+
+	@Test
+	void createAttachedMakesTheSetAndAttachesItAtTheBottom() {
+		Workspace start = ws(PlaceSets.EMPTY.attach("set-farm"), SetLibrary.EMPTY.put(FARM));
+		NewSet result = LibraryOps.createAttached(start, PlaceRef.EVERYWHERE, "Barn");
+		assertTrue(result.ok());
+		assertEquals("Barn", result.name());
+		assertEquals(List.of("set-farm", result.setId()),
+				result.workspace().profile().everywhere().attached().stream().map(Attachment::setId).toList());
+	}
+
+	@Test
+	void createAttachedRefusesAFullPlaceAGoneZoneAndABadName() {
+		List<SoundSet> sets = new ArrayList<>();
+		PlaceSets place = PlaceSets.EMPTY;
+		for (int i = 0; i < PlaceSets.MAX_SETS; i++) {
+			sets.add(new SoundSet("s" + i, "N" + i, List.of()));
+			place = place.attach("s" + i);
+		}
+		Workspace full = ws(place, new SetLibrary(sets));
+		assertEquals("soundsculptor.sets.error.place_full", LibraryOps.canCreateAttached(full, PlaceRef.EVERYWHERE, "More").key());
+		NewSet refused = LibraryOps.createAttached(full, PlaceRef.EVERYWHERE, "More");
+		assertSame(full, refused.workspace(), "nothing is added to the library either");
+		assertEquals("soundsculptor.sets.error.place_full", refused.problem().key());
+
+		Workspace start = ws(PlaceSets.EMPTY, SetLibrary.EMPTY);
+		assertEquals("soundsculptor.place_sets.zone_gone", LibraryOps.createAttached(start, PlaceRef.zone("gone"), "More").problem().key());
+		assertNotNull(LibraryOps.createAttached(start, PlaceRef.EVERYWHERE, " ").problem());
 	}
 }
