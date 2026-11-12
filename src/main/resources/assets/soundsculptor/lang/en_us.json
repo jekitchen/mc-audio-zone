@@ -623,7 +623,7 @@
 	"soundsculptor.sets.file.field.limit_window": "limit window",
 	"soundsculptor.sets.file.field.limit_per_source": "limit per source",
 	"soundsculptor.sets.file.problem.value.bad_id": "%s can only use a-z, 0-9 and -",
-	"soundsculptor.sets.file.problem.value.reserved_id": "%s is reserved for Quick changes",
+	"soundsculptor.sets.file.problem.value.reserved_id": "%s is a reserved name and can't be used as a Sound Set ID",
 	"soundsculptor.sets.file.problem.value.not_quick": "%s is not \"quick\"",
 	"soundsculptor.sets.file.problem.value.entry_id_used": "%1$s is already used by entry %2$s",
 	"soundsculptor.sets.file.problem.not_set": "The file is not a Sound Set (expected a JSON object).",

@@ -241,5 +241,7 @@ class SetStoreTest {
 	void refusesIdsThatAreNotLibraryIds() {
 		assertThrows(IllegalArgumentException.class, () -> store().save(SoundSet.quick(List.of())));
 		assertThrows(IllegalArgumentException.class, () -> store().fileFor("../x"));
+		assertThrows(IllegalArgumentException.class, () -> store().fileFor("deleted"));
+		assertThrows(IllegalArgumentException.class, () -> store().fileFor("con"));
 	}
 }

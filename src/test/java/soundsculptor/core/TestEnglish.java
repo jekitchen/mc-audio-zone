@@ -90,7 +90,7 @@ public final class TestEnglish implements Translator {
 			Map.entry("soundsculptor.sets.file.field.limit_window", "limit window"),
 			Map.entry("soundsculptor.sets.file.field.limit_per_source", "limit per source"),
 			Map.entry("soundsculptor.sets.file.problem.value.bad_id", "%s can only use a-z, 0-9 and -"),
-			Map.entry("soundsculptor.sets.file.problem.value.reserved_id", "%s is reserved for Quick changes"),
+			Map.entry("soundsculptor.sets.file.problem.value.reserved_id", "%s is a reserved name and can't be used as a Sound Set ID"),
 			Map.entry("soundsculptor.sets.file.problem.value.not_quick", "%s is not \"quick\""),
 			Map.entry("soundsculptor.sets.file.problem.value.entry_id_used", "%1$s is already used by entry %2$s"),
 			Map.entry("soundsculptor.sets.file.problem.not_set", "The file is not a Sound Set (expected a JSON object)."),

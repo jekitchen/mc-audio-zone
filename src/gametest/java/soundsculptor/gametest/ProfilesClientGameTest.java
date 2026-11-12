@@ -146,6 +146,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(context.computeOnClient(mc -> panel(mc).find(A)) == null, "A is gone from the list");
+			context.runOnClient(mc -> ProfileManager.flushSaves());
 			Path fileA = context.computeOnClient(mc -> ProfileManager.store().fileFor(A));
 			check(!Files.exists(fileA) && Files.exists(fileA.resolveSibling(fileA.getFileName() + ".bak")), "A's file is deleted and kept as .bak");
 

@@ -89,7 +89,7 @@ public final class SetStore {
 
 	/** The file for a set ID. */
 	public Path fileFor(String id) {
-		if (!SetCodec.ID_PATTERN.matcher(id).matches() || SoundSet.QUICK_ID.equals(id)) {
+		if (!SetCodec.ID_PATTERN.matcher(id).matches() || SetCodec.isReservedId(id)) {
 			throw new IllegalArgumentException("not a library Sound Set ID: " + id);
 		}
 		return directory.resolve(id + ".json");

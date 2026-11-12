@@ -1,6 +1,7 @@
 package soundsculptor.core.sets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -94,6 +95,11 @@ class SetCodecTest {
 	void rejectsBadAndReservedIds() {
 		assertTrue(problem(header("Farm Set", "Farm")).contains("Sound Set 'Farm', id"));
 		assertTrue(problem(header("quick", "Farm")).contains("reserved"));
+		for (String id : new String[] {"deleted", "con", "nul", "com1", "lpt9"}) {
+			assertTrue(problem(header(id, "Farm")).contains("reserved"), id);
+			assertTrue(SetCodec.isReservedId(id), id);
+		}
+		assertFalse(SetCodec.isReservedId("set-0123456789ab"));
 		assertTrue(problem(header("", "Farm")).contains("id"));
 	}
 

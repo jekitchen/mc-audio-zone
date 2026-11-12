@@ -119,6 +119,8 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			write(file, json);
 			context.runOnClient(mc -> ProfileManager.reload());
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "after re-reading the file the sound is still muted");
+			// reload() starts a save on the saver thread that briefly removes the .bak before copying it again.
+			context.runOnClient(mc -> ProfileManager.flushSaves());
 			check(Files.exists(file.resolveSibling(file.getFileName() + ".bak")), "the previous file should be kept as .bak");
 
 			// Fail open (FR-13.2): errors never stop a sound; more than 10 in a minute turn on Bypass with a notice.

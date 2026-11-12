@@ -30,6 +30,15 @@ public final class SetCodec {
 	/** Library set IDs: lowercase letters, digits and hyphens. */
 	public static final Pattern ID_PATTERN = Pattern.compile("[a-z0-9-]+");
 
+	/**
+	 * IDs that are never library set IDs: {@code quick} (a place's Quick changes), {@code deleted} (the file
+	 * {@code sets/deleted.json} keeps deleted names) and the Windows device names, which cannot be file names.
+	 * {@link SetLibrary#newId()} makes {@code set-} plus hex digits, so it can never produce one.
+	 */
+	private static final Set<String> RESERVED_IDS = Set.of(SoundSet.QUICK_ID, "deleted", "con", "prn", "aux", "nul",
+			"com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
+			"lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9");
+
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "entries");
 	private static final Set<String> QUICK_FIELDS = Set.of("id", "entries");
@@ -38,6 +47,11 @@ public final class SetCodec {
 	private static final Pattern LOCATION = Pattern.compile("line ([0-9]+) column ([0-9]+)");
 
 	private SetCodec() {
+	}
+
+	/** True for an ID no library set may have (see {@link #RESERVED_IDS}). */
+	public static boolean isReservedId(String id) {
+		return RESERVED_IDS.contains(id);
 	}
 
 	/** A set read from a file, and the unknown fields that were ignored. */
@@ -150,7 +164,7 @@ public final class SetCodec {
 		if (!ID_PATTERN.matcher(id).matches()) {
 			throw top.problem(SetText.F_ID, Message.of(SetText.BAD_ID, quote(id)));
 		}
-		if (SoundSet.QUICK_ID.equals(id)) {
+		if (isReservedId(id)) {
 			throw top.problem(SetText.F_ID, Message.of(SetText.RESERVED_ID, quote(id)));
 		}
 		String name = top.string("name", SetText.F_NAME);

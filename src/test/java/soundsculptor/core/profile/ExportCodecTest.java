@@ -102,6 +102,16 @@ class ExportCodecTest {
 	}
 
 	@Test
+	void aSetWithAReservedIdIsRefused() {
+		for (String id : new String[] {"deleted", "con"}) {
+			JsonArray sets = new JsonArray();
+			sets.add(SetCodec.toJsonObject(new SoundSet(id, "Reserved", List.of())));
+			assertEquals("Sound Set 'Reserved', id: \"" + id + "\" is a reserved name and can't be used as a Sound Set ID.",
+					problem(withLibrarySets(sets)));
+		}
+	}
+
+	@Test
 	void aSetListedTwiceIsRefused() {
 		JsonArray sets = new JsonArray();
 		sets.add(SetCodec.toJsonObject(FARM));
