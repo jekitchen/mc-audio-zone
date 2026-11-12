@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import soundsculptor.core.sets.Attachment;
+import soundsculptor.core.sets.EntryResolution;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SoundSet;
@@ -95,6 +96,39 @@ class StressProfileTest {
 			assertTrue(count >= 1 && count <= 3, z.id() + " has " + count + " entries");
 			assertEquals(stress.get(i), z.withSets(stress.get(i).sets()), "the same zone, only its sets differ");
 		}
+	}
+
+	@Test
+	void stressZonesWeighWhatTheZonesBeforeSoundSetsDid() {
+		// PRD 9.1: the worst case stays comparable with the one it replaced. The typical zones hold the old 1 to 3 rules
+		// each, so they are the yardstick: per farm sound, zones matched (each costs a geometry test every tick) and zone
+		// limits must stay within 15% of theirs.
+		double[] stress = zoneLoad(StressProfile.zones(WORLD, OVERWORLD));
+		double[] before = zoneLoad(StressProfile.typicalZones(WORLD, OVERWORLD));
+		assertTrue(Math.abs(stress[0] - before[0]) <= 0.15 * before[0], "zones matched per sound: " + stress[0] + " against " + before[0]);
+		assertTrue(Math.abs(stress[1] - before[1]) <= 0.15 * before[1], "zone limits per sound: " + stress[1] + " against " + before[1]);
+		for (int s = 1; s <= StressProfile.POOL_SIZE; s++) {
+			for (SetEntry e : StressProfile.library().get("stress-pool-" + s).entries()) {
+				assertTrue(!e.pattern().matches("anymod:any.sound"), "no shared match-all entry: " + e.pattern());
+			}
+		}
+	}
+
+	/** Average zones whose sets match each farm sound, and average zones that set a limit for it. */
+	private static double[] zoneLoad(List<Zone> zones) {
+		Precedence precedence = new Precedence(StressProfile.everywhere(), zones, StressProfile.library());
+		List<String> ids = StressProfile.soundIds();
+		EntryResolution[] row = new EntryResolution[zones.size() + 1];
+		int matched = 0;
+		int limits = 0;
+		for (String id : ids) {
+			precedence.resolve(id, row);
+			for (int i = 1; i < row.length; i++) {
+				matched += row[i] == EntryResolution.NONE ? 0 : 1;
+				limits += row[i].limit() == null ? 0 : 1;
+			}
+		}
+		return new double[] {matched / (double) ids.size(), limits / (double) ids.size()};
 	}
 
 	@Test

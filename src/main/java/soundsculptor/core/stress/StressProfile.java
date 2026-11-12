@@ -24,7 +24,9 @@ import soundsculptor.core.zones.ZoneMode;
  * <ul>
  *   <li><b>Stress:</b> Everywhere attaches 2 library Sound Sets of 25 entries each, mixing single sounds and groups;
  *       64 zones (the maximum, every kind) that all affect a 9 x 9 pen centred on (0, {@value #PEN_Y}, 0) each attach 1
- *       to 3 sets from a pool of 8, so most pool sets are shared by several zones.</li>
+ *       to 3 sets from a pool of 8, so most pool sets are shared by several zones. The pool is drawn so the zones weigh
+ *       what the 64 zones of 1 to 3 rules weighed before Sound Sets (see {@link #POOL_SEED}), keeping the worst case
+ *       comparable with PRD 9.1's.</li>
  *   <li><b>Typical:</b> the shape it had before Sound Sets, so its timings compare with earlier runs: Everywhere
  *       attaches one set of 20 single-sound entries, and each zone attaches one set of its own with the 1 to 3 entries it
  *       used to hold as rules. The zones are the stress zones (same seed, same geometry).</li>
@@ -44,6 +46,15 @@ public final class StressProfile {
 	/** Zones attach sets from this many. */
 	public static final int POOL_SIZE = 8;
 	private static final long SEED = 11_2L;
+	/**
+	 * Seed of the zone pool. Pool entries are drawn exactly as the zones' own rules were before Sound Sets (same
+	 * patterns, same settings), but each set holds 1 or 2 of them, because a zone now attaches 1 to 3 sets: on average
+	 * that matches about as many zones per sound as the old 1 to 3 rules did. The seed was picked from a scan: its pool
+	 * has no match-all {@code *} entry (shared by a dozen zones, it would make all of them match every sound), and over
+	 * the budget tests' 255 sounds its zones match 18.7 zones and 7.2 zone limits per sound, against 19.5 and 6.7 before
+	 * Sound Sets. {@code StressProfileTest} keeps both within 15%.
+	 */
+	private static final long POOL_SEED = 323;
 
 	private static final String[] PROFESSIONS = {"armorer", "butcher", "cartographer", "cleric", "farmer", "fisherman",
 			"fletcher", "leatherworker", "librarian", "mason", "shepherd", "toolsmith", "weaponsmith"};
@@ -144,13 +155,13 @@ public final class StressProfile {
 		return new SetLibrary(sets);
 	}
 
-	/** {@value #POOL_SIZE} sets of 1 to 3 group entries each, which zones attach. */
+	/** {@value #POOL_SIZE} sets of 1 or 2 group entries each, which zones attach; see {@link #POOL_SEED}. */
 	private static List<SoundSet> pool() {
-		Random random = new Random(SEED + 2);
+		Random random = new Random(POOL_SEED);
 		List<SoundSet> pool = new ArrayList<>(POOL_SIZE);
 		for (int s = 0; s < POOL_SIZE; s++) {
 			List<SetEntry> entries = new ArrayList<>();
-			int count = 1 + random.nextInt(3);
+			int count = 1 + random.nextInt(2);
 			for (int e = 0; e < count; e++) {
 				String pattern = ZONE_PATTERNS[random.nextInt(ZONE_PATTERNS.length)];
 				entries.add(withSettings(SetEntry.of("p" + s + "e" + e, pattern), random));
