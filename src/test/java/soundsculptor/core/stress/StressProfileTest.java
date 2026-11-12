@@ -71,7 +71,30 @@ class StressProfileTest {
 		}
 		assertTrue(uses.size() <= StressProfile.POOL_SIZE);
 		assertTrue(uses.values().stream().filter(n -> n > 1).count() >= 2, "sets are shared by several zones: " + uses);
-		assertEquals(2 + StressProfile.POOL_SIZE, library.size());
+		assertEquals(2 + StressProfile.POOL_SIZE + 1 + Precedence.MAX_ZONES, library.size(), "stress, pool, typical and zone sets");
+	}
+
+	@Test
+	void typicalProfileKeepsItsPreSetsShape() {
+		// PRD 9.1 typical profile: 20 single sounds on Everywhere, and zones with 1 to 3 entries each, as before Sound Sets.
+		SetLibrary library = StressProfile.library();
+		List<Attachment> everywhere = StressProfile.typicalEverywhere().attached();
+		assertEquals(List.of(new Attachment(StressProfile.TYPICAL_SET_ID, true)), everywhere);
+		List<SetEntry> entries = library.get(StressProfile.TYPICAL_SET_ID).entries();
+		assertEquals(StressProfile.TYPICAL_ENTRIES, entries.size());
+		assertTrue(entries.stream().allMatch(e -> e.pattern().isExact()), "single sounds only");
+		assertEquals(StressProfile.everywhereEntries().stream().filter(e -> e.pattern().isExact()).limit(20).toList(), entries);
+
+		List<Zone> typical = StressProfile.typicalZones(WORLD, OVERWORLD);
+		List<Zone> stress = StressProfile.zones(WORLD, OVERWORLD);
+		assertEquals(stress.size(), typical.size());
+		for (int i = 0; i < typical.size(); i++) {
+			Zone z = typical.get(i);
+			assertEquals(1, z.sets().attached().size(), z.id());
+			int count = library.get(z.sets().attached().get(0).setId()).entries().size();
+			assertTrue(count >= 1 && count <= 3, z.id() + " has " + count + " entries");
+			assertEquals(stress.get(i), z.withSets(stress.get(i).sets()), "the same zone, only its sets differ");
+		}
 	}
 
 	@Test

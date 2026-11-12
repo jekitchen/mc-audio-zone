@@ -1,6 +1,5 @@
 package soundsculptor.gametest;
 
-import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.diag.MemoryEstimate;
 import soundsculptor.core.diag.TimingWindow;
 import soundsculptor.core.outline.OutlineMode;
@@ -33,14 +32,15 @@ import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Automated noisy-farm stress and soak test (PRD 11.2, budgets in 9.1): the "stress" profile (50 global rules, 64
- * zones of every kind around a 9 × 9 pen) with 300 sounds per second played in the pen.
+ * Automated noisy-farm stress and soak test (PRD 11.2, budgets in 9.1): the "stress" profile (2 sets of 25 entries on
+ * Everywhere, 64 zones of every kind around a 9 × 9 pen, each with 1 to 3 shared sets) with 300 sounds per second played
+ * in the pen.
  *
  * <p>Checks the budgets Diagnostics can measure: average cost per sound start under 10 µs with the stress profile and
- * under 5 µs with a typical one (20 rules, 8 zones, half of them elsewhere), worst sound start under 100 µs,
- * per-tick re-check under 0.2 ms, outline drawing for 64 zones under 0.3 ms per frame, Sound Sculptor data under
- * 8 MB, and, through the soak phase, no errors and no memory growth. FPS and the F3 frame graph (11.2 step 3) stay a
- * manual check.
+ * under 5 µs with a typical one (one set of 20 single sounds, 8 zones with a set of 1 to 3 entries each, half of them
+ * elsewhere), worst sound start under 100 µs, per-tick re-check under 0.2 ms, outline drawing for 64 zones under
+ * 0.3 ms per frame, Sound Sculptor data under 8 MB, and, through the soak phase, no errors and no memory growth. FPS
+ * and the F3 frame graph (11.2 step 3) stay a manual check.
  *
  * <p>Timings are taken after a warm-up (the hook run 40,000 times, then 10 seconds of the farm), as in a real session. On CI runners (shared machines with software
  * graphics) the time budgets are multiplied by {@value #CI_FACTOR}; the measured numbers are always printed.
@@ -151,15 +151,17 @@ public final class M8StressClientGameTest implements FabricClientGameTest {
 			check(perFrame < 300 * factor, "outline drawing should be under 0.3 ms per frame, was " + perFrame + " µs");
 			check(memoryStart < MemoryEstimate.BUDGET_BYTES, "Sound Sculptor data should be under 8 MB, was " + memoryStart);
 
-			// PRD 9.1: a typical profile stays under 5 µs per sound. 20 entries on Everywhere and 8 zones with sets attached,
-			// of which 4 cover the pen and 4 are 100 blocks away, like a player's own zones around a base.
+			// PRD 9.1: a typical profile stays under 5 µs per sound. Everywhere has one set of 20 single sounds; 8 zones have a
+			// set of 1 to 3 entries each, 4 covering the pen and 4 100 blocks away, like a player's own zones around a base.
+			// The same shape as before Sound Sets, so the figure compares with earlier runs.
 			List<Zone> typicalZones = new ArrayList<>();
+			List<Zone> withOwnSets = StressProfile.typicalZones(key, "minecraft:overworld");
 			for (int i = 0; i < 8; i++) {
-				Zone zone = zones.get(i);
+				Zone zone = shift(withOwnSets.get(i), dx, dy, dz);
 				typicalZones.add(i < 4 ? zone : shift(zone, 100, 0, 100));
 			}
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(StressProfile.everywhereEntries().subList(0, 20))).withZones(typicalZones)));
+					.withEverywhere(StressProfile.typicalEverywhere()).withZones(typicalZones)));
 			List<TimingWindow.Stats> typical = new ArrayList<>();
 			for (int second = 0; second < TYPICAL_SECONDS; second++) {
 				for (int tick = 0; tick < 20; tick++) {
@@ -172,7 +174,7 @@ public final class M8StressClientGameTest implements FabricClientGameTest {
 				typical.add(context.computeOnClient(mc -> SoundHook.soundTiming().stats(now)));
 			}
 			double perSoundTypical = median(typical.subList(2, typical.size()), true);
-			System.out.println(String.format(Locale.ROOT, "STRESS typical profile (20 entries, 8 zones): per-sound avg=%.2fus", perSoundTypical));
+			System.out.println(String.format(Locale.ROOT, "STRESS typical profile (20 single sounds, 8 zones): per-sound avg=%.2fus", perSoundTypical));
 			check(perSoundTypical < 5 * factor, "average cost per sound start with a typical profile should be under 5 µs, was " + perSoundTypical);
 			// The soak runs with the stress profile again.
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
