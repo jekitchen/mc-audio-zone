@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import soundsculptor.core.Message;
 import soundsculptor.core.profile.Profile;
@@ -164,6 +165,29 @@ class QuickChangesTest {
 		assertEquals(Boolean.TRUE, quickEntry(muted, PEN, COW).mute());
 		assertTrue(QuickActions.isMuted(muted, PEN, COW));
 		assertFalse(QuickActions.isMuted(muted, EVERYWHERE, COW));
+	}
+
+	@Test
+	void mutedAtAgreesWithIsMutedForEverySoundAndPlace() {
+		// One resolver per list rebuild (FR-1.6) must show the same state as asking row by row.
+		Workspace ws = ws(PlaceSets.EMPTY.attach(MUTES_COWS.id()).attach(QUIET_PIGS.id()),
+				PlaceSets.EMPTY.attach(COWS_NOT_MUTED.id()), MUTES_COWS, COWS_NOT_MUTED, QUIET_PIGS);
+		ws = apply(ws, EVERYWHERE, PIG, new EntryEdit.Mute(true));
+		ws = apply(ws, PEN, PIG, new EntryEdit.Mute(true));
+		List<String> sounds = List.of(COW, PIG, "minecraft:entity.cow.hurt", "minecraft:block.stone.step");
+		for (PlaceRef where : List.of(EVERYWHERE, PEN, PlaceRef.zone("gone"))) {
+			Predicate<String> muted = QuickActions.mutedAt(ws, where);
+			for (String sound : sounds) {
+				assertEquals(QuickActions.isMuted(ws, where, sound), muted.test(sound), where + " " + sound);
+			}
+		}
+		Predicate<String> everywhere = QuickActions.mutedAt(ws, EVERYWHERE);
+		assertTrue(everywhere.test(COW) && everywhere.test(PIG), "the library mutes cows; Quick changes mutes pigs");
+		assertFalse(everywhere.test("minecraft:block.stone.step"));
+		Predicate<String> pen = QuickActions.mutedAt(ws, PEN);
+		assertFalse(pen.test(COW), "Pen's set says cows are not muted");
+		assertTrue(pen.test(PIG));
+		assertFalse(QuickActions.mutedAt(ws, PlaceRef.zone("gone")).test(PIG), "a deleted zone mutes nothing");
 	}
 
 	// ---- Save to library ----

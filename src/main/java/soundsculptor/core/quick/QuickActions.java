@@ -1,6 +1,7 @@
 package soundsculptor.core.quick;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 import soundsculptor.core.Message;
 import soundsculptor.core.sets.EntryResolver;
@@ -37,18 +38,31 @@ public final class QuickActions {
 
 	/**
 	 * Whether the sound is muted at the place now, by any set attached there (FR-1.5: buttons show the actual state).
-	 * {@code false} for a zone that no longer exists.
+	 * {@code false} for a zone that no longer exists. For many sounds at once, use {@link #mutedAt}.
 	 */
 	public static boolean isMuted(Workspace ws, PlaceRef where, String soundId) {
+		return mutedAt(ws, where).test(soundId);
+	}
+
+	/**
+	 * {@link #isMuted} for many sounds at one place: one resolver for the place, built here and shared by every test,
+	 * so a list can show each row's state without sorting the place's entries once per row. A snapshot of {@code ws}:
+	 * get a new one after a change. Never true for a zone that no longer exists.
+	 */
+	public static Predicate<String> mutedAt(Workspace ws, PlaceRef where) {
 		PlaceSets place = ws.profile().place(where);
-		return place != null && isMuted(place, ws.library(), soundId);
+		if (place == null) {
+			return soundId -> false;
+		}
+		EntryResolver resolver = resolver(place, ws.library());
+		return soundId -> resolver.resolve(soundId).muted();
 	}
 
 	/**
 	 * The row's Mute/Unmute button (FR-4.10). When the sound is not muted, Mute: a new mute starts with the Cue default
 	 * (FR-7.6). When it is muted only by its Quick changes entry, Unmute clears that setting (and the default Cue the
 	 * mute added). When any other set at the place, or another Quick changes entry, would still mute it, Unmute writes
-	 * {@code mute=false} ("Not muted").
+	 * {@code mute=false} ("Not muted"). Builds up to two resolvers for the place: call it on a press, not per row.
 	 */
 	public static EntryEdit toggleMute(Workspace ws, PlaceRef where, String soundId, boolean cueDefault) {
 		PlaceSets place = ws.profile().place(where);
@@ -118,7 +132,11 @@ public final class QuickActions {
 	}
 
 	private static boolean isMuted(PlaceSets place, SetLibrary library, String soundId) {
-		return EntryResolver.forPlace(place, library, null).resolve(soundId).muted();
+		return resolver(place, library).resolve(soundId).muted();
+	}
+
+	private static EntryResolver resolver(PlaceSets place, SetLibrary library) {
+		return EntryResolver.forPlace(place, library, null);
 	}
 
 	/** The first entry whose pattern is exactly {@code soundId}, or {@code null}. */

@@ -34,6 +34,7 @@ import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Predicate;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
@@ -276,6 +277,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 		List<RecentRow> snapshot = RecentLog.get().sounds().snapshot(now, sort, this::subtitle);
 		String needle = filter.strip().toLowerCase(Locale.ROOT);
 		List<SculptList.Row> rows = new ArrayList<>(snapshot.size());
+		Predicate<String> muted = mutedAtApplyTarget();
 		for (RecentRow row : snapshot) {
 			String name = subtitle(row.id());
 			String shownName = name == null ? SoundNames.readable(row.id()) : name;
@@ -283,13 +285,13 @@ public final class SoundSculptorScreen extends SculptScreen {
 			if (!needle.isEmpty() && !(shownName + " " + row.id() + " " + category).toLowerCase(Locale.ROOT).contains(needle)) {
 				continue;
 			}
-			rows.add(toListRow(row, shownName, category, now));
+			rows.add(toListRow(row, shownName, category, now, muted));
 		}
 		recentList.setRows(rows);
 		refreshCount++;
 	}
 
-	private SculptList.Row toListRow(RecentRow row, String name, String category, long now) {
+	private SculptList.Row toListRow(RecentRow row, String name, String category, long now, Predicate<String> muted) {
 		// Status as text plus an icon character, never color alone (FR-1.2).
 		String status = Component.translatable("soundsculptor.recent.status_line." + row.status().name().toLowerCase(Locale.ROOT),
 				Component.translatable(row.status().translationKey())).getString();
@@ -309,7 +311,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 			String band = Component.translatable(row.band().translationKey()).getString();
 			columns.add(new SculptList.Row.Column(() -> band, BAND_WIDTH, 1));
 		}
-		return new SculptList.Row(row.id(), columns, List.of(muteButton(row.id()), editSoundButton(row.id()), whyButton(row.id())));
+		return new SculptList.Row(row.id(), columns, List.of(muteButton(row.id(), muted), editSoundButton(row.id()), whyButton(row.id())));
 	}
 
 	/**
@@ -317,13 +319,23 @@ public final class SoundSculptorScreen extends SculptScreen {
 	 * place "Apply to" chose. The icon shows the sound's actual state at that place, whichever set decides it
 	 * (crossed-out speaker when muted, speaker with waves when not); the label, tooltip and narration say what pressing
 	 * it does.
+	 *
+	 * @param mutedAt the mute state at that place, from {@link #mutedAtApplyTarget}, shared by every row of one rebuild
 	 */
-	private SculptButton muteButton(String soundId) {
-		boolean muted = QuickActions.isMuted(ProfileManager.workspace(), applyTarget().place(), soundId);
+	private SculptButton muteButton(String soundId, Predicate<String> mutedAt) {
+		boolean muted = mutedAt.test(soundId);
 		return SculptButton.icon(
 				Identifier.fromNamespaceAndPath("soundsculptor", muted ? "icon/mute" : "icon/volume"),
 				Component.translatable(muted ? "soundsculptor.recent.unmute" : "soundsculptor.recent.mute"),
 				() -> toggleMute(soundId));
+	}
+
+	/**
+	 * Which sounds are muted at the place "Apply to" chose: one resolver for a whole list rebuild, not one per row
+	 * (Recently Played rebuilds 4 times a second, FR-1.6).
+	 */
+	private Predicate<String> mutedAtApplyTarget() {
+		return QuickActions.mutedAt(ProfileManager.workspace(), applyTarget().place());
 	}
 
 	/** Quick action Edit: opens the rule editor on the sound's exact-ID rule (a new one if it has none). */
@@ -500,6 +512,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 		}
 		List<SoundEntry> found = SoundSearch.search(searchEntries, SearchQuery.parse(searchText), KnownSounds.seenExcluded());
 		List<SculptList.Row> rows = new ArrayList<>(found.size());
+		Predicate<String> muted = mutedAtApplyTarget();
 		for (SoundEntry entry : found) {
 			String id = entry.id();
 			String name = entry.subtitle() == null ? SoundNames.readable(id) : entry.subtitle();
@@ -510,7 +523,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 					new SculptList.Row.Column(() -> name, 0, 0),
 					new SculptList.Row.Column(() -> seen, SEEN_WIDTH, 0),
 					new SculptList.Row.Column(() -> id, 0, 1));
-			rows.add(new SculptList.Row(id, columns, List.of(muteButton(id), editSoundButton(id), whyButton(id))));
+			rows.add(new SculptList.Row(id, columns, List.of(muteButton(id, muted), editSoundButton(id), whyButton(id))));
 		}
 		searchCount = found.size();
 		searchList.setRows(rows);
