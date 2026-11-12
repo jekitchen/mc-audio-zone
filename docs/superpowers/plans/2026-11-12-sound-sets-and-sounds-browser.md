@@ -49,7 +49,7 @@
   - Status always uses text and an icon, never color alone.
   - Every control is reachable with Tab, arrows and Enter, and is read by the narrator.
   - Layouts must work at 854 × 480 and GUI scales 1–4.
-- Ownership: Core tasks are mine (Claude). MC tasks are Max's area. Max must review this plan before Task 1, because the rename and the model switch touch his code. Agree on each MC task's builder before it starts.
+- Ownership: the project owner is primary (from 2026-11-12) and approves this plan; Claude builds both Core and MC tasks. The Core/MC tags still mark which tasks touch version-sensitive Minecraft code.
 
 ## Review Focus
 
