@@ -382,4 +382,72 @@ class QuickChangesTest {
 				"an existing entry can still change");
 		assertTrue(QuickActions.apply(full, PEN, COW, new EntryEdit.Mute(true)).ok());
 	}
+
+	// ---- Quick changes switched off (FR-8.6 On/Off) ----
+
+	private static PlaceSets quickOff(SetEntry... entries) {
+		return PlaceSets.EMPTY.withQuickEntries(List.of(entries)).setEnabled(SoundSet.QUICK_ID, false);
+	}
+
+	private static boolean quickOn(PlaceSets place) {
+		return place.attached().get(0).setId().equals(SoundSet.QUICK_ID) && place.attached().get(0).enabled();
+	}
+
+	@Test
+	void aQuickActionThatSetsAValueSwitchesQuickChangesBackOn() {
+		Workspace start = ws(quickOff(SetEntry.of("e1", PIG).withVolume(40)));
+		assertFalse(QuickActions.isMuted(start, EVERYWHERE, COW));
+		Workspace muted = apply(start, EVERYWHERE, COW, QuickActions.toggleMute(start, EVERYWHERE, COW, false));
+		assertTrue(quickOn(muted.profile().everywhere()), "Mute must take effect, so Quick changes is switched back on");
+		assertTrue(QuickActions.isMuted(muted, EVERYWHERE, COW));
+
+		Workspace louder = apply(ws(PlaceSets.EMPTY, quickOff(SetEntry.of("e1", PIG).withVolume(40))), PEN, PIG, new EntryEdit.Volume(70));
+		assertTrue(quickOn(louder.profile().zone("pen").sets()), "Volume on an existing entry switches it back on too");
+
+		Workspace alreadyMuted = ws(quickOff(SetEntry.of("e1", COW).withMute(true).withCue(false)));
+		Workspace mutedAgain = apply(alreadyMuted, EVERYWHERE, COW, QuickActions.toggleMute(alreadyMuted, EVERYWHERE, COW, false));
+		assertTrue(quickOn(mutedAgain.profile().everywhere()), "even when the entry already says Muted");
+		assertTrue(QuickActions.isMuted(mutedAgain, EVERYWHERE, COW));
+	}
+
+	@Test
+	void aQuickActionThatOnlyClearsLeavesQuickChangesOff() {
+		Workspace start = ws(quickOff(SetEntry.of("e1", COW).withMute(true).withVolume(40)));
+		Workspace cleared = apply(start, EVERYWHERE, COW, new EntryEdit.Mute(null));
+		assertFalse(quickOn(cleared.profile().everywhere()), "clearing a value never switches Quick changes on");
+	}
+
+	// ---- Edit… on a sound row: the entry editor saves into Quick changes (FR-1.5) ----
+
+	@Test
+	void putQuickEntryCreatesTheSetAndReplacesByEntryId() {
+		Workspace start = ws(PlaceSets.EMPTY, PlaceSets.EMPTY);
+		SetEntry entry = SetEntry.of("e1", COW).withVolume(30);
+		Workspace added = QuickActions.putQuickEntry(start, PEN, entry);
+		assertEquals(List.of(entry), added.profile().zone("pen").sets().quickEntries());
+		assertTrue(added.profile().everywhere().quickEntries().isEmpty());
+
+		Workspace replaced = QuickActions.putQuickEntry(added, PEN, entry.withVolume(60));
+		assertEquals(List.of(entry.withVolume(60)), replaced.profile().zone("pen").sets().quickEntries(), "same ID: replaced, not added");
+	}
+
+	@Test
+	void putQuickEntrySwitchesQuickChangesOnOnlyForAnEntryThatApplies() {
+		Workspace off = ws(quickOff(SetEntry.of("e1", PIG).withVolume(40)));
+		assertTrue(quickOn(QuickActions.putQuickEntry(off, EVERYWHERE, SetEntry.of("e2", COW).withMute(true)).profile().everywhere()));
+		assertFalse(quickOn(QuickActions.putQuickEntry(off, EVERYWHERE, SetEntry.of("e2", COW).withMute(true).withEnabled(false))
+				.profile().everywhere()), "an entry that is off does not switch Quick changes on");
+	}
+
+	@Test
+	void putQuickEntryChangesNothingForAGoneZoneOrAFullSet() {
+		Workspace start = ws(PlaceSets.EMPTY);
+		assertSame(start, QuickActions.putQuickEntry(start, PlaceRef.zone("gone"), SetEntry.of("e1", COW).withMute(true)));
+		List<SetEntry> entries = new ArrayList<>();
+		for (int i = 0; i < SoundSet.MAX_ENTRIES; i++) {
+			entries.add(SetEntry.of("g" + i, "minecraft:sound." + i).withVolume(50));
+		}
+		Workspace full = ws(PlaceSets.EMPTY.withQuickEntries(entries));
+		assertSame(full, QuickActions.putQuickEntry(full, EVERYWHERE, SetEntry.of("new", COW).withMute(true)));
+	}
 }

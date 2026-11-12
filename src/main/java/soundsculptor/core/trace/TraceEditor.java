@@ -51,10 +51,14 @@ public final class TraceEditor {
 				return refused(ctx, ws, TraceEditError.RULE_NOT_FOUND.message());
 			}
 			SetEntry changed = edit.apply(old);
-			if (changed.equals(old)) {
+			PlaceSets edited = place.withQuickChanges(quick.putEntry(changed));
+			if (QuickActions.switchesQuickOn(edit)) {
+				// The edit must take effect even if the player switched this place's Quick changes off (FR-8.6).
+				edited = edited.setEnabled(SoundSet.QUICK_ID, true);
+			}
+			if (edited.equals(place)) {
 				return applied(ctx, ws, ws, TOAST_CHANGED, changed.pattern().text());
 			}
-			PlaceSets edited = place.withQuickChanges(quick.putEntry(changed));
 			return applied(ctx, ws, new Workspace(ws.profile().withPlace(where.place(), edited), ws.library()), TOAST_CHANGED,
 					changed.pattern().text());
 		}

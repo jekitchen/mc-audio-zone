@@ -6,7 +6,6 @@ import soundsculptor.core.diag.TimingWindow;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.recent.RecentRow;
 import soundsculptor.core.recent.SortOrder;
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.ApplyTo;
 import soundsculptor.core.quick.QuickActionResult;
@@ -14,7 +13,6 @@ import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.sets.PlaceRef;
-import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.search.SoundEntry;
@@ -47,18 +45,17 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The main Sound Sculptor screen (FR-12.1). Header: active profile and the Bypass toggle (FR-13.1). Tabs: Recently
- * Played (FR-1, with the Mute and Edit quick actions), Search, Rules (the global rules), Sound Sets (the library,
- * FR-4.7), Zones, Profiles (FR-11.2, FR-11.3) and Settings; Inspect arrives with M12. Lives in {@code soundsculptor.mc}
+ * Played (FR-1, with the Mute and Edit quick actions), Search, Sound Sets (the library, FR-4.7), Zones (Everywhere
+ * first, FR-8.10), Profiles (FR-11.2, FR-11.3) and Settings; Inspect arrives with M12. Lives in {@code soundsculptor.mc}
  * because it uses Minecraft's sound manager and GUI classes.
  */
 public final class SoundSculptorScreen extends SculptScreen {
 	public static final int TAB_RECENT = 0;
 	public static final int TAB_SEARCH = 1;
-	public static final int TAB_RULES = 2;
-	public static final int TAB_SETS = 3;
-	public static final int TAB_ZONES = 4;
-	public static final int TAB_PROFILES = 5;
-	public static final int TAB_SETTINGS = 6;
+	public static final int TAB_SETS = 2;
+	public static final int TAB_ZONES = 3;
+	public static final int TAB_PROFILES = 4;
+	public static final int TAB_SETTINGS = 5;
 	/** FR-3.4: results update 150 ms after the player stops typing. */
 	public static final long SEARCH_DELAY_MS = 150;
 	/** FR-1.6: the list refreshes at most 4 times per second (every 5 ticks). */
@@ -98,8 +95,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 	public SculptDropdown<SortOrder> sortDropdown;
 	public SculptTextField filterField;
 	public SculptToggle bypassToggle;
-	public SculptList rulesList;
-	private RuleListPanel rulesPanel;
 	private SetLibraryPanel setsPanel;
 	private ZoneListPanel zonesPanel;
 	private ProfileListPanel profilesPanel;
@@ -113,7 +108,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 	private boolean searchPending;
 	private long searchChangedAt;
 	private List<SoundEntry> searchEntries;
-	public SculptButton addRuleButton;
 	/** The Settings tab's page tabs, in {@link SettingsPage} order. */
 	public final List<SculptTabButton> pageTabs = new ArrayList<>();
 	public SculptButton copyReportButton;
@@ -141,7 +135,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 				// FR-1.6: the Recently Played tab does not pause a singleplayer game, so sounds keep arriving.
 				new Tab(Component.translatable("soundsculptor.tab.recent"), false),
 				new Tab(Component.translatable("soundsculptor.tab.search"), true),
-				new Tab(Component.translatable("soundsculptor.tab.rules"), true),
 				new Tab(Component.translatable("soundsculptor.tab.sets"), true),
 				new Tab(Component.translatable("soundsculptor.tab.zones"), true),
 				new Tab(Component.translatable("soundsculptor.tab.profiles"), true),
@@ -178,7 +171,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 	@Override
 	protected void buildTab(int index, Body body) {
 		if (index != TAB_SETTINGS && index != TAB_PROFILES && !ProfileManager.isLoaded()) {
-			// Opened outside a world (e.g. from Mod Menu on the title screen): sounds, rules and zones belong to a
+			// Opened outside a world (e.g. from Mod Menu on the title screen): sounds, Sound Sets and zones belong to a
 			// world's profile (FR-11.1), so there is nothing to show or change yet.
 			body.label(() -> Component.translatable("soundsculptor.no_world"));
 			return;
@@ -187,8 +180,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 			buildRecent(body);
 		} else if (index == TAB_SEARCH) {
 			buildSearch(body);
-		} else if (index == TAB_RULES) {
-			buildRules(body);
 		} else if (index == TAB_SETS) {
 			setsPanel = new SetLibraryPanel(this);
 			setsPanel.build(body);
@@ -348,10 +339,13 @@ public final class SoundSculptorScreen extends SculptScreen {
 		return QuickActions.mutedAt(ProfileManager.workspace(), applyTarget().place());
 	}
 
-	/** Quick action Edit: opens the rule editor on the sound's exact-ID rule (a new one if it has none). */
+	/**
+	 * Quick action Edit…: opens the entry editor on the sound's single-sound entry in the Quick changes of the place
+	 * "Apply to" chose (a new one if it has none, FR-1.5).
+	 */
 	private SculptButton editSoundButton(String soundId) {
 		return SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.recent.edit"),
-				() -> minecraft.gui.setScreen(EntryEditorScreen.forSound(this, applyTarget(), soundId)));
+				() -> minecraft.gui.setScreen(EntryEditorScreen.forSound(this, applyTarget().place(), soundId)));
 	}
 
 	/** Why?: the sound trace for this sound's most recent play (FR-14.1). */
@@ -389,14 +383,14 @@ public final class SoundSculptorScreen extends SculptScreen {
 	}
 
 	/**
-	 * Where quick actions on Recently Played and Search rows put their rule (FR-1.5, FR-3.7): Everywhere, or the zone
+	 * Where quick actions on Recently Played and Search rows put their change (FR-1.5, FR-3.7): Everywhere, or the zone
 	 * chosen in "Apply to" while the player still stands in it.
 	 */
 	public ApplyTarget applyTarget() {
 		return ApplyTo.select(applyChoices, applyZoneId);
 	}
 
-	/** Chooses where quick actions put their rule; refreshes the rows, whose Mute/Unmute follows the choice. */
+	/** Chooses where quick actions put their change; refreshes the rows, whose Mute/Unmute follows the choice. */
 	public void setApplyTarget(ApplyTarget target) {
 		applyZoneId = target.zoneId();
 		if (applyToDropdown != null && !applyToDropdown.value().equals(target)) {
@@ -434,7 +428,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 		if (currentTab() == TAB_SEARCH) {
 			runSearch();
 		}
-		refreshRules();
 		if (setsPanel != null && currentTab() == TAB_SETS) {
 			setsPanel.refresh();
 		}
@@ -544,38 +537,6 @@ public final class SoundSculptorScreen extends SculptScreen {
 
 	public String searchText() {
 		return searchText;
-	}
-
-	// ---- Rules (PRD 6.1, FR-4) ----
-
-	private void buildRules(Body body) {
-		rulesPanel = new RuleListPanel(this, RuleTarget.GLOBAL);
-		rulesPanel.build(body);
-		addRuleButton = rulesPanel.addButton;
-		rulesList = rulesPanel.list;
-	}
-
-	/** Rebuilds the rule rows from the profile. The list keeps the focused row and button. */
-	public void refreshRules() {
-		if (rulesPanel != null && currentTab() == TAB_RULES) {
-			rulesPanel.refresh();
-		}
-	}
-
-	public void setRuleEnabled(String ruleId, boolean enabled) {
-		rulesPanel.setEnabled(ruleId, enabled);
-	}
-
-	public void moveRule(String ruleId, int delta) {
-		rulesPanel.move(ruleId, delta);
-	}
-
-	public void confirmDelete(SetEntry rule) {
-		rulesPanel.confirmDelete(rule);
-	}
-
-	public void deleteRule(String ruleId) {
-		rulesPanel.delete(ruleId);
 	}
 
 	// ---- Sound Sets (FR-4.7) ----

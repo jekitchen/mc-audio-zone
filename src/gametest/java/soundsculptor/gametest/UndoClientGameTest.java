@@ -1,6 +1,5 @@
 package soundsculptor.gametest;
 
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
@@ -8,6 +7,7 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetCodec;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SoundSet;
+import soundsculptor.mc.PlaceSetsScreen;
 import soundsculptor.mc.QuickUndo;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
@@ -34,6 +34,8 @@ import net.minecraft.client.input.KeyEvent;
  */
 public final class UndoClientGameTest implements FabricClientGameTest {
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
+	private static final SoundSet COWS = new SoundSet("undo-cows", "Quiet cows", List.of(SetEntry.of("e1", "minecraft:entity.cow.*").withVolume(40)));
+	private static final SoundSet PIGS = new SoundSet("undo-pigs", "Pigs muted", List.of(SetEntry.of("e1", "minecraft:entity.pig.*").withMute(true)));
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -68,7 +70,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitTicks(2);
 			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Undo should unmute");
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).isEmpty()), "Undo should leave no rule behind");
+			check(context.computeOnClient(mc -> QuickEntries.of(ProfileManager.profile()).isEmpty()), "Undo should leave no entry behind");
 			check(toastText(context).equals("Undone"), "a toast should confirm the undo");
 			check(context.computeOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(0).getMessage().getString())
 					.equals("Mute"), "the row should offer Mute again");
@@ -111,34 +113,39 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 
 			// Undo is refused once the profile changed some other way, and nothing changes.
 			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
-			context.runOnClient(mc -> ProfileManager.update(p -> RuleTarget.GLOBAL.put(p, SetEntry.of("other", "minecraft:entity.cow.*").withVolume(40))));
+			context.runOnClient(mc -> ProfileManager.update(p -> QuickEntries.put(p, SetEntry.of("other", "minecraft:entity.cow.*").withVolume(40))));
 			context.runOnClient(mc -> main(mc).pressUndo());
 			check(toastText(context).startsWith("Can't undo"), "a stale Undo should say it can't undo, was " + toastText(context));
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)
-					&& RuleTarget.GLOBAL.rule(ProfileManager.profile(), "other") != null), "a refused Undo changes nothing");
+					&& QuickEntries.get(ProfileManager.profile(), "other") != null), "a refused Undo changes nothing");
 
-			// Rules tab: On/Off, Move and Delete each offer Undo.
-			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("a", "minecraft:entity.cow.*").withVolume(40),
-							SetEntry.of("b", "minecraft:entity.pig.*").withMute(true))))));
-			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_RULES));
-			context.runOnClient(mc -> main(mc).setRuleEnabled("a", false));
-			check(toastText(context).equals("Turned off minecraft:entity.cow.*"), "On/Off toast, was " + toastText(context));
-			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rule(ProfileManager.profile(), "a").enabled()), "Undo turns the rule back on");
-			context.runOnClient(mc -> main(mc).moveRule("b", -1));
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).get(0).id()).equals("b"), "Move up applies at once");
-			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).get(0).id()).equals("a"), "Undo puts the order back");
-			context.runOnClient(mc -> main(mc).deleteRule("a"));
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rule(ProfileManager.profile(), "a")) == null, "Delete applies at once");
-			check(toastText(context).equals("Deleted the rule for minecraft:entity.cow.*"), "Delete toast, was " + toastText(context));
-			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).stream().map(SetEntry::id).toList())
-					.equals(List.of("a", "b")), "Undo brings the deleted rule back in its place");
-			check(context.computeOnClient(mc -> main(mc).rulesList.findRow("a")) != null, "the restored rule is listed again");
+			// Everywhere's Sound Sets (FR-8.6): On/Off, Move and Detach each offer Undo.
+			context.runOnClient(mc -> ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name())
+					.withEverywhere(PlaceSets.EMPTY.attach(COWS.id()).attach(PIGS.id())), ws.library().put(COWS).put(PIGS))));
+			context.runOnClient(mc -> mc.gui.setScreen(new PlaceSetsScreen(main(mc), PlaceRef.EVERYWHERE)));
+			context.waitForScreen(PlaceSetsScreen.class);
+			context.runOnClient(mc -> places(mc).panel.setEnabled(COWS.id(), false));
+			check(placeToast(context).equals("Turned off 'Quiet cows' here"), "On/Off toast, was " + placeToast(context));
+			context.runOnClient(mc -> places(mc).pressUndo());
+			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().get(0).enabled()), "Undo turns the set back on");
+			context.runOnClient(mc -> places(mc).panel.move(PIGS.id(), -1));
+			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().get(0).setId()).equals(PIGS.id()), "Move up applies at once");
+			context.runOnClient(mc -> places(mc).pressUndo());
+			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().get(0).setId()).equals(COWS.id()), "Undo puts the order back");
+			context.runOnClient(mc -> places(mc).panel.detach(COWS.id()));
+			check(!context.computeOnClient(mc -> ProfileManager.profile().everywhere().uses(COWS.id())), "Detach applies at once");
+			check(context.computeOnClient(mc -> ProfileManager.library().contains(COWS.id())), "a detached set stays in the library");
+			check(placeToast(context).equals("Detached 'Quiet cows'"), "Detach toast, was " + placeToast(context));
+			context.runOnClient(mc -> places(mc).pressUndo());
+			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().stream().map(a -> a.setId()).toList())
+					.equals(List.of(COWS.id(), PIGS.id())), "Undo brings the detached set back in its place");
+			check(context.computeOnClient(mc -> places(mc).panel.list.findRow(COWS.id())) != null, "the restored set is listed again");
+			context.runOnClient(mc -> places(mc).onClose());
+			context.waitForScreen(SoundSculptorScreen.class);
+			context.runOnClient(mc -> ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name()),
+					ws.library().remove(COWS.id()).remove(PIGS.id()))));
 
-			// Zones tab: Delete a zone (with its rules), then Undo.
+			// Zones tab: Delete a zone (with its Quick changes), then Undo.
 			context.runOnClient(mc -> ProfileManager.update(p -> p.withZones(List.of(
 					new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Box(9, 3, 9),
 							PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.sheep.*").withMute(true))))))));
@@ -152,13 +159,13 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			check(toastText(context).equals("Deleted the zone Pen"), "zone Delete toast, was " + toastText(context));
 			context.runOnClient(mc -> main(mc).pressUndo());
 			check(context.computeOnClient(mc -> ProfileManager.profile().zone("z1") != null
-					&& ProfileManager.profile().zone("z1").sets().quickEntries().size() == 1), "Undo brings the zone and its rules back");
+					&& ProfileManager.profile().zone("z1").sets().quickEntries().size() == 1), "Undo brings the zone and its Quick changes back");
 			check(context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow("z1")) != null, "the restored zone is listed again");
 			context.takeScreenshot("undo-toast-zone");
 
 			// Library Sound Sets: Undo puts a set edit back in memory and in its file.
 			context.runOnClient(mc -> {
-				main(mc).selectTab(SoundSculptorScreen.TAB_RULES);
+				main(mc).selectTab(SoundSculptorScreen.TAB_SETS);
 				ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(ws.profile(), ws.library().put(
 						new SoundSet("farm-animals", "Farm animals", List.of(SetEntry.of("cow", "minecraft:entity.cow.ambient").withVolume(30))))));
 				ProfileManager.flushSaves();
@@ -220,7 +227,19 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 		});
 	}
 
+	private static PlaceSetsScreen places(Minecraft mc) {
+		return (PlaceSetsScreen) mc.gui.screen();
+	}
+
+	private static String placeToast(ClientGameTestContext context) {
+		return context.computeOnClient(mc -> {
+			SculptScreen.Toast toast = places(mc).toast();
+			return toast == null ? "(no toast)" : toast.message().getString();
+		});
+	}
+
 	private static SoundSculptorScreen main(Minecraft mc) {
+
 		return (SoundSculptorScreen) mc.gui.screen();
 	}
 

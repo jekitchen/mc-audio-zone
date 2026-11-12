@@ -9,6 +9,7 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.zones.BoxEdit;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptColorPicker;
@@ -33,8 +34,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * The zone editor (PRD 6.1 Zones, FR-8 MVP, FR-10.4): name, on/off, color, the center with "My position" and "Block
  * I'm looking at" (FR-8.1), and the box's size (FR-8.3), drawn by marking two corners in the world or moved one side at
- * a time (M8 review). The zone's own rules are edited on their own
- * screen ("Zone rules", FR-8.6). Save and Cancel with the unsaved-changes dialog (FR-12.4), errors under the fields that
+ * a time (M8 review). The zone's attached Sound Sets are edited on their own screen ("Sound Sets…", FR-8.6). Save and Cancel with the unsaved-changes dialog (FR-12.4), errors under the fields that
  * disable Save (FR-12.7). Outside mode, fade edges, cylinders and personal bubbles arrive in M13; a zone's existing
  * settings for them are kept.
  */
@@ -67,7 +67,7 @@ public final class ZoneEditorScreen extends SculptScreen {
 	public SculptTextField heightField;
 	public SculptTextField depthField;
 	public SculptButton saveButton;
-	public SculptButton rulesButton;
+	public SculptButton setsButton;
 	public SculptButton markCornersButton;
 	public SculptDropdown<BoxEdit.Side> sideDropdown;
 	public SculptButton shrinkButton;
@@ -146,9 +146,9 @@ public final class ZoneEditorScreen extends SculptScreen {
 
 	@Override
 	protected void addFooterWidgets(List<AbstractWidget> footer) {
-		rulesButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.zone_editor.rules"), this::openRules),
-				Component.translatable("soundsculptor.zone_editor.rules.tip"));
-		footer.add(rulesButton);
+		setsButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.zone_editor.sets"), this::openSets),
+				Component.translatable("soundsculptor.zone_editor.sets.tip"));
+		footer.add(setsButton);
 		footer.add(SculptButton.text(Component.translatable("soundsculptor.ui.cancel"), this::onClose));
 		saveButton = SculptButton.text(Component.translatable("soundsculptor.ui.save"), this::save);
 		footer.add(saveButton);
@@ -270,8 +270,8 @@ public final class ZoneEditorScreen extends SculptScreen {
 		if (saveButton != null) {
 			saveButton.active = draft.canSave();
 		}
-		if (rulesButton != null) {
-			rulesButton.active = draft.canSave();
+		if (setsButton != null) {
+			setsButton.active = draft.canSave();
 		}
 		if (lookingAtButton != null) {
 			lookingAtButton.active = lookedAtBlock(minecraft).isPresent();
@@ -389,7 +389,7 @@ public final class ZoneEditorScreen extends SculptScreen {
 		return Optional.empty();
 	}
 
-	// ---- Save, Cancel, Rules ----
+	// ---- Save, Cancel, Sound Sets ----
 
 	public void save() {
 		if (saveChanges()) {
@@ -414,7 +414,7 @@ public final class ZoneEditorScreen extends SculptScreen {
 		Zone built = draft.build();
 		int color = draft.color();
 		ProfileManager.update(profile -> {
-			// Keep sets changed since this editor opened (on the zone rules screen).
+			// Keep sets changed since this editor opened (on the zone's Sound Sets screen, or by a quick action).
 			Zone saved = profile.zone(zoneId);
 			Zone zone = saved == null ? built : built.withSets(saved.sets());
 			return profile.putZone(zone).withZoneColor(zoneId, color);
@@ -422,11 +422,11 @@ public final class ZoneEditorScreen extends SculptScreen {
 		return true;
 	}
 
-	/** "Zone rules": saves the zone (it must exist to hold rules), then opens its rule list. */
-	public void openRules() {
+	/** "Sound Sets…": saves the zone (it must exist to have sets attached), then opens its attached sets (FR-8.6). */
+	public void openSets() {
 		if (!saveChanges()) {
 			return;
 		}
-		minecraft.gui.setScreen(new ZoneRulesScreen(parent, zoneId));
+		minecraft.gui.setScreen(new PlaceSetsScreen(parent, PlaceRef.zone(zoneId)));
 	}
 }

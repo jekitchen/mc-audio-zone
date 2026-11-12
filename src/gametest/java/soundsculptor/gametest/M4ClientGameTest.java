@@ -1,7 +1,6 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.sets.PlaceSets;
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.profile.Profile;
@@ -153,7 +152,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ProfileManager.reload());
 			Path brokenCopy = file.resolveSibling(file.getFileName() + ".broken");
 			check(Files.exists(brokenCopy), "the corrupt file should be kept as .broken");
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).isEmpty()), "an empty profile should be used");
+			check(context.computeOnClient(mc -> QuickEntries.of(ProfileManager.profile()).isEmpty()), "an empty profile should be used");
 			context.waitTicks(5);
 			check(context.computeOnClient(mc -> Notices.shownTitles()).contains("Sound Sculptor profile could not be loaded"), "a notice should explain");
 			context.takeScreenshot("m4-broken-profile-toast");

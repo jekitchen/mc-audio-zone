@@ -1,6 +1,5 @@
 package soundsculptor.gametest;
 
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
@@ -16,6 +15,7 @@ import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.SoundHook;
+import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
 import soundsculptor.mc.ui.SculptList;
@@ -109,10 +109,10 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 				row.buttons().get(0).onPress(null);
 				check(t.trace().volumePercent() == 30, "the group entry should win now, volume " + t.trace().volumePercent());
 				check(t.text().contains("    *:*villager*: Volume 30%\n      Decides loudness"), "the group entry should decide:\n" + t.text());
-				check(!RuleTarget.GLOBAL.rule(ProfileManager.profile(), "e").enabled(), "the exact entry should be off");
+				check(!QuickEntries.get(ProfileManager.profile(), "e").enabled(), "the exact entry should be off");
 				// The shared quick-action Undo (FR-12.5): Ctrl+Z presses the toast's Undo.
 				t.pressUndo();
-				check(RuleTarget.GLOBAL.rule(ProfileManager.profile(), "e").enabled() && t.trace().volumePercent() == 60, "Undo should turn the exact entry back on");
+				check(QuickEntries.get(ProfileManager.profile(), "e").enabled() && t.trace().volumePercent() == 60, "Undo should turn the exact entry back on");
 				check(t.toast() != null && t.toast().message().getString().equals("Undone"), "the toast should say Undone");
 				row = t.row(target);
 				row.buttons().get(0).onPress(null);
@@ -120,7 +120,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			closeTrace(context);
 
 			// AC: no matching entry: Mute on the "No entry matches" line adds a single-sound entry to Everywhere's Quick
-			// changes: muted on the next play, and the entry is on the Rules tab.
+			// changes: muted on the next play, and the entry is listed in Everywhere's Quick changes.
 			setQuick(context, List.of());
 			check(play(context, spot) == 1.0F, "with no entries the villager plays at 100%");
 			openTrace(context);
@@ -140,14 +140,11 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			});
 			closeTrace(context);
 			check(play(context, spot) == 0.0F, "the villager should be muted on its next play");
-			context.setScreen(SoundSculptorScreen::new);
-			context.waitForScreen(SoundSculptorScreen.class);
+			context.setScreen(() -> SetEditorScreen.forQuickChanges(null, PlaceRef.EVERYWHERE));
+			context.waitForScreen(SetEditorScreen.class);
 			context.runOnClient(mc -> {
-				SoundSculptorScreen main = (SoundSculptorScreen) mc.gui.screen();
-				main.selectTab(SoundSculptorScreen.TAB_RULES);
 				String id = QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER).id();
-				check(main.bodyWidgets().stream().anyMatch(w -> w instanceof SculptList list && list.findRow(id) != null),
-						"the new entry should be on the Rules tab");
+				check(((SetEditorScreen) mc.gui.screen()).entryList.findRow(id) != null, "the new entry should be in Everywhere's Quick changes");
 			});
 			context.setScreen(() -> null);
 
