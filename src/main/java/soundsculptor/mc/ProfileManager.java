@@ -7,7 +7,7 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileFormatException;
 import soundsculptor.core.profile.ProfileStore;
-import soundsculptor.core.rules.RuleResolver;
+import soundsculptor.core.sets.EntryResolver;
 import soundsculptor.core.zones.Precedence;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -114,7 +114,7 @@ public final class ProfileManager {
 	}
 
 	/** Compiled global rules. */
-	public static RuleResolver rules() {
+	public static EntryResolver rules() {
 		return current.precedence().globalRules();
 	}
 

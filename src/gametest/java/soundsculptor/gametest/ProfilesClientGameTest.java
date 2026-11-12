@@ -4,7 +4,7 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileSettings;
 import soundsculptor.core.profile.WorldIds;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -49,8 +49,8 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			Profile serverA = Profile.empty("Server A")
-					.putRule(Rule.of("r1", "minecraft:entity.villager.*").withMute(true))
-					.putRule(Rule.of("r2", "*cow*").withVolume(40))
+					.putRule(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))
+					.putRule(SetEntry.of("r2", "*cow*").withVolume(40))
 					.withZones(List.of(zone("fa", A), zone("ba", A).asBubble()))
 					.withSettings(new ProfileSettings(false))
 					.withLastJoined(Instant.parse("2026-11-01T12:00:00Z"));
@@ -163,7 +163,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			String boostKey = "boost.example.net";
 			context.runOnClient(mc -> {
 				try {
-					ProfileManager.store().save(boostKey, Profile.empty("Boost server").putRule(Rule.of("b1", "*bell*").withVolume(150)));
+					ProfileManager.store().save(boostKey, Profile.empty("Boost server").putRule(SetEntry.of("b1", "*bell*").withVolume(150)));
 				} catch (java.io.IOException e) {
 					throw new AssertionError(e);
 				}

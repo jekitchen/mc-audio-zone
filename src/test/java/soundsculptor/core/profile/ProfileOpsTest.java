@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -32,11 +32,11 @@ class ProfileOpsTest {
 
 	/** Server A: 2 global rules, a fixed zone and a bubble. */
 	private static final Profile A = new Profile("Server A", new ProfileSettings(false),
-			List.of(Rule.of("a1", "x:one").withMute(true), Rule.of("a2", "x:two").withVolume(30)),
+			List.of(SetEntry.of("a1", "x:one").withMute(true), SetEntry.of("a2", "x:two").withVolume(30)),
 			List.of(fixedOn("aFixed", "a.net"), bubble("aBubble")), Map.of("aFixed", 1, "aBubble", 2));
 
 	/** Server B: its own rule, fixed zone and bubble. */
-	private static final Profile B = new Profile("Server B", ProfileSettings.DEFAULTS, List.of(Rule.of("b1", "x:b")),
+	private static final Profile B = new Profile("Server B", ProfileSettings.DEFAULTS, List.of(SetEntry.of("b1", "x:b")),
 			List.of(fixed("bFixed", new Shape.Sphere(6)), bubble("bBubble")), Map.of("bFixed", 3, "bBubble", 4));
 
 	@Test
@@ -64,7 +64,7 @@ class ProfileOpsTest {
 	@Test
 	void copyingABoostAsksForTheBoostConfirmFirst() {
 		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
-		Profile loud = A.withGlobalRules(List.of(Rule.of("a1", "x:one").withVolume(200)));
+		Profile loud = A.withGlobalRules(List.of(SetEntry.of("a1", "x:one").withVolume(200)));
 		assertTrue(ProfileOps.copyFrom(loud, B).needsBoostConfirm());
 		assertFalse(ProfileOps.copyFrom(loud, B.withBoostConfirmed(true)).needsBoostConfirm());
 		assertFalse(ProfileOps.copyFrom(A, B).needsBoostConfirm());

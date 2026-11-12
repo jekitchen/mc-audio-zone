@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Set;
 
-import soundsculptor.core.rules.PatternError;
+import soundsculptor.core.sets.PatternError;
 
 import org.junit.jupiter.api.Test;
 

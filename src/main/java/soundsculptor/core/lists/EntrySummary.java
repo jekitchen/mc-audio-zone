@@ -5,14 +5,14 @@ import java.util.Collection;
 import java.util.List;
 
 import soundsculptor.core.Translator;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 
 /**
  * The Rules tab row summary (PRD 6.1), such as "Muted" and "Cue on", as separate chips in a fixed order: off,
  * mute, volume, limit, cue. Also used for rule lines in the copied trace.
  */
-public final class RuleSummary {
+public final class EntrySummary {
 	public static final String SEPARATOR = "soundsculptor.summary.separator";
 	public static final String DISABLED = "soundsculptor.summary.rule.disabled";
 	public static final String MUTED = "soundsculptor.summary.rule.muted";
@@ -25,10 +25,10 @@ public final class RuleSummary {
 	public static final String NOTHING = "soundsculptor.summary.rule.nothing";
 	public static final String MATCHES = "soundsculptor.summary.rule.matches";
 
-	private RuleSummary() {
+	private EntrySummary() {
 	}
 
-	public static List<SummaryPart> parts(Rule rule) {
+	public static List<SummaryPart> parts(SetEntry rule) {
 		List<SummaryPart> parts = new ArrayList<>();
 		if (!rule.enabled()) {
 			parts.add(SummaryPart.of(DISABLED));
@@ -58,7 +58,7 @@ public final class RuleSummary {
 	}
 
 	/** The chips joined with the translated separator, for one-line places such as the copied trace. */
-	public static String text(Rule rule, Translator translator) {
+	public static String text(SetEntry rule, Translator translator) {
 		return join(parts(rule), translator);
 	}
 
@@ -75,7 +75,7 @@ public final class RuleSummary {
 	}
 
 	/** How many of {@code knownIds} the rule's pattern matches, for the row's match count. */
-	public static int matchCount(Rule rule, Collection<String> knownIds) {
+	public static int matchCount(SetEntry rule, Collection<String> knownIds) {
 		int count = 0;
 		for (String id : knownIds) {
 			if (rule.pattern().matches(id)) {

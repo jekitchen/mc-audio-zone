@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -19,7 +19,7 @@ import org.junit.jupiter.api.io.TempDir;
  * "world:6f1c…" and "play.example.net:25570" cannot be read back from the name.
  */
 class ProfileWorldKeyTest {
-	private static final Profile PROFILE = Profile.empty("Example").withGlobalRules(List.of(Rule.of("r1", "x:one")));
+	private static final Profile PROFILE = Profile.empty("Example").withGlobalRules(List.of(SetEntry.of("r1", "x:one")));
 
 	@TempDir
 	Path dir;

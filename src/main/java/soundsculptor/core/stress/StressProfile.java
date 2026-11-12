@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -72,12 +72,12 @@ public final class StressProfile {
 	}
 
 	/** 50 global rules: every fourth farm sound as an exact rule, plus wildcard families. */
-	public static List<Rule> globalRules() {
+	public static List<SetEntry> globalRules() {
 		Random random = new Random(SEED);
 		List<String> ids = soundIds();
-		List<Rule> rules = new ArrayList<>();
+		List<SetEntry> rules = new ArrayList<>();
 		for (int i = 0; i < ids.size() && rules.size() < 25; i += 4) {
-			rules.add(withSettings(Rule.of("g" + rules.size(), ids.get(i)), random));
+			rules.add(withSettings(SetEntry.of("g" + rules.size(), ids.get(i)), random));
 		}
 		String[] wildcards = {"minecraft:entity.villager.*", "*villager*", "minecraft:entity.chicken.*",
 				"minecraft:entity.cow.*", "minecraft:entity.*.ambient", "minecraft:entity.*.hurt", "minecraft:entity.*.death",
@@ -86,7 +86,7 @@ public final class StressProfile {
 				"*:*.step", "minecraft:block.*", "minecraft:entity.*", "*golem*", "*.click*", "minecraft:block.chest.*",
 				"minecraft:entity.zombie.*", "*sheep*", "minecraft:entity.pig.*", "*"};
 		for (String w : wildcards) {
-			rules.add(withSettings(Rule.of("g" + rules.size(), w), random));
+			rules.add(withSettings(SetEntry.of("g" + rules.size(), w), random));
 		}
 		return List.copyOf(rules);
 	}
@@ -128,11 +128,11 @@ public final class StressProfile {
 					bubble = true;
 				}
 			}
-			List<Rule> rules = new ArrayList<>();
+			List<SetEntry> rules = new ArrayList<>();
 			int count = 1 + random.nextInt(3);
 			for (int r = 0; r < count; r++) {
 				String pattern = ZONE_PATTERNS[random.nextInt(ZONE_PATTERNS.length)];
-				rules.add(withSettings(Rule.of("z" + i + "r" + r, pattern), random));
+				rules.add(withSettings(SetEntry.of("z" + i + "r" + r, pattern), random));
 			}
 			Zone zone = new Zone("z" + i, "Stress " + i, true, worldKey, dimension, new Point(ax, ay, az), shape, rules)
 					.withMode(mode);
@@ -150,8 +150,8 @@ public final class StressProfile {
 	}
 
 	/** A mix of mute, volume, limit and cue settings, like a real profile. */
-	private static Rule withSettings(Rule rule, Random random) {
-		Rule r = switch (random.nextInt(4)) {
+	private static SetEntry withSettings(SetEntry rule, Random random) {
+		SetEntry r = switch (random.nextInt(4)) {
 			case 0 -> rule.withMute(true);
 			case 1 -> rule.withVolume(random.nextInt(101));
 			case 2 -> rule.withVolume(random.nextInt(101)).withLimit(new Limit(1 + random.nextInt(10), 1000, random.nextBoolean()));

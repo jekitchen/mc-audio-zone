@@ -5,7 +5,7 @@ import java.util.List;
 
 import soundsculptor.core.outline.ColorError;
 import soundsculptor.core.outline.ZoneColors;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.BoxEdit;
 import soundsculptor.core.zones.Point;
@@ -73,12 +73,12 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 	public static final double DEFAULT_SIZE = 10;
 
 	private final String id;
-	private final List<Rule> rules;
+	private final List<SetEntry> rules;
 	private final Point storedAnchor;
 	/** The shape when the editor opened: a sphere stays on offer for a zone that already was one (FR-8.3). */
 	private final ShapeKind openedShape;
 
-	private ZoneDraft(String id, List<Rule> rules, Point storedAnchor, EnumMap<Field, String> values,
+	private ZoneDraft(String id, List<SetEntry> rules, Point storedAnchor, EnumMap<Field, String> values,
 			EnumMap<Field, String> defaults) {
 		super(Field.class, values, defaults);
 		this.id = id;

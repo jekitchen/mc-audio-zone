@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 
-import soundsculptor.core.rules.PatternError;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.PatternError;
+import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.search.SoundSearch;
 
 /**

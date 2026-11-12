@@ -2,7 +2,7 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.diag.DiagnosticsReport;
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.Diagnostics;
 import soundsculptor.mc.ProfileManager;
@@ -38,8 +38,8 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				ProfileManager.setBypass(false);
 				ProfileManager.update(p -> Profile.empty(p.name())
-						.putRule(Rule.of("w", "*villager*").withMute(true))
-						.putRule(Rule.of("e", AMBIENT).withVolume(60)));
+						.putRule(SetEntry.of("w", "*villager*").withMute(true))
+						.putRule(SetEntry.of("e", AMBIENT).withVolume(60)));
 				RecentLog.get().sounds().clear();
 			});
 			context.setScreen(SoundSculptorScreen::new);

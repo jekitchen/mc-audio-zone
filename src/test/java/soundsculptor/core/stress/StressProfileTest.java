@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -22,7 +22,7 @@ class StressProfileTest {
 
 	@Test
 	void hasFiftyGlobalRulesMixingExactAndWildcard() {
-		List<Rule> rules = StressProfile.globalRules();
+		List<SetEntry> rules = StressProfile.globalRules();
 		assertEquals(50, rules.size());
 		long exact = rules.stream().filter(r -> r.pattern().isExact()).count();
 		assertTrue(exact >= 15 && exact <= 35, "exact: " + exact);

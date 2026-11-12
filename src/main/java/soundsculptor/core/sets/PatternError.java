@@ -1,4 +1,4 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 /**
  * Why a rule pattern was refused (PRD FR-4.2). The UI shows the translated message under the field and disables Save.

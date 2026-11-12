@@ -11,7 +11,7 @@ import soundsculptor.core.cue.CueRules;
 import soundsculptor.core.cue.CueSettings;
 import soundsculptor.core.limit.RepeatLimiter;
 import soundsculptor.core.recent.PlayStatus;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.trace.LastPlays;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.SoundDecision;
@@ -32,7 +32,7 @@ import soundsculptor.core.zones.Zone;
  * Bypass, vanilla-covered sounds (Music, UI, Voice/Speech) and the time before a profile is loaded leave the sound as
  * vanilla plays it.
  *
- * <p>Each rule has its own repeat-limit counter (FR-6.7). Rule IDs are unique only within one list, so a zone rule's
+ * <p>Each rule has its own repeat-limit counter (FR-6.7). SetEntry IDs are unique only within one list, so a zone rule's
  * counter is keyed by its zone as well ({@link #limiterKey}); a global {@code r1} and zone {@code a}'s {@code r1}
  * never share a count. Counters survive profile saves that keep the rule.
  *
@@ -47,8 +47,8 @@ public final class SoundStartDecider {
 	private final RepeatLimiter limiter = new RepeatLimiter();
 	private final SoundDecision decision = new SoundDecision();
 	private Precedence precedence;
-	private Map<Rule, String> globalKeys = Map.of();
-	private Map<Zone, Map<Rule, String>> zoneKeys = Map.of();
+	private Map<SetEntry, String> globalKeys = Map.of();
+	private Map<Zone, Map<SetEntry, String>> zoneKeys = Map.of();
 	private CueSettings cueSettings = CueSettings.DEFAULT;
 	private boolean boostSupported = true;
 
@@ -62,19 +62,19 @@ public final class SoundStartDecider {
 	 * exist keep counting; the rest are forgotten.
 	 */
 	public void setProfile(Precedence precedence) {
-		Map<Rule, String> global = new IdentityHashMap<>();
+		Map<SetEntry, String> global = new IdentityHashMap<>();
 		Set<String> keys = new HashSet<>();
-		for (Rule rule : precedence.globalRules().rulesInOrder()) {
+		for (SetEntry rule : precedence.globalRules().rulesInOrder()) {
 			String key = limiterKey(null, rule.id());
 			global.put(rule, key);
 			keys.add(key);
 		}
-		Map<Zone, Map<Rule, String>> zones = new IdentityHashMap<>();
+		Map<Zone, Map<SetEntry, String>> zones = new IdentityHashMap<>();
 		List<Zone> list = precedence.zones();
 		for (int i = 0; i < list.size(); i++) {
 			Zone zone = list.get(i);
-			Map<Rule, String> rules = new IdentityHashMap<>();
-			for (Rule rule : precedence.zoneRules(i).rulesInOrder()) {
+			Map<SetEntry, String> rules = new IdentityHashMap<>();
+			for (SetEntry rule : precedence.zoneRules(i).rulesInOrder()) {
 				String key = limiterKey(zone, rule.id());
 				rules.put(rule, key);
 				keys.add(key);
@@ -172,8 +172,8 @@ public final class SoundStartDecider {
 		}
 	}
 
-	private String keyOf(Zone zone, Rule rule) {
-		Map<Rule, String> keys = zone == null ? globalKeys : zoneKeys.get(zone);
+	private String keyOf(Zone zone, SetEntry rule) {
+		Map<SetEntry, String> keys = zone == null ? globalKeys : zoneKeys.get(zone);
 		String key = keys == null ? null : keys.get(rule);
 		// Not in the snapshot's maps can only mean a rule from another snapshot: key it the same way (allocates).
 		return key != null ? key : limiterKey(zone, rule.id());

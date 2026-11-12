@@ -1,11 +1,11 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RecentLog;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.SoundHook;
 import soundsculptor.mc.ui.SculptDialog;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -53,7 +53,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			// FR-4 AC 1: rule minecraft:entity.villager.* set to Mute, made with the keyboard from the Rules tab.
 			context.runOnClient(mc -> main(mc).setFocused(main(mc).addRuleButton));
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
-			context.waitForScreen(RuleEditorScreen.class);
+			context.waitForScreen(EntryEditorScreen.class);
 			// 6.2: a fresh editor shows no error yet, but Save is disabled until the pattern is valid.
 			check(editor(context, e -> !e.patternField.isErrorShown() && !e.saveButton.active),
 					"a new rule should open without an error shown and with Save disabled");
@@ -74,13 +74,13 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.getInput().pressKey(InputConstants.KEY_BACKSPACE);
 			context.waitTicks(1);
 			check(editor(context, e -> !e.patternField.isErrorShown() && e.saveButton.active), "removing # should clear the error");
-			context.runOnClient(mc -> editor(mc).setMute(RuleEditorScreen.MuteChoice.MUTE));
+			context.runOnClient(mc -> editor(mc).setMute(EntryEditorScreen.MuteChoice.MUTE));
 			context.takeScreenshot("m5-editor-villager-mute");
 			context.runOnClient(mc -> editor(mc).save());
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().size() == 1), "Save should add the rule");
 			String wildcardId = context.computeOnClient(mc -> ProfileManager.profile().globalRules().get(0).id());
-			int listed = context.computeOnClient(mc -> soundsculptor.core.lists.RuleSummary.matchCount(ProfileManager.profile().rule(wildcardId),
+			int listed = context.computeOnClient(mc -> soundsculptor.core.lists.EntrySummary.matchCount(ProfileManager.profile().rule(wildcardId),
 					soundsculptor.mc.KnownSounds.ids()));
 			int previewed = context.computeOnClient(mc -> soundsculptor.core.editor.PatternPreview.of("minecraft:entity.villager.*",
 					soundsculptor.mc.KnownSounds.ids(), soundsculptor.mc.KnownSounds.seenExcluded()).count());
@@ -91,8 +91,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(play(context, TRADER_AMBIENT, SoundSource.NEUTRAL), "the wandering trader is not a villager and should play");
 
 			// FR-4 AC 3: an exact rule at 100% below the mute rule wins for that one sound.
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.create(main(mc))));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(main(mc))));
+			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars(VILLAGER_AMBIENT);
 			context.runOnClient(mc -> editor(mc).setFocused(editor(mc).volumeField));
 			context.getInput().typeChars("100");
@@ -103,8 +103,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(play(context, VILLAGER_AMBIENT, SoundSource.NEUTRAL), "the exact rule should let villager ambient play");
 			check(lastStartFactor == 1.0F, "at 100% the volume is unchanged");
 			check(!play(context, VILLAGER_HURT, SoundSource.NEUTRAL), "other villager sounds stay muted");
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.edit(main(mc), ProfileManager.profile().rule(wildcardId))));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(main(mc), ProfileManager.profile().rule(wildcardId))));
+			context.waitForScreen(EntryEditorScreen.class);
 			String overridden = editor(context, e -> e.overriddenText().getString());
 			check(overridden.equals("Partly overridden by: " + VILLAGER_AMBIENT), "the wildcard rule should say it is overridden, was " + overridden);
 			context.takeScreenshot("m5-editor-overridden");
@@ -112,7 +112,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(SoundSculptorScreen.class);
 
 			// FR-4 AC 2 and FR-5 AC: *:block.*.step at 50% makes every footstep quieter, by the rule's factor.
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(Rule.of(p.newRuleId(), "*:block.*.step").withVolume(50))));
+			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(SetEntry.of(p.newRuleId(), "*:block.*.step").withVolume(50))));
 			check(play(context, STONE_STEP, SoundSource.BLOCKS), "a 50% sound still plays");
 			check(lastStartFactor == 0.5F, "stone steps should play at 50%");
 			check(play(context, WOOD_STEP, SoundSource.BLOCKS), "a 50% sound still plays");
@@ -123,8 +123,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 
 			// A-2: edit a rule's volume with the keyboard only: the slider moves in 5% steps.
 			String stepId = context.computeOnClient(mc -> ProfileManager.profile().globalRules().get(2).id());
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.edit(main(mc), ProfileManager.profile().rule(stepId))));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(main(mc), ProfileManager.profile().rule(stepId))));
+			context.waitForScreen(EntryEditorScreen.class);
 			context.runOnClient(mc -> editor(mc).setFocused(editor(mc).volumeSlider));
 			context.getInput().pressKey(InputConstants.KEY_LEFT);
 			context.getInput().pressKey(InputConstants.KEY_LEFT);
@@ -135,7 +135,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(SculptDialog.class);
 			context.takeScreenshot("m5-editor-unsaved-dialog");
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(2));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.waitForScreen(EntryEditorScreen.class);
 			check(editor(context, e -> e.volumeField.getValue()).equals("40"), "Keep editing should keep 40%");
 			context.runOnClient(mc -> editor(mc).save());
 			context.waitForScreen(SoundSculptorScreen.class);
@@ -156,7 +156,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(!play(context, VILLAGER_HURT, SoundSource.NEUTRAL), "with the rule on again, villager hurt is muted");
 
 			// Vanilla-covered sounds are never changed, not even by *.
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(Rule.of(p.newRuleId(), "*").withMute(true))));
+			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(SetEntry.of(p.newRuleId(), "*").withMute(true))));
 			check(context.computeOnClient(mc -> {
 				SoundInstance click = SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.parse(UI_CLICK)), 1.0F);
 				mc.getSoundManager().play(click);
@@ -182,8 +182,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(play(context, TRADER_AMBIENT, SoundSource.NEUTRAL), "after deleting *, the trader plays again");
 
 			// Edit from Recently Played opens the sound's exact rule.
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.forSound(main(mc), VILLAGER_AMBIENT)));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.forSound(main(mc), VILLAGER_AMBIENT)));
+			context.waitForScreen(EntryEditorScreen.class);
 			check(editor(context, e -> e.draft().build().volume() == 100), "Edit should open the existing exact rule");
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitForScreen(SoundSculptorScreen.class);
@@ -220,12 +220,12 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 		return (SoundSculptorScreen) mc.gui.screen();
 	}
 
-	private static RuleEditorScreen editor(Minecraft mc) {
-		check(mc.gui.screen() instanceof RuleEditorScreen, "expected the rule editor, found " + mc.gui.screen());
-		return (RuleEditorScreen) mc.gui.screen();
+	private static EntryEditorScreen editor(Minecraft mc) {
+		check(mc.gui.screen() instanceof EntryEditorScreen, "expected the rule editor, found " + mc.gui.screen());
+		return (EntryEditorScreen) mc.gui.screen();
 	}
 
-	private static <T> T editor(ClientGameTestContext context, Function<RuleEditorScreen, T> read) {
+	private static <T> T editor(ClientGameTestContext context, Function<EntryEditorScreen, T> read) {
 		return context.computeOnClient(mc -> read.apply(editor(mc)));
 	}
 

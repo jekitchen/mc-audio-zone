@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.RuleResolver;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.EntryResolver;
+import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.SoundDecision;
@@ -108,18 +108,18 @@ public final class SoundTracer {
 	}
 
 	/** The matched rules of one list and the winner per setting, with the specificity step that decided it. */
-	static ListTrace explain(RuleResolver rules, String soundId) {
-		List<Rule> matched = new ArrayList<>();
-		for (Rule rule : rules.rulesInOrder()) {
+	static ListTrace explain(EntryResolver rules, String soundId) {
+		List<SetEntry> matched = new ArrayList<>();
+		for (SetEntry rule : rules.rulesInOrder()) {
 			if (rule.pattern().matches(soundId)) {
 				matched.add(rule);
 			}
 		}
-		Map<TraceProperty, RuleWinner> winners = new EnumMap<>(TraceProperty.class);
+		Map<TraceProperty, EntryWinner> winners = new EnumMap<>(TraceProperty.class);
 		for (TraceProperty property : TraceProperty.values()) {
-			Rule winner = null;
-			Rule runnerUp = null;
-			for (Rule rule : matched) {
+			SetEntry winner = null;
+			SetEntry runnerUp = null;
+			for (SetEntry rule : matched) {
 				if (!property.setBy(rule)) {
 					continue;
 				}
@@ -131,28 +131,28 @@ public final class SoundTracer {
 				}
 			}
 			if (winner != null) {
-				winners.put(property, new RuleWinner(winner, ruleReason(winner, runnerUp)));
+				winners.put(property, new EntryWinner(winner, ruleReason(winner, runnerUp)));
 			}
 		}
 		return new ListTrace(matched, winners);
 	}
 
-	private static RuleWinReason ruleReason(Rule winner, Rule runnerUp) {
+	private static EntryWinReason ruleReason(SetEntry winner, SetEntry runnerUp) {
 		if (runnerUp == null) {
-			return RuleWinReason.ONLY_MATCH;
+			return EntryWinReason.ONLY_MATCH;
 		}
 		SoundPattern w = winner.pattern();
 		SoundPattern r = runnerUp.pattern();
 		if (w.isExact() && !r.isExact()) {
-			return RuleWinReason.EXACT_ID;
+			return EntryWinReason.EXACT_ID;
 		}
 		if (w.literalCount() > r.literalCount()) {
-			return RuleWinReason.MORE_LITERAL;
+			return EntryWinReason.MORE_LITERAL;
 		}
 		if (w.starCount() < r.starCount()) {
-			return RuleWinReason.FEWER_STARS;
+			return EntryWinReason.FEWER_STARS;
 		}
-		return RuleWinReason.LIST_ORDER;
+		return EntryWinReason.LIST_ORDER;
 	}
 
 	/** Picks the winning zone for one setting exactly as {@code Precedence.decide} does, and names the deciding step. */

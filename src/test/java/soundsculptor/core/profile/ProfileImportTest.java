@@ -10,7 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Shape;
 
 import soundsculptor.core.TestEnglish;
@@ -119,9 +119,9 @@ class ProfileImportTest {
 
 	@Test
 	void zoneRulesCountTowardsTheRuleLimit() throws ProfileFormatException {
-		List<Rule> many = new java.util.ArrayList<>();
+		List<SetEntry> many = new java.util.ArrayList<>();
 		for (int i = 0; i < 1000; i++) {
-			many.add(Rule.of("g" + i, "a:b" + i));
+			many.add(SetEntry.of("g" + i, "a:b" + i));
 		}
 		Profile p = new Profile("A", ProfileSettings.DEFAULTS, many);
 		ProfileImport.check(ProfileCodec.toJson(p));

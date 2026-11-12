@@ -3,7 +3,7 @@ package soundsculptor.core.trace;
 import java.util.ArrayList;
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 
 /**
@@ -24,7 +24,7 @@ public final class TraceEditor {
 	}
 
 	/** Applies one inline control to a rule line: a global rule, or the zone rule shown on a zone line. */
-	public static TraceEditResult edit(TraceEditContext ctx, EditableRules rules, RuleLocation where, RuleEdit edit) {
+	public static TraceEditResult edit(TraceEditContext ctx, EditableRules rules, RuleLocation where, EntryEdit edit) {
 		TraceEditError invalid = edit.validate();
 		if (invalid != null) {
 			return refused(ctx, rules, invalid);
@@ -34,7 +34,7 @@ public final class TraceEditor {
 			if (i < 0) {
 				return refused(ctx, rules, TraceEditError.RULE_NOT_FOUND);
 			}
-			Rule changed = edit.apply(rules.globalRules().get(i));
+			SetEntry changed = edit.apply(rules.globalRules().get(i));
 			EditableRules after = new EditableRules(replace(rules.globalRules(), i, changed), rules.zones());
 			return applied(ctx, rules, after, TOAST_CHANGED, changed.pattern().text());
 		}
@@ -47,7 +47,7 @@ public final class TraceEditor {
 		if (i < 0) {
 			return refused(ctx, rules, TraceEditError.RULE_NOT_FOUND);
 		}
-		Rule changed = edit.apply(zone.rules().get(i));
+		SetEntry changed = edit.apply(zone.rules().get(i));
 		Zone edited = withRules(zone, replace(zone.rules(), i, changed));
 		EditableRules after = new EditableRules(rules.globalRules(), replace(rules.zones(), z, edited));
 		return applied(ctx, rules, after, TOAST_CHANGED, changed.pattern().text());
@@ -71,7 +71,7 @@ public final class TraceEditor {
 	 * in a zone shown in the trace, with {@code edit} applied. An exact rule for the sound already in that list is
 	 * reused, and turned on, instead of adding a second one.
 	 */
-	public static TraceEditResult addRuleForSound(TraceEditContext ctx, EditableRules rules, String zoneId, RuleEdit edit) {
+	public static TraceEditResult addRuleForSound(TraceEditContext ctx, EditableRules rules, String zoneId, EntryEdit edit) {
 		ExactRules.Change change = ExactRules.edit(rules, zoneId, ctx.soundId(), edit, false);
 		if (change.error() != null) {
 			return refused(ctx, rules, change.error());
@@ -85,12 +85,12 @@ public final class TraceEditor {
 	 * specific matching rule. {@code null} when the zone is not in the trace or none of its rules match; the panel
 	 * then offers "Add rule for this sound".
 	 */
-	public static Rule matchedZoneRule(SoundTrace trace, String zoneId, TraceProperty property) {
+	public static SetEntry matchedZoneRule(SoundTrace trace, String zoneId, TraceProperty property) {
 		for (ZoneLine line : trace.zones()) {
 			if (!line.zone().id().equals(zoneId)) {
 				continue;
 			}
-			RuleWinner winner = line.rules().winners().get(property);
+			EntryWinner winner = line.rules().winners().get(property);
 			if (winner != null) {
 				return winner.rule();
 			}
@@ -116,7 +116,7 @@ public final class TraceEditor {
 		return new TraceEditResult(null, before, after, ctx.trace(after), ctx.play() != null, toastKey, List.of(toastArg));
 	}
 
-	static Zone withRules(Zone zone, List<Rule> rules) {
+	static Zone withRules(Zone zone, List<SetEntry> rules) {
 		return new Zone(zone.id(), zone.name(), zone.enabled(), zone.worldKey(), zone.dimension(), zone.anchor(), zone.shape(),
 				rules, zone.mode(), zone.edge(), zone.anchorType());
 	}

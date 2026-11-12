@@ -3,18 +3,18 @@ package soundsculptor.mc;
 import soundsculptor.core.editor.FieldError;
 import soundsculptor.core.editor.PatternPreview;
 import soundsculptor.core.editor.PatternSuggestions;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.search.SearchQuery;
 import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundSearch;
-import soundsculptor.core.editor.RuleDraft;
-import soundsculptor.core.editor.RuleDraft.Field;
+import soundsculptor.core.editor.EntryDraft;
+import soundsculptor.core.editor.EntryDraft.Field;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.QuickActions;
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.RuleResolver;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.EntryResolver;
 import soundsculptor.core.ui.SliderModel;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.ui.SculptButton;
@@ -41,7 +41,7 @@ import net.minecraft.resources.Identifier;
  * Cancel, with the unsaved-changes dialog (FR-12.4), a reset button per value (FR-12.6) and inline errors that disable
  * Save (FR-12.7). Limit and Cue arrive with their milestones (M11, M9); a rule's existing limit and cue are kept.
  */
-public final class RuleEditorScreen extends SculptScreen {
+public final class EntryEditorScreen extends SculptScreen {
 	private static final Identifier RESET_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/reset");
 	private static final int ENABLED_WIDTH = 110;
 	private static final int MUTE_WIDTH = 170;
@@ -64,7 +64,7 @@ public final class RuleEditorScreen extends SculptScreen {
 		}
 	}
 
-	private final RuleDraft draft;
+	private final EntryDraft draft;
 	/** The global list, or one zone's list. */
 	private final RuleTarget target;
 	private PatternPreview preview;
@@ -86,7 +86,7 @@ public final class RuleEditorScreen extends SculptScreen {
 	public SculptList matchList;
 	public SculptButton saveButton;
 
-	private RuleEditorScreen(Screen parent, RuleTarget target, RuleDraft draft, boolean isNew) {
+	private EntryEditorScreen(Screen parent, RuleTarget target, EntryDraft draft, boolean isNew) {
 		super(Component.translatable(isNew ? "soundsculptor.rule_editor.title.new" : "soundsculptor.rule_editor.title.edit"), parent);
 		this.target = target;
 		this.draft = draft;
@@ -94,27 +94,27 @@ public final class RuleEditorScreen extends SculptScreen {
 	}
 
 	/** Opens the editor for a new rule. */
-	public static RuleEditorScreen create(Screen parent) {
+	public static EntryEditorScreen create(Screen parent) {
 		return create(parent, RuleTarget.GLOBAL);
 	}
 
 	/** Opens the editor for a new rule in a zone's list or the global list (FR-8.6). */
-	public static RuleEditorScreen create(Screen parent, RuleTarget target) {
-		return new RuleEditorScreen(parent, target, RuleDraft.blank(target.newRuleId(ProfileManager.profile()), false), true);
+	public static EntryEditorScreen create(Screen parent, RuleTarget target) {
+		return new EntryEditorScreen(parent, target, EntryDraft.blank(target.newRuleId(ProfileManager.profile()), false), true);
 	}
 
 	/** Opens the editor for an existing rule. */
-	public static RuleEditorScreen edit(Screen parent, Rule rule) {
+	public static EntryEditorScreen edit(Screen parent, SetEntry rule) {
 		return edit(parent, RuleTarget.GLOBAL, rule);
 	}
 
 	/** Opens the editor for an existing rule of a zone's list or the global list. */
-	public static RuleEditorScreen edit(Screen parent, RuleTarget target, Rule rule) {
-		return new RuleEditorScreen(parent, target, RuleDraft.of(rule, false), false);
+	public static EntryEditorScreen edit(Screen parent, RuleTarget target, SetEntry rule) {
+		return new EntryEditorScreen(parent, target, EntryDraft.of(rule, false), false);
 	}
 
 	/** Opens the editor on a sound's exact-ID rule, or a new exact-ID rule for it. */
-	public static RuleEditorScreen forSound(Screen parent, String soundId) {
+	public static EntryEditorScreen forSound(Screen parent, String soundId) {
 		return forSound(parent, ApplyTarget.EVERYWHERE, soundId);
 	}
 
@@ -122,19 +122,19 @@ public final class RuleEditorScreen extends SculptScreen {
 	 * Opens the editor on the sound's exact-ID rule in the list "Apply to" chose (FR-1.5, FR-3.7), or a new exact-ID
 	 * rule for it there.
 	 */
-	public static RuleEditorScreen forSound(Screen parent, ApplyTarget applyTo, String soundId) {
+	public static EntryEditorScreen forSound(Screen parent, ApplyTarget applyTo, String soundId) {
 		RuleTarget target = applyTo.isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(applyTo.zoneId());
-		Rule exact = QuickActions.exactRule(ProfileManager.profile(), applyTo, soundId);
+		SetEntry exact = QuickActions.exactRule(ProfileManager.profile(), applyTo, soundId);
 		if (exact != null) {
 			return edit(parent, target, exact);
 		}
-		RuleEditorScreen screen = create(parent, target);
+		EntryEditorScreen screen = create(parent, target);
 		screen.draft.set(Field.PATTERN, soundId);
 		screen.updatePreview();
 		return screen;
 	}
 
-	public RuleDraft draft() {
+	public EntryDraft draft() {
 		return draft;
 	}
 
@@ -215,7 +215,7 @@ public final class RuleEditorScreen extends SculptScreen {
 		String volumeText = draft.text(Field.VOLUME);
 		double initialVolume = draft.error(Field.VOLUME) == null && !volumeText.isBlank() ? Double.parseDouble(volumeText.trim()) : inheritedVolume;
 		volumeSlider = Tooltips.describe(new SculptSlider(SLIDER_WIDTH, Component.translatable("soundsculptor.rule_editor.volume"),
-				new SliderModel(Rule.MIN_VOLUME, 100, 5, 1, 100, initialVolume),
+				new SliderModel(SetEntry.MIN_VOLUME, 100, 5, 1, 100, initialVolume),
 				value -> draft.text(Field.VOLUME).isBlank()
 						? Component.translatable("soundsculptor.rule_editor.volume.not_set", inheritedText())
 						: Component.literal((int) value + "%"),
@@ -356,12 +356,12 @@ public final class RuleEditorScreen extends SculptScreen {
 		if (!draft.canSave()) {
 			return;
 		}
-		Rule candidate = draft.build();
+		SetEntry candidate = draft.build();
 		Profile withCandidate = target.put(ProfileManager.profile(), candidate);
-		Set<Rule> winners = new RuleResolver(target.rules(withCandidate)).overriddenBy(candidate, preview.matches());
+		Set<SetEntry> winners = new EntryResolver(target.rules(withCandidate)).overriddenBy(candidate, preview.matches());
 		if (!winners.isEmpty()) {
 			List<String> patterns = new ArrayList<>();
-			for (Rule winner : winners) {
+			for (SetEntry winner : winners) {
 				patterns.add(winner.pattern().text());
 			}
 			overridden = Component.translatable("soundsculptor.rule_editor.overridden", String.join(", ", patterns));
@@ -386,13 +386,13 @@ public final class RuleEditorScreen extends SculptScreen {
 			return;
 		}
 		String id = draft.id();
-		List<Rule> others = new ArrayList<>();
-		for (Rule rule : target.rules(ProfileManager.profile())) {
+		List<SetEntry> others = new ArrayList<>();
+		for (SetEntry rule : target.rules(ProfileManager.profile())) {
 			if (!rule.id().equals(id)) {
 				others.add(rule);
 			}
 		}
-		soundsculptor.core.rules.RuleResolution resolution = new RuleResolver(others).resolve(pattern);
+		soundsculptor.core.sets.EntryResolution resolution = new EntryResolver(others).resolve(pattern);
 		inheritedMuted = resolution.muted();
 		inheritedVolume = resolution.volumePercent();
 	}
@@ -533,7 +533,7 @@ public final class RuleEditorScreen extends SculptScreen {
 			volumeField.revealError();
 			return false;
 		}
-		Rule rule = draft.build();
+		SetEntry rule = draft.build();
 		ProfileManager.update(profile -> target.put(profile, rule));
 		return true;
 	}

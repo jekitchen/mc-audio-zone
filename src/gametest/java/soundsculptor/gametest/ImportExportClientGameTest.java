@@ -2,7 +2,7 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileCodec;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -38,10 +38,10 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			Profile original = Profile.empty("Export test")
-					.putRule(Rule.of("r1", "minecraft:entity.villager.*").withMute(true))
+					.putRule(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))
 					.withZones(List.of(
 							new Zone("hall", "Trading hall", true, key, "minecraft:overworld", new Point(120.5, 64, -33.25),
-									new Shape.Box(20, 8, 12), List.of(Rule.of("z1", "*cow*").withVolume(40))),
+									new Shape.Box(20, 8, 12), List.of(SetEntry.of("z1", "*cow*").withVolume(40))),
 							new Zone("near", "Near", true, key, "minecraft:the_nether", new Point(-7, 30, 9), new Shape.Sphere(16), List.of())));
 			context.runOnClient(mc -> ProfileManager.update(p -> original));
 			Path imports = context.computeOnClient(mc -> ProfileTransfer.importsDir());
@@ -78,8 +78,8 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 			// Another server's export (FR-11.5): rules, bubble and settings come in; its 2 fixed zones are skipped, and both
 			// the dialog and the toast say so; this world's own fixed zones stay.
 			Profile serverA = Profile.empty("Server A")
-					.putRule(Rule.of("a1", "*bee*").withVolume(20))
-					.putRule(Rule.of("a2", "*zombie*").withMute(true))
+					.putRule(SetEntry.of("a1", "*bee*").withVolume(20))
+					.putRule(SetEntry.of("a2", "*zombie*").withMute(true))
 					.withZones(List.of(zoneFor("fa1", A), zoneFor("fa2", A), zoneFor("ba", A).asBubble()));
 			write(imports.resolve("server-a.json"), ProfileCodec.toJson(serverA, A));
 			importFromScreen(context, "server-a.json");

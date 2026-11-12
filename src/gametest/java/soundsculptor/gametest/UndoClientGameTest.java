@@ -1,7 +1,7 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -103,7 +103,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 
 			// Undo is refused once the profile changed some other way, and nothing changes.
 			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(Rule.of("other", "minecraft:entity.cow.*").withVolume(40))));
+			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(SetEntry.of("other", "minecraft:entity.cow.*").withVolume(40))));
 			context.runOnClient(mc -> main(mc).pressUndo());
 			check(toastText(context).startsWith("Can't undo"), "a stale Undo should say it can't undo, was " + toastText(context));
 			check(context.computeOnClient(mc -> ProfileManager.profile().isExactMuted(VILLAGER)
@@ -111,8 +111,8 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 
 			// Rules tab: On/Off, Move and Delete each offer Undo.
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.putRule(Rule.of("a", "minecraft:entity.cow.*").withVolume(40))
-					.putRule(Rule.of("b", "minecraft:entity.pig.*").withMute(true))));
+					.putRule(SetEntry.of("a", "minecraft:entity.cow.*").withVolume(40))
+					.putRule(SetEntry.of("b", "minecraft:entity.pig.*").withMute(true))));
 			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_RULES));
 			context.runOnClient(mc -> main(mc).setRuleEnabled("a", false));
 			check(toastText(context).equals("Turned off minecraft:entity.cow.*"), "On/Off toast, was " + toastText(context));
@@ -126,14 +126,14 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> ProfileManager.profile().rule("a")) == null, "Delete applies at once");
 			check(toastText(context).equals("Deleted the rule for minecraft:entity.cow.*"), "Delete toast, was " + toastText(context));
 			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().stream().map(Rule::id).toList())
+			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().stream().map(SetEntry::id).toList())
 					.equals(List.of("a", "b")), "Undo brings the deleted rule back in its place");
 			check(context.computeOnClient(mc -> main(mc).rulesList.findRow("a")) != null, "the restored rule is listed again");
 
 			// Zones tab: Delete a zone (with its rules), then Undo.
 			context.runOnClient(mc -> ProfileManager.update(p -> p.withZones(List.of(
 					new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Box(9, 3, 9),
-							List.of(Rule.of("r1", "minecraft:entity.sheep.*").withMute(true)))))));
+							List.of(SetEntry.of("r1", "minecraft:entity.sheep.*").withMute(true)))))));
 			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_ZONES));
 			context.runOnClient(mc -> main(mc).zonesPanel().setEnabled("z1", false));
 			check(toastText(context).equals("Turned off Pen"), "zone On/Off toast, was " + toastText(context));

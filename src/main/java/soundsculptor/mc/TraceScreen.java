@@ -3,14 +3,14 @@ package soundsculptor.mc;
 import soundsculptor.core.Translator;
 import soundsculptor.core.boost.BoostWarning;
 import soundsculptor.core.editor.FieldError;
-import soundsculptor.core.editor.RuleDraft;
+import soundsculptor.core.editor.EntryDraft;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.trace.EditableRules;
 import soundsculptor.core.trace.LastPlay;
-import soundsculptor.core.trace.RuleEdit;
+import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.trace.RuleLocation;
 import soundsculptor.core.trace.SoundTrace;
 import soundsculptor.core.trace.TraceEditContext;
@@ -210,15 +210,15 @@ public final class TraceScreen extends SculptScreen {
 	private List<SculptButton> buttons(TraceText.Target target) {
 		List<SculptButton> buttons = new ArrayList<>();
 		if (target instanceof TraceText.RuleTarget ruleTarget) {
-			Rule rule = ruleTarget.rule();
+			SetEntry rule = ruleTarget.rule();
 			RuleLocation where = ruleTarget.where();
 			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(rule.enabled()), ON_OFF_WIDTH,
-					() -> edit(where, new RuleEdit.Enabled(!rule.enabled()))),
+					() -> edit(where, new EntryEdit.Enabled(!rule.enabled()))),
 					Component.translatable(rule.enabled() ? "soundsculptor.rules.turn_off" : "soundsculptor.rules.turn_on")));
 			boolean muted = Boolean.TRUE.equals(rule.mute());
 			boolean cueDefault = ProfileManager.profile().settings().cueDefault();
 			buttons.add(SculptButton.text(Component.translatable(muted ? "soundsculptor.recent.unmute" : "soundsculptor.recent.mute"), MUTE_WIDTH,
-					() -> edit(where, muted ? new RuleEdit.UnmuteWithCue(cueDefault) : new RuleEdit.MuteWithCue(cueDefault))));
+					() -> edit(where, muted ? new EntryEdit.UnmuteWithCue(cueDefault) : new EntryEdit.MuteWithCue(cueDefault))));
 			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.trace.edit.volume"), VOLUME_WIDTH,
 					() -> openVolume(where, rule)), Component.translatable("soundsculptor.trace.edit.volume.tip")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.trace.edit.open_rule"), () -> openRuleEditor(where)));
@@ -239,7 +239,7 @@ public final class TraceScreen extends SculptScreen {
 	// ---- Edits ----
 
 	/** An On/Off or Mute button on a rule line. */
-	public void edit(RuleLocation where, RuleEdit edit) {
+	public void edit(RuleLocation where, EntryEdit edit) {
 		applyOne(TraceEditor.edit(context(), currentRules(), where, edit));
 	}
 
@@ -253,10 +253,10 @@ public final class TraceScreen extends SculptScreen {
 	 * yet, so its line appears with the same controls. Focus moves to it.
 	 */
 	public void addRule(String zoneId) {
-		TraceEditResult result = TraceEditor.addRuleForSound(context(), currentRules(), zoneId, new RuleEdit.Enabled(true));
+		TraceEditResult result = TraceEditor.addRuleForSound(context(), currentRules(), zoneId, new EntryEdit.Enabled(true));
 		applyOne(result);
 		if (result.ok() && lines != null) {
-			Rule added = soundsculptor.core.trace.ExactRules.find(result.after(), zoneId, soundId);
+			SetEntry added = soundsculptor.core.trace.ExactRules.find(result.after(), zoneId, soundId);
 			SculptList.Row row = added == null ? null : lines.findRow(key(new TraceText.RuleTarget(new RuleLocation(zoneId, added.id()), added), -1));
 			if (row != null && !row.buttons().isEmpty()) {
 				focusPath(ComponentPath.path(lines, ComponentPath.path(row, ComponentPath.leaf(row.buttons().get(0)))));
@@ -315,7 +315,7 @@ public final class TraceScreen extends SculptScreen {
 	// ---- Volume panel ----
 
 	/** Opens the Volume panel for a rule line: a slider and a number field that apply as they change. */
-	public void openVolume(RuleLocation where, Rule rule) {
+	public void openVolume(RuleLocation where, SetEntry rule) {
 		finishVolume();
 		volumeTarget = where;
 		volumeBefore = ProfileManager.profile();
@@ -330,14 +330,14 @@ public final class TraceScreen extends SculptScreen {
 		volumeField.setValue(rule.volume() == null ? "" : rule.volume().toString());
 		volumeField.placeholder(Component.translatable("soundsculptor.trace.edit.volume_not_set"));
 		// Checked exactly like the rule editor's Volume field (FR-12.7), e.g. "250" is refused and nothing changes.
-		RuleDraft check = RuleDraft.of(rule, false);
+		EntryDraft check = EntryDraft.of(rule, false);
 		volumeField.validator(value -> {
-			check.set(RuleDraft.Field.VOLUME, value);
-			FieldError error = check.error(RuleDraft.Field.VOLUME);
+			check.set(EntryDraft.Field.VOLUME, value);
+			FieldError error = check.error(EntryDraft.Field.VOLUME);
 			return error == null ? null : Component.translatable(error.translationKey(), error.args().toArray());
 		});
 		volumeSlider = Tooltips.describe(new SculptSlider(sliderWidth, Component.translatable("soundsculptor.rule_editor.volume"),
-				new SliderModel(Rule.MIN_VOLUME, max, 5, 1, 100, Math.min(max, initial)),
+				new SliderModel(SetEntry.MIN_VOLUME, max, 5, 1, 100, Math.min(max, initial)),
 				value -> Component.literal((int) value + "%"), null,
 				value -> {
 					if (!volumeField.isFocused()) {
@@ -367,7 +367,7 @@ public final class TraceScreen extends SculptScreen {
 	}
 
 	private void applyVolume(Integer volume) {
-		TraceEditResult result = TraceEditor.edit(context(), currentRules(), volumeTarget, new RuleEdit.Volume(volume));
+		TraceEditResult result = TraceEditor.edit(context(), currentRules(), volumeTarget, new EntryEdit.Volume(volume));
 		if (!result.ok()) {
 			showToast(errorText(result.error()), null);
 			return;
@@ -393,12 +393,12 @@ public final class TraceScreen extends SculptScreen {
 	/** "Open full editor" on a rule line: for changes the panel does not offer, such as the pattern. */
 	public void openRuleEditor(RuleLocation where) {
 		RuleTarget target = where.isGlobal() ? RuleTarget.GLOBAL : RuleTarget.zone(where.zoneId());
-		Rule rule = target.rule(ProfileManager.profile(), where.ruleId());
+		SetEntry rule = target.rule(ProfileManager.profile(), where.ruleId());
 		if (rule == null) {
 			showToast(errorText(TraceEditError.RULE_NOT_FOUND), null);
 			return;
 		}
-		minecraft.gui.setScreen(RuleEditorScreen.edit(this, target, rule));
+		minecraft.gui.setScreen(EntryEditorScreen.edit(this, target, rule));
 	}
 
 	/** "Open full editor" on a zone line: shape, size and anchor. */

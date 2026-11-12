@@ -12,10 +12,10 @@ import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.ApplyTo;
 import soundsculptor.core.quick.QuickActionResult;
 import soundsculptor.core.quick.QuickActions;
-import soundsculptor.core.trace.RuleEdit;
+import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.trace.TraceEditError;
 import soundsculptor.core.zones.Point;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundNames;
@@ -328,7 +328,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 	/** Quick action Edit: opens the rule editor on the sound's exact-ID rule (a new one if it has none). */
 	private SculptButton editSoundButton(String soundId) {
 		return SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.recent.edit"),
-				() -> minecraft.gui.setScreen(RuleEditorScreen.forSound(this, applyTarget(), soundId)));
+				() -> minecraft.gui.setScreen(EntryEditorScreen.forSound(this, applyTarget(), soundId)));
 	}
 
 	/** Why?: the sound trace for this sound's most recent play (FR-14.1). */
@@ -344,7 +344,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 	public void toggleMute(String soundId) {
 		ApplyTarget target = applyTarget();
 		Profile profile = ProfileManager.profile();
-		RuleEdit edit = QuickActions.toggleMute(profile, target, soundId);
+		EntryEdit edit = QuickActions.toggleMute(profile, target, soundId);
 		QuickActionResult result = QuickActions.apply(profile, target, soundId, edit);
 		if (!result.ok()) {
 			showToast(errorText(result.error()), null);
@@ -352,7 +352,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 		}
 		if (result.changed()) {
 			ProfileManager.update(current -> result.after());
-			String toastKey = (edit instanceof RuleEdit.MuteWithCue ? "soundsculptor.recent.toast.muted" : "soundsculptor.recent.toast.unmuted")
+			String toastKey = (edit instanceof EntryEdit.MuteWithCue ? "soundsculptor.recent.toast.muted" : "soundsculptor.recent.toast.unmuted")
 					+ (target.isEverywhere() ? "" : "_in");
 			List<String> args = target.isEverywhere() ? List.of(soundName(soundId)) : List.of(soundName(soundId), target.zoneName());
 			QuickUndo.offer(this, this::refreshLists, result.before(), result.after(), toastKey, args);
@@ -544,7 +544,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 		rulesPanel.move(ruleId, delta);
 	}
 
-	public void confirmDelete(Rule rule) {
+	public void confirmDelete(SetEntry rule) {
 		rulesPanel.confirmDelete(rule);
 	}
 

@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -84,7 +84,7 @@ class WorldIdsTest {
 
 	private static Zone fixed(String id, String worldKey) {
 		return new Zone(id, "Hall " + id, true, worldKey, "minecraft:overworld", new Point(1, 64, 2), new Shape.Sphere(8),
-				List.of(Rule.of("r1", "*villager*").withVolume(50)));
+				List.of(SetEntry.of("r1", "*villager*").withVolume(50)));
 	}
 
 	@Test
@@ -92,7 +92,7 @@ class WorldIdsTest {
 		String oldKey = WorldKey.world(ID).key();
 		Zone bubble = fixed("z2", "").asBubble();
 		Profile current = Profile.empty("My World")
-				.withGlobalRules(List.of(Rule.of("r1", "minecraft:entity.villager.*").withMute(true)))
+				.withGlobalRules(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true)))
 				.withZones(List.of(fixed("z1", oldKey), bubble, fixed("z3", "play.example.net")))
 				.withZoneColor("z1", 0xE69F00);
 

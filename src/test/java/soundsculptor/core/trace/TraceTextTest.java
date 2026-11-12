@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 
 import soundsculptor.core.TestEnglish;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -27,7 +27,7 @@ class TraceTextTest {
 		return new LastPlay(true, WORLD, OVERWORLD, x, 0, 0, volume, dropped, cueShown);
 	}
 
-	private static Zone sphere(String id, double x, double radius, Rule... rules) {
+	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
 		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), List.of(rules));
 	}
 
@@ -37,8 +37,8 @@ class TraceTextTest {
 
 	@Test
 	void globalRulesShowTheWinnerItsReasonAndWhoWasOverridden() {
-		Rule wildcard = Rule.of("w", "*villager*").withMute(true);
-		Rule exact = Rule.of("e", AMBIENT).withVolume(60);
+		SetEntry wildcard = SetEntry.of("w", "*villager*").withMute(true);
+		SetEntry exact = SetEntry.of("e", AMBIENT).withVolume(60);
 		String text = text(new Precedence(List.of(wildcard, exact), List.of()), playAt(0, 60, false, false), false);
 		assertEquals(String.join("\n",
 				"Sound Sculptor trace for minecraft:entity.villager.ambient",
@@ -60,8 +60,8 @@ class TraceTextTest {
 
 	@Test
 	void zonesShowModeWeightDistanceTheirRulesAndTheWinners() {
-		Zone near = sphere("near", 3, 20, Rule.of("rn", "*villager*").withVolume(20));
-		Zone far = sphere("far", 9, 20, Rule.of("rf", "*villager*").withVolume(80));
+		Zone near = sphere("near", 3, 20, SetEntry.of("rn", "*villager*").withVolume(20));
+		Zone far = sphere("far", 9, 20, SetEntry.of("rf", "*villager*").withVolume(80));
 		String text = text(new Precedence(List.of(), List.of(far, near)), playAt(0, 20, false, false), false);
 		assertTrue(text.contains(String.join("\n",
 				"Zones",
@@ -80,7 +80,7 @@ class TraceTextTest {
 
 	@Test
 	void noticesComeFirst() {
-		Precedence p = new Precedence(List.of(Rule.of("m", AMBIENT).withMute(true)), List.of());
+		Precedence p = new Precedence(List.of(SetEntry.of("m", AMBIENT).withMute(true)), List.of());
 		List<String> lines = text(p, playAt(0, 100, false, false), true).lines().toList();
 		assertEquals("  Bypass is on: nothing is changed.", lines.get(1));
 		assertEquals("Global rules", lines.get(2));
@@ -88,7 +88,7 @@ class TraceTextTest {
 
 	@Test
 	void limitDroppedPlayAndCueShown() {
-		Rule rule = Rule.of("l", AMBIENT).withMute(true).withCue(true).withLimit(new Limit(3, 1000, true));
+		SetEntry rule = SetEntry.of("l", AMBIENT).withMute(true).withCue(true).withLimit(new Limit(3, 1000, true));
 		String text = text(new Precedence(List.of(rule), List.of()), playAt(0, 0, true, true), false);
 		assertTrue(text.endsWith(String.join("\n",
 				"Result",
@@ -102,7 +102,7 @@ class TraceTextTest {
 
 	@Test
 	void notHeardYetLeavesOutWhatHappenedAtTheLastPlay() {
-		String text = text(new Precedence(List.of(Rule.of("m", AMBIENT).withMute(true)), List.of()), null, false);
+		String text = text(new Precedence(List.of(SetEntry.of("m", AMBIENT).withMute(true)), List.of()), null, false);
 		assertTrue(text.contains("Not heard yet; zones depend on where it plays"), text);
 		assertFalse(text.contains("Last play"), text);
 		assertFalse(text.contains("cue was shown"), text);
@@ -111,7 +111,7 @@ class TraceTextTest {
 	@Test
 	void fadeWeightAndUnnamedZones() {
 		Zone fade = new Zone("z7", "", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(20),
-				List.of(Rule.of("r", "*").withMute(true))).withEdge(soundsculptor.core.zones.ZoneEdge.fade(8));
+				List.of(SetEntry.of("r", "*").withMute(true))).withEdge(soundsculptor.core.zones.ZoneEdge.fade(8));
 		String text = text(new Precedence(List.of(), List.of(fade)), playAt(16, 50, false, false), false);
 		assertTrue(text.contains("  z7 (Inside): weight 50%, 16 blocks from its anchor"), text);
 	}

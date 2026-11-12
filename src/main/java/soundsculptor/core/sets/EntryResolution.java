@@ -1,4 +1,4 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 /**
  * The winning rule for each property of one sound ID within one rule list (PRD FR-4.5). A {@code null} winner
@@ -6,9 +6,9 @@ package soundsculptor.core.rules;
  *
  * <p>Zones and the global list are combined later by the precedence step (FR-9, issue #7).
  */
-public record RuleResolution(Rule loudness, Rule limit, Rule cue) {
+public record EntryResolution(SetEntry loudness, SetEntry limit, SetEntry cue) {
 	/** Shared result for a sound no rule sets anything for. */
-	public static final RuleResolution NONE = new RuleResolution(null, null, null);
+	public static final EntryResolution NONE = new EntryResolution(null, null, null);
 
 	public boolean muted() {
 		return loudness != null && Boolean.TRUE.equals(loudness.mute());

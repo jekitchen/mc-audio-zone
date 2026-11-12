@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.List;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +19,7 @@ class PrecedenceFullZonesTest {
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
 	private static final double NO_PLAYER = Double.NaN;
 
-	private static Zone sphere(String id, double x, double radius, Rule... rules) {
+	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
 		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), List.of(rules));
 	}
 
@@ -37,8 +37,8 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void p6FadeZoneBlendsVolumeByItsWeight() {
-		Zone a = sphere("a", 0, 10, Rule.of("r", "minecraft:entity.cow.*").withMute(true)).withEdge(ZoneEdge.fade(4));
-		Precedence p = new Precedence(List.of(Rule.of("g", "minecraft:entity.cow.*").withVolume(100)), List.of(a));
+		Zone a = sphere("a", 0, 10, SetEntry.of("r", "minecraft:entity.cow.*").withMute(true)).withEdge(ZoneEdge.fade(4));
+		Precedence p = new Precedence(List.of(SetEntry.of("g", "minecraft:entity.cow.*").withVolume(100)), List.of(a));
 		SoundDecision d = decide(p, COW, 8);
 		assertEquals(50, d.volumePercent(), 1e-4, "2 blocks inside a 4-block fade: w = 0.5");
 		assertEquals(0.5, d.loudnessWeight(), 1e-6);
@@ -49,7 +49,7 @@ class PrecedenceFullZonesTest {
 	@Test
 	void walkingTowardTheCentreGetsSteadilyQuieter() {
 		// FR-8 acceptance: fade 8 on a 20-block sphere muting cows; silent from 8 blocks inside.
-		Zone a = sphere("a", 0, 20, Rule.of("r", "minecraft:entity.cow.*").withMute(true)).withEdge(ZoneEdge.fade(8));
+		Zone a = sphere("a", 0, 20, SetEntry.of("r", "minecraft:entity.cow.*").withMute(true)).withEdge(ZoneEdge.fade(8));
 		Precedence p = new Precedence(List.of(), List.of(a));
 		float previous = 101;
 		for (double x = 20; x >= 12; x -= 1) {
@@ -62,7 +62,7 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void fadeZoneLimitAndCueApplyOnlyFromHalfWeight() {
-		Zone a = sphere("a", 0, 10, Rule.of("r", "minecraft:entity.cow.*").withLimit(new Limit(2, 1000, false)).withCue(true))
+		Zone a = sphere("a", 0, 10, SetEntry.of("r", "minecraft:entity.cow.*").withLimit(new Limit(2, 1000, false)).withCue(true))
 				.withEdge(ZoneEdge.fade(4));
 		Precedence p = new Precedence(List.of(), List.of(a));
 		SoundDecision quarter = decide(p, COW, 9);
@@ -76,7 +76,7 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void defaultEdgeZonesUseTheProfileEdge() {
-		Zone a = sphere("a", 0, 10, Rule.of("r", "minecraft:entity.cow.*").withMute(true));
+		Zone a = sphere("a", 0, 10, SetEntry.of("r", "minecraft:entity.cow.*").withMute(true));
 		assertEquals(0, decide(new Precedence(List.of(), List.of(a)), COW, 8).volumePercent(), 1e-4, "profile default is hard");
 		assertEquals(50, decide(new Precedence(List.of(), List.of(a), ZoneEdge.fade(4)), COW, 8).volumePercent(), 1e-4);
 	}
@@ -85,7 +85,7 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void outsideZoneAffectsOnlySoundsOutsideIt() {
-		Zone base = sphere("base", 0, 20, Rule.of("r", "*:entity.*").withMute(true)).withMode(ZoneMode.OUTSIDE);
+		Zone base = sphere("base", 0, 20, SetEntry.of("r", "*:entity.*").withMute(true)).withMode(ZoneMode.OUTSIDE);
 		Precedence p = new Precedence(List.of(), List.of(base));
 		assertEquals(100, decide(p, COW, 5).volumePercent(), 1e-4, "inside the base: audible");
 		assertEquals(0, decide(p, COW, 30).volumePercent(), 1e-4, "outside: muted");
@@ -94,8 +94,8 @@ class PrecedenceFullZonesTest {
 	@Test
 	void p7CloserInsideZoneBeatsABroadOutsideZone() {
 		// Outside zone O around the base, centre 40 blocks from the sound; Inside zone A 6 blocks away.
-		Zone o = sphere("o", 40, 20, Rule.of("all", "*").withMute(true)).withMode(ZoneMode.OUTSIDE);
-		Zone a = sphere("a", 6, 10, Rule.of("r", "*villager*").withVolume(70));
+		Zone o = sphere("o", 40, 20, SetEntry.of("all", "*").withMute(true)).withMode(ZoneMode.OUTSIDE);
+		Zone a = sphere("a", 6, 10, SetEntry.of("r", "*villager*").withVolume(70));
 		SoundDecision d = decide(new Precedence(List.of(), List.of(o, a)), VILLAGER, 0);
 		assertEquals(70, d.volumePercent(), 1e-4);
 		assertSame(a, d.loudnessZone());
@@ -104,14 +104,14 @@ class PrecedenceFullZonesTest {
 	@Test
 	void outsideZoneDistanceIsMeasuredFromItsCentre() {
 		// O's centre is 25 away, A's 30 away: O wins although the sound is far outside O.
-		Zone o = sphere("o", 25, 5, Rule.of("all", "*").withVolume(10)).withMode(ZoneMode.OUTSIDE);
-		Zone a = sphere("a", 30, 40, Rule.of("r", "*").withVolume(90));
+		Zone o = sphere("o", 25, 5, SetEntry.of("all", "*").withVolume(10)).withMode(ZoneMode.OUTSIDE);
+		Zone a = sphere("a", 30, 40, SetEntry.of("r", "*").withVolume(90));
 		assertEquals(10, decide(new Precedence(List.of(), List.of(o, a)), COW, 0).volumePercent(), 1e-4);
 	}
 
 	@Test
 	void outsideFadeRisesAwayFromTheShape() {
-		Zone o = sphere("o", 0, 10, Rule.of("all", "*").withMute(true)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(4));
+		Zone o = sphere("o", 0, 10, SetEntry.of("all", "*").withMute(true)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(4));
 		Precedence p = new Precedence(List.of(), List.of(o));
 		assertEquals(50, decide(p, COW, 12).volumePercent(), 1e-4);
 		assertEquals(0, decide(p, COW, 20).volumePercent(), 1e-4);
@@ -121,7 +121,7 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void bubbleFollowsThePlayer() {
-		Zone bubble = sphere("bubble", 0, 8, Rule.of("all", "*").withVolume(30)).asBubble();
+		Zone bubble = sphere("bubble", 0, 8, SetEntry.of("all", "*").withVolume(30)).asBubble();
 		Precedence p = new Precedence(List.of(), List.of(bubble));
 		assertEquals(30, decide(p, COW, 105, 0, 0, 100, 0, 0).volumePercent(), 1e-4, "5 blocks from the player");
 		assertEquals(100, decide(p, COW, 120, 0, 0, 100, 0, 0).volumePercent(), 1e-4, "20 blocks from the player");
@@ -129,7 +129,7 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void bubbleAppliesInAnyWorldAndDimension() {
-		Zone bubble = sphere("bubble", 0, 8, Rule.of("all", "*").withVolume(30)).asBubble();
+		Zone bubble = sphere("bubble", 0, 8, SetEntry.of("all", "*").withVolume(30)).asBubble();
 		SoundDecision out = new SoundDecision();
 		new Precedence(List.of(), List.of(bubble)).decide(COW, true, "other.server", "minecraft:the_nether", 1, 0, 0, 0, 0, 0, out);
 		assertEquals(30, out.volumePercent(), 1e-4);
@@ -137,14 +137,14 @@ class PrecedenceFullZonesTest {
 
 	@Test
 	void bubbleIsSkippedWithoutAPlayerPosition() {
-		Zone bubble = sphere("bubble", 0, 8, Rule.of("all", "*").withVolume(30)).asBubble();
+		Zone bubble = sphere("bubble", 0, 8, SetEntry.of("all", "*").withVolume(30)).asBubble();
 		assertEquals(100, decide(new Precedence(List.of(), List.of(bubble)), COW, 1).volumePercent(), 1e-4);
 	}
 
 	@Test
 	void p9BubbleAndFixedZoneCompeteByAnchorDistance() {
-		Zone bubble = sphere("bubble", 0, 50, Rule.of("all", "*").withVolume(50)).asBubble();
-		Zone fixed = sphere("fixed", 2, 20, Rule.of("r", "*").withVolume(20));
+		Zone bubble = sphere("bubble", 0, 50, SetEntry.of("all", "*").withVolume(50)).asBubble();
+		Zone fixed = sphere("fixed", 2, 20, SetEntry.of("r", "*").withVolume(20));
 		Precedence p = new Precedence(List.of(), List.of(bubble, fixed));
 		// Source at the origin; the fixed anchor is 2 away, the player 10 away.
 		assertEquals(20, decide(p, COW, 0, 0, 0, 10, 0, 0).volumePercent(), 1e-4);
@@ -157,7 +157,7 @@ class PrecedenceFullZonesTest {
 	@Test
 	void cylinderZonesWork() {
 		Zone c = new Zone("c", "C", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Cylinder(5, 10),
-				List.of(Rule.of("r", "*").withMute(true)));
+				List.of(SetEntry.of("r", "*").withMute(true)));
 		Precedence p = new Precedence(List.of(), List.of(c));
 		assertEquals(0, decide(p, COW, 4).volumePercent(), 1e-4);
 		assertEquals(100, decide(p, COW, 0, 6, 0, NO_PLAYER, NO_PLAYER, NO_PLAYER).volumePercent(), 1e-4, "above the top");

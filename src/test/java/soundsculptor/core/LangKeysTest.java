@@ -27,9 +27,9 @@ import soundsculptor.core.outline.ColorError;
 import soundsculptor.core.outline.ZoneColor;
 import soundsculptor.core.recent.DistanceBand;
 import soundsculptor.core.recent.PlayStatus;
-import soundsculptor.core.rules.PatternError;
+import soundsculptor.core.sets.PatternError;
 import soundsculptor.core.trace.TraceEditError;
-import soundsculptor.core.trace.RuleWinReason;
+import soundsculptor.core.trace.EntryWinReason;
 import soundsculptor.core.trace.TraceNotice;
 import soundsculptor.core.trace.ZoneWinReason;
 import soundsculptor.core.ui.Palette;
@@ -59,7 +59,7 @@ class LangKeysTest {
 				"soundsculptor.recent.status.", keys(PlayStatus.values(), PlayStatus::translationKey),
 				"soundsculptor.trace.notice.", keys(TraceNotice.values(), TraceNotice::translationKey),
 				"soundsculptor.trace.edit.error.", keys(TraceEditError.values(), TraceEditError::translationKey),
-				"soundsculptor.trace.rule_reason.", keys(RuleWinReason.values(), RuleWinReason::translationKey),
+				"soundsculptor.trace.rule_reason.", keys(EntryWinReason.values(), EntryWinReason::translationKey),
 				"soundsculptor.trace.zone_reason.", keys(ZoneWinReason.values(), ZoneWinReason::translationKey));
 	}
 

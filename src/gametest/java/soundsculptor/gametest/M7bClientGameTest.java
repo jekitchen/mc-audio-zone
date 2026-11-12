@@ -6,7 +6,7 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.SoundHook;
 import soundsculptor.mc.ZoneEditorScreen;
 import soundsculptor.mc.ZoneRulesScreen;
@@ -86,11 +86,11 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			check(saved != null && saved.shape().equals(new Shape.Box(8, 10, 10)), "Zone rules should save the zone first, was " + saved);
 			check(context.computeOnClient(mc -> ProfileManager.profile().colorOf(zoneId)) == 0x56B4E9, "the color should be saved");
 			context.runOnClient(mc -> ((ZoneRulesScreen) mc.gui.screen()).panel.addButton.onPress(null));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("*villager*");
 			context.runOnClient(mc -> {
-				RuleEditorScreen e = (RuleEditorScreen) mc.gui.screen();
-				e.setMute(RuleEditorScreen.MuteChoice.MUTE);
+				EntryEditorScreen e = (EntryEditorScreen) mc.gui.screen();
+				e.setMute(EntryEditorScreen.MuteChoice.MUTE);
 				e.save();
 			});
 			context.waitForScreen(ZoneRulesScreen.class);

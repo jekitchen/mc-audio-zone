@@ -1,6 +1,6 @@
 package soundsculptor.core.profile;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,7 +24,7 @@ import java.util.Set;
  * @param boostConfirmed whether the player has confirmed the boost dialog for this profile (FR-5.4: asked once per
  *                   profile, the first time a volume goes above 100%)
  */
-public record Profile(String name, ProfileSettings settings, List<Rule> globalRules, List<Zone> zones,
+public record Profile(String name, ProfileSettings settings, List<SetEntry> globalRules, List<Zone> zones,
 		Map<String, Integer> zoneColors, Instant lastJoined, boolean boostConfirmed) {
 	/** Bumped on every change to the file format, with a migration step (PRD 7.6). */
 	public static final int SCHEMA_VERSION = 2;
@@ -49,13 +49,13 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	}
 
 	/** A profile never joined, with boost not yet confirmed. */
-	public Profile(String name, ProfileSettings settings, List<Rule> globalRules, List<Zone> zones,
+	public Profile(String name, ProfileSettings settings, List<SetEntry> globalRules, List<Zone> zones,
 			Map<String, Integer> zoneColors) {
 		this(name, settings, globalRules, zones, zoneColors, null, false);
 	}
 
 	/** A profile with no zones. */
-	public Profile(String name, ProfileSettings settings, List<Rule> globalRules) {
+	public Profile(String name, ProfileSettings settings, List<SetEntry> globalRules) {
 		this(name, settings, globalRules, List.of(), Map.of());
 	}
 
@@ -71,7 +71,7 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		return new Profile(value, settings, globalRules, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
-	public Profile withGlobalRules(List<Rule> value) {
+	public Profile withGlobalRules(List<SetEntry> value) {
 		return new Profile(name, settings, value, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
@@ -100,13 +100,13 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	 * such a rule must first show the boost dialog (FR-5.4) unless it was already confirmed.
 	 */
 	public boolean hasBoost() {
-		for (Rule rule : globalRules) {
+		for (SetEntry rule : globalRules) {
 			if (needsConfirm(rule)) {
 				return true;
 			}
 		}
 		for (Zone zone : zones) {
-			for (Rule rule : zone.rules()) {
+			for (SetEntry rule : zone.rules()) {
 				if (needsConfirm(rule)) {
 					return true;
 				}
@@ -115,7 +115,7 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		return false;
 	}
 
-	private static boolean needsConfirm(Rule rule) {
+	private static boolean needsConfirm(SetEntry rule) {
 		return rule.volume() != null && rule.volume() > 100;
 	}
 
@@ -147,8 +147,8 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	 * The exact-ID rule for this sound ID (the rule quick actions create and edit, FR-1.5), or null. An exact-ID rule
 	 * is one whose pattern is the ID itself, with no wildcard.
 	 */
-	public Rule exactRule(String soundId) {
-		for (Rule rule : globalRules) {
+	public SetEntry exactRule(String soundId) {
+		for (SetEntry rule : globalRules) {
 			if (rule.pattern().text().equals(soundId)) {
 				return rule;
 			}
@@ -158,15 +158,15 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 
 	/** Whether this sound ID has an exact-ID rule that mutes it. */
 	public boolean isExactMuted(String soundId) {
-		Rule rule = exactRule(soundId);
+		SetEntry rule = exactRule(soundId);
 		return rule != null && rule.enabled() && Boolean.TRUE.equals(rule.mute());
 	}
 
 	/** Quick action Mute: sets mute on the sound's exact-ID rule, creating the rule if needed (FR-1.5). */
 	public Profile muteExact(String soundId) {
-		Rule existing = exactRule(soundId);
+		SetEntry existing = exactRule(soundId);
 		if (existing == null) {
-			return withRules(append(Rule.of(exactRuleId(soundId), soundId).withMute(true)));
+			return withRules(append(SetEntry.of(exactRuleId(soundId), soundId).withMute(true)));
 		}
 		return replace(existing, existing.withEnabled(true).withMute(true));
 	}
@@ -176,13 +176,13 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	 * and unmuting leaves the profile as it was.
 	 */
 	public Profile unmuteExact(String soundId) {
-		Rule existing = exactRule(soundId);
+		SetEntry existing = exactRule(soundId);
 		if (existing == null) {
 			return this;
 		}
-		Rule cleared = existing.withMute(null);
+		SetEntry cleared = existing.withMute(null);
 		if (!cleared.setsLoudness() && !cleared.setsLimit() && !cleared.setsCue()) {
-			List<Rule> rules = new ArrayList<>(globalRules);
+			List<SetEntry> rules = new ArrayList<>(globalRules);
 			rules.remove(existing);
 			return withRules(rules);
 		}
@@ -190,8 +190,8 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	}
 
 	/** The global rule with this ID, or null. */
-	public Rule rule(String id) {
-		for (Rule rule : globalRules) {
+	public SetEntry rule(String id) {
+		for (SetEntry rule : globalRules) {
 			if (rule.id().equals(id)) {
 				return rule;
 			}
@@ -200,18 +200,18 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	}
 
 	/** Saves a rule from the editor: replaces the rule with the same ID in place, or adds it at the end. */
-	public Profile putRule(Rule rule) {
-		Rule existing = rule(rule.id());
+	public Profile putRule(SetEntry rule) {
+		SetEntry existing = rule(rule.id());
 		return existing == null ? withRules(append(rule)) : replace(existing, rule);
 	}
 
 	/** Deletes the rule with this ID; returns this profile if there is none. */
 	public Profile removeRule(String id) {
-		Rule existing = rule(id);
+		SetEntry existing = rule(id);
 		if (existing == null) {
 			return this;
 		}
-		List<Rule> rules = new ArrayList<>(globalRules);
+		List<SetEntry> rules = new ArrayList<>(globalRules);
 		rules.remove(existing);
 		return withRules(rules);
 	}
@@ -221,7 +221,7 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 	 * step 4). Returns this profile if the rule is missing or already at that end.
 	 */
 	public Profile moveRule(String id, int delta) {
-		Rule existing = rule(id);
+		SetEntry existing = rule(id);
 		if (existing == null) {
 			return this;
 		}
@@ -230,7 +230,7 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		if (to == from) {
 			return this;
 		}
-		List<Rule> rules = new ArrayList<>(globalRules);
+		List<SetEntry> rules = new ArrayList<>(globalRules);
 		rules.remove(from);
 		rules.add(to, existing);
 		return withRules(rules);
@@ -316,18 +316,18 @@ public record Profile(String name, ProfileSettings settings, List<Rule> globalRu
 		return "exact:" + soundId;
 	}
 
-	private Profile withRules(List<Rule> rules) {
+	private Profile withRules(List<SetEntry> rules) {
 		return withGlobalRules(rules);
 	}
 
-	private List<Rule> append(Rule rule) {
-		List<Rule> rules = new ArrayList<>(globalRules);
+	private List<SetEntry> append(SetEntry rule) {
+		List<SetEntry> rules = new ArrayList<>(globalRules);
 		rules.add(rule);
 		return rules;
 	}
 
-	private Profile replace(Rule old, Rule replacement) {
-		List<Rule> rules = new ArrayList<>(globalRules);
+	private Profile replace(SetEntry old, SetEntry replacement) {
+		List<SetEntry> rules = new ArrayList<>(globalRules);
 		rules.set(rules.indexOf(old), replacement);
 		return withRules(rules);
 	}

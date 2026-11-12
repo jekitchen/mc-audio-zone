@@ -11,9 +11,9 @@ import java.util.List;
 
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileSettings;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.trace.RuleEdit;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.trace.TraceEditError;
 import soundsculptor.core.trace.TraceEditor;
 import soundsculptor.core.undo.UndoSlot;
@@ -30,11 +30,11 @@ class QuickActionsTest {
 	private static final String AMBIENT = "minecraft:entity.villager.ambient";
 	private static final Point HOME = new Point(0, 64, 0);
 
-	private static Zone pen(Rule... rules) {
+	private static Zone pen(SetEntry... rules) {
 		return new Zone("pen", "Villager pen", true, WORLD, OVERWORLD, HOME, new Shape.Sphere(10), List.of(rules));
 	}
 
-	private static Profile profile(List<Rule> global, Zone... zones) {
+	private static Profile profile(List<SetEntry> global, Zone... zones) {
 		Profile profile = new Profile("p", ProfileSettings.DEFAULTS, global).withZones(List.of(zones));
 		return zones.length == 0 ? profile : profile.withZoneColor("pen", 0xE69F00);
 	}
@@ -51,7 +51,7 @@ class QuickActionsTest {
 	@Test
 	void muteEverywhereCreatesTheSameGlobalRuleAsTheOldQuickAction() {
 		Profile start = profile(List.of(), pen());
-		QuickActionResult result = ok(QuickActions.apply(start, ApplyTarget.EVERYWHERE, AMBIENT, new RuleEdit.Mute(true)));
+		QuickActionResult result = ok(QuickActions.apply(start, ApplyTarget.EVERYWHERE, AMBIENT, new EntryEdit.Mute(true)));
 		assertEquals(start.muteExact(AMBIENT).globalRules(), result.after().globalRules());
 		assertEquals("exact:" + AMBIENT, result.after().globalRules().get(0).id());
 		assertTrue(QuickActions.isMuted(result.after(), ApplyTarget.EVERYWHERE, AMBIENT));
@@ -62,9 +62,9 @@ class QuickActionsTest {
 	@Test
 	void muteInAZoneAddsAnExactRuleToThatZoneOnly() {
 		Profile start = profile(List.of(), pen());
-		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new RuleEdit.Mute(true)));
+		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(true)));
 		assertEquals(List.of(), result.after().globalRules());
-		Rule added = result.after().zones().get(0).rules().get(0);
+		SetEntry added = result.after().zones().get(0).rules().get(0);
 		assertEquals("pen/exact:" + AMBIENT, added.id());
 		assertEquals(AMBIENT, added.pattern().text());
 		assertEquals(Boolean.TRUE, added.mute());
@@ -75,9 +75,9 @@ class QuickActionsTest {
 
 	@Test
 	void anExistingExactRuleInTheTargetIsEditedAndTurnedOnInstead() {
-		Rule old = Rule.of("mine", AMBIENT).withVolume(50).withEnabled(false);
+		SetEntry old = SetEntry.of("mine", AMBIENT).withVolume(50).withEnabled(false);
 		Profile start = profile(List.of(), pen(old));
-		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new RuleEdit.Mute(true)));
+		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(true)));
 		assertEquals(List.of(old.withEnabled(true).withMute(true)), result.after().zones().get(0).rules());
 		assertEquals(TraceEditor.TOAST_CHANGED, result.toastKey());
 	}
@@ -86,10 +86,10 @@ class QuickActionsTest {
 	void volumeAndLimitAndCueEditTheSameRule() {
 		Profile p = profile(List.of(), pen());
 		ApplyTarget pen = penTarget(p);
-		p = ok(QuickActions.apply(p, pen, AMBIENT, new RuleEdit.Volume(30))).after();
-		p = ok(QuickActions.apply(p, pen, AMBIENT, new RuleEdit.SetLimit(2, 1000, false))).after();
-		p = ok(QuickActions.apply(p, pen, AMBIENT, new RuleEdit.Cue(true))).after();
-		Rule rule = QuickActions.exactRule(p, pen, AMBIENT);
+		p = ok(QuickActions.apply(p, pen, AMBIENT, new EntryEdit.Volume(30))).after();
+		p = ok(QuickActions.apply(p, pen, AMBIENT, new EntryEdit.SetLimit(2, 1000, false))).after();
+		p = ok(QuickActions.apply(p, pen, AMBIENT, new EntryEdit.Cue(true))).after();
+		SetEntry rule = QuickActions.exactRule(p, pen, AMBIENT);
 		assertEquals(30, rule.volume());
 		assertEquals(new Limit(2, 1000, false), rule.limit());
 		assertEquals(Boolean.TRUE, rule.cue());
@@ -99,10 +99,10 @@ class QuickActionsTest {
 	@Test
 	void unmuteRemovesARuleLeftSettingNothingSoMuteThenUnmuteLeavesTheProfileAsItWas() {
 		for (boolean inZone : new boolean[] {false, true}) {
-			Profile start = profile(List.of(Rule.of("r1", "*villager*").withVolume(40)), pen());
+			Profile start = profile(List.of(SetEntry.of("r1", "*villager*").withVolume(40)), pen());
 			ApplyTarget target = inZone ? penTarget(start) : ApplyTarget.EVERYWHERE;
-			Profile muted = ok(QuickActions.apply(start, target, AMBIENT, new RuleEdit.Mute(true))).after();
-			QuickActionResult unmuted = ok(QuickActions.apply(muted, target, AMBIENT, new RuleEdit.Mute(null)));
+			Profile muted = ok(QuickActions.apply(start, target, AMBIENT, new EntryEdit.Mute(true))).after();
+			QuickActionResult unmuted = ok(QuickActions.apply(muted, target, AMBIENT, new EntryEdit.Mute(null)));
 			assertEquals(start, unmuted.after());
 			assertEquals(QuickActions.TOAST_REMOVED, unmuted.toastKey());
 			assertEquals(List.of(AMBIENT), unmuted.toastArgs());
@@ -111,17 +111,17 @@ class QuickActionsTest {
 
 	@Test
 	void unmuteKeepsARuleThatStillSetsSomethingAndDoesNotTurnItOn() {
-		Rule old = Rule.of("mine", AMBIENT).withMute(true).withVolume(50).withEnabled(false);
+		SetEntry old = SetEntry.of("mine", AMBIENT).withMute(true).withVolume(50).withEnabled(false);
 		Profile start = profile(List.of(), pen(old));
-		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new RuleEdit.Mute(null)));
-		assertEquals(List.of(Rule.of("mine", AMBIENT).withVolume(50).withEnabled(false)), result.after().zones().get(0).rules());
+		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(null)));
+		assertEquals(List.of(SetEntry.of("mine", AMBIENT).withVolume(50).withEnabled(false)), result.after().zones().get(0).rules());
 		assertEquals(TraceEditor.TOAST_CHANGED, result.toastKey());
 	}
 
 	@Test
 	void clearingWhenThereIsNoRuleChangesNothing() {
 		Profile start = profile(List.of(), pen());
-		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new RuleEdit.Mute(null)));
+		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(null)));
 		assertSame(start, result.after());
 		assertSame(start, result.before());
 		assertNull(result.toastKey(), "no change, so no Undo toast");
@@ -130,8 +130,8 @@ class QuickActionsTest {
 
 	@Test
 	void repeatingAnActionThatChangesNothingOffersNoUndo() {
-		Profile muted = ok(QuickActions.apply(profile(List.of()), ApplyTarget.EVERYWHERE, AMBIENT, new RuleEdit.Mute(true))).after();
-		QuickActionResult again = ok(QuickActions.apply(muted, ApplyTarget.EVERYWHERE, AMBIENT, new RuleEdit.Mute(true)));
+		Profile muted = ok(QuickActions.apply(profile(List.of()), ApplyTarget.EVERYWHERE, AMBIENT, new EntryEdit.Mute(true))).after();
+		QuickActionResult again = ok(QuickActions.apply(muted, ApplyTarget.EVERYWHERE, AMBIENT, new EntryEdit.Mute(true)));
 		assertSame(muted, again.after());
 		assertNull(again.toastKey());
 	}
@@ -140,17 +140,17 @@ class QuickActionsTest {
 	void toggleMuteFlipsBetweenMuteAndClear() {
 		Profile p = profile(List.of(), pen());
 		ApplyTarget pen = penTarget(p);
-		assertEquals(new RuleEdit.MuteWithCue(true), QuickActions.toggleMute(p, pen, AMBIENT));
+		assertEquals(new EntryEdit.MuteWithCue(true), QuickActions.toggleMute(p, pen, AMBIENT));
 		p = ok(QuickActions.apply(p, pen, AMBIENT, QuickActions.toggleMute(p, pen, AMBIENT))).after();
 		assertTrue(QuickActions.isMuted(p, pen, AMBIENT));
-		assertEquals(new RuleEdit.UnmuteWithCue(true), QuickActions.toggleMute(p, pen, AMBIENT));
+		assertEquals(new EntryEdit.UnmuteWithCue(true), QuickActions.toggleMute(p, pen, AMBIENT));
 	}
 
 	@Test
 	void aDisabledMutingRuleDoesNotCountAsMuted() {
-		Profile p = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withMute(true).withEnabled(false)));
+		Profile p = profile(List.of(SetEntry.of("exact:" + AMBIENT, AMBIENT).withMute(true).withEnabled(false)));
 		assertFalse(QuickActions.isMuted(p, ApplyTarget.EVERYWHERE, AMBIENT));
-		assertEquals(new RuleEdit.MuteWithCue(true), QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE, AMBIENT));
+		assertEquals(new EntryEdit.MuteWithCue(true), QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE, AMBIENT));
 	}
 
 	@Test
@@ -160,7 +160,7 @@ class QuickActionsTest {
 			Profile p = profile(List.of(), pen()).withSettings(ProfileSettings.DEFAULTS.withCueDefault(cueDefault));
 			p = ok(QuickActions.apply(p, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE,
 					AMBIENT))).after();
-			Rule rule = QuickActions.exactRule(p, ApplyTarget.EVERYWHERE, AMBIENT);
+			SetEntry rule = QuickActions.exactRule(p, ApplyTarget.EVERYWHERE, AMBIENT);
 			assertEquals(Boolean.TRUE, rule.mute());
 			assertEquals(cueDefault, rule.cue());
 		}
@@ -168,7 +168,7 @@ class QuickActionsTest {
 
 	@Test
 	void quickMuteKeepsACueTheRuleAlreadySets() {
-		Profile p = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withCue(false).withVolume(50)));
+		Profile p = profile(List.of(SetEntry.of("exact:" + AMBIENT, AMBIENT).withCue(false).withVolume(50)));
 		p = ok(QuickActions.apply(p, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(p, ApplyTarget.EVERYWHERE,
 				AMBIENT))).after();
 		assertEquals(Boolean.FALSE, QuickActions.exactRule(p, ApplyTarget.EVERYWHERE, AMBIENT).cue());
@@ -177,7 +177,7 @@ class QuickActionsTest {
 	@Test
 	void toggledMuteThenUnmuteLeavesTheProfileAsItWas() {
 		for (boolean inZone : new boolean[] {false, true}) {
-			Profile start = profile(List.of(Rule.of("r1", "*villager*").withVolume(40)), pen());
+			Profile start = profile(List.of(SetEntry.of("r1", "*villager*").withVolume(40)), pen());
 			ApplyTarget target = inZone ? penTarget(start) : ApplyTarget.EVERYWHERE;
 			Profile muted = ok(QuickActions.apply(start, target, AMBIENT, QuickActions.toggleMute(start, target, AMBIENT))).after();
 			QuickActionResult unmuted = ok(QuickActions.apply(muted, target, AMBIENT, QuickActions.toggleMute(muted, target,
@@ -189,22 +189,22 @@ class QuickActionsTest {
 
 	@Test
 	void unmuteKeepsACueThatDiffersFromTheDefaultOrARuleThatSetsMore() {
-		Profile cueOff = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withMute(true).withCue(false)));
+		Profile cueOff = profile(List.of(SetEntry.of("exact:" + AMBIENT, AMBIENT).withMute(true).withCue(false)));
 		cueOff = ok(QuickActions.apply(cueOff, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(cueOff,
 				ApplyTarget.EVERYWHERE, AMBIENT))).after();
-		assertEquals(Rule.of("exact:" + AMBIENT, AMBIENT).withCue(false), QuickActions.exactRule(cueOff, ApplyTarget.EVERYWHERE,
+		assertEquals(SetEntry.of("exact:" + AMBIENT, AMBIENT).withCue(false), QuickActions.exactRule(cueOff, ApplyTarget.EVERYWHERE,
 				AMBIENT), "the player turned Cue off on purpose");
-		Profile more = profile(List.of(Rule.of("exact:" + AMBIENT, AMBIENT).withMute(true).withCue(true).withVolume(50)));
+		Profile more = profile(List.of(SetEntry.of("exact:" + AMBIENT, AMBIENT).withMute(true).withCue(true).withVolume(50)));
 		more = ok(QuickActions.apply(more, ApplyTarget.EVERYWHERE, AMBIENT, QuickActions.toggleMute(more,
 				ApplyTarget.EVERYWHERE, AMBIENT))).after();
-		assertEquals(Rule.of("exact:" + AMBIENT, AMBIENT).withCue(true).withVolume(50), QuickActions.exactRule(more,
+		assertEquals(SetEntry.of("exact:" + AMBIENT, AMBIENT).withCue(true).withVolume(50), QuickActions.exactRule(more,
 				ApplyTarget.EVERYWHERE, AMBIENT));
 	}
 
 	@Test
 	void outOfRangeValuesAreRefusedWithTheEditorMessage() {
 		Profile start = profile(List.of(), pen());
-		QuickActionResult result = QuickActions.apply(start, penTarget(start), AMBIENT, new RuleEdit.Volume(250));
+		QuickActionResult result = QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Volume(250));
 		assertEquals(TraceEditError.VOLUME_OUT_OF_RANGE, result.error());
 		assertSame(start, result.after());
 		assertNull(result.toastKey());
@@ -215,27 +215,27 @@ class QuickActionsTest {
 		Profile withPen = profile(List.of(), pen());
 		ApplyTarget pen = penTarget(withPen);
 		Profile without = withPen.withZones(List.of());
-		assertEquals(TraceEditError.ZONE_NOT_FOUND, QuickActions.apply(without, pen, AMBIENT, new RuleEdit.Mute(true)).error());
+		assertEquals(TraceEditError.ZONE_NOT_FOUND, QuickActions.apply(without, pen, AMBIENT, new EntryEdit.Mute(true)).error());
 		assertNull(QuickActions.exactRule(without, pen, AMBIENT));
 		assertFalse(QuickActions.isMuted(without, pen, AMBIENT));
 	}
 
 	@Test
 	void aFullProfileRefusesNewRulesButStillEditsExistingOnes() {
-		List<Rule> rules = new ArrayList<>();
+		List<SetEntry> rules = new ArrayList<>();
 		for (int i = 0; i < TraceEditor.MAX_RULES - 1; i++) {
-			rules.add(Rule.of("g" + i, "minecraft:sound." + i));
+			rules.add(SetEntry.of("g" + i, "minecraft:sound." + i));
 		}
-		Profile full = profile(rules, pen(Rule.of("mine", AMBIENT)));
+		Profile full = profile(rules, pen(SetEntry.of("mine", AMBIENT)));
 		assertEquals(TraceEditError.TOO_MANY_RULES,
-				QuickActions.apply(full, ApplyTarget.EVERYWHERE, AMBIENT, new RuleEdit.Mute(true)).error());
-		assertTrue(QuickActions.apply(full, penTarget(full), AMBIENT, new RuleEdit.Mute(true)).ok());
+				QuickActions.apply(full, ApplyTarget.EVERYWHERE, AMBIENT, new EntryEdit.Mute(true)).error());
+		assertTrue(QuickActions.apply(full, penTarget(full), AMBIENT, new EntryEdit.Mute(true)).ok());
 	}
 
 	@Test
 	void undoRestoresTheProfileBeforeTheQuickAction() {
 		Profile start = profile(List.of(), pen());
-		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new RuleEdit.Volume(20)));
+		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Volume(20)));
 		UndoSlot<Profile> undo = new UndoSlot<>();
 		undo.offer(result.before(), result.after(), result.toastKey(), result.toastArgs(), 1000);
 		assertEquals(start, undo.undo(result.after(), 2000).orElseThrow());

@@ -3,7 +3,7 @@ package soundsculptor.mc;
 import soundsculptor.core.diag.DiagnosticsReport;
 import soundsculptor.core.diag.MemoryMeter;
 import soundsculptor.core.diag.TimingWindow;
-import soundsculptor.core.rules.RuleResolver;
+import soundsculptor.core.sets.EntryResolver;
 import soundsculptor.core.zones.Zone;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.util.Util;
@@ -43,7 +43,7 @@ public final class Diagnostics {
 
 	public static DiagnosticsReport.Data data() {
 		long now = Util.getMillis();
-		RuleResolver rules = ProfileManager.rules();
+		EntryResolver rules = ProfileManager.rules();
 		long lookups = rules.cacheHits() + rules.cacheMisses();
 		double hitRate = lookups == 0 ? Double.NaN : rules.cacheHits() / (double) lookups;
 		return new DiagnosticsReport.Data(version("soundsculptor"), version("minecraft"), ProfileManager.isBypassed(),

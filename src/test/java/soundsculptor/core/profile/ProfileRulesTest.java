@@ -4,22 +4,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /** The Rules tab's list operations (PRD 6.1 Rules: add, edit, delete, move up/down; FR-4.7 disable). */
 class ProfileRulesTest {
-	private static final Rule A = Rule.of("r1", "minecraft:entity.villager.*").withMute(true);
-	private static final Rule B = Rule.of("r2", "*:block.*.step").withVolume(50);
-	private static final Rule C = Rule.of("r3", "minecraft:entity.villager.ambient").withVolume(100);
+	private static final SetEntry A = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
+	private static final SetEntry B = SetEntry.of("r2", "*:block.*.step").withVolume(50);
+	private static final SetEntry C = SetEntry.of("r3", "minecraft:entity.villager.ambient").withVolume(100);
 
-	private static Profile profile(Rule... rules) {
+	private static Profile profile(SetEntry... rules) {
 		return new Profile("Default", ProfileSettings.DEFAULTS, List.of(rules));
 	}
 
 	private static List<String> ids(Profile p) {
-		return p.globalRules().stream().map(Rule::id).toList();
+		return p.globalRules().stream().map(SetEntry::id).toList();
 	}
 
 	@Test
@@ -29,7 +29,7 @@ class ProfileRulesTest {
 
 	@Test
 	void putReplacesTheRuleWithTheSameIdInPlace() {
-		Rule edited = B.withVolume(25);
+		SetEntry edited = B.withVolume(25);
 		Profile p = profile(A, B, C).putRule(edited);
 		assertEquals(List.of("r1", "r2", "r3"), ids(p));
 		assertSame(edited, p.rule("r2"));

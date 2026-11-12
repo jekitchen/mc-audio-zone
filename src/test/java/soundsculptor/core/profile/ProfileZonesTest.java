@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -26,13 +26,13 @@ class ProfileZonesTest {
 
 	static Zone fixed(String id, Shape shape) {
 		return new Zone(id, "Zone " + id, true, SERVER, OVERWORLD, new Point(120.5, 64, -33.5), shape,
-				List.of(Rule.of(id + "r1", "*villager*").withVolume(50)));
+				List.of(SetEntry.of(id + "r1", "*villager*").withVolume(50)));
 	}
 
 	/** A bubble as the file stores it: no world key, dimension or position. */
 	static Zone bubble(String id) {
 		return new Zone(id, "Bubble " + id, true, "", "", new Point(0, 0, 0), new Shape.Sphere(8),
-				List.of(Rule.of(id + "r1", "*").withMute(true))).asBubble();
+				List.of(SetEntry.of(id + "r1", "*").withMute(true))).asBubble();
 	}
 
 	@Test
@@ -72,7 +72,7 @@ class ProfileZonesTest {
 		Zone sphere = fixed("z1", new Shape.Sphere(12.5));
 		Zone box = fixed("z2", new Shape.Box(20, 8, 30)).withEdge(ZoneEdge.fade(6));
 		Zone cylinder = new Zone("z3", "Tower", false, SERVER, "minecraft:the_nether", new Point(-5, 70, 9),
-				new Shape.Cylinder(4, 40), List.of(new Rule("r9", false, soundsculptor.core.rules.SoundPattern.of("minecraft:block.*"),
+				new Shape.Cylinder(4, 40), List.of(new SetEntry("r9", false, soundsculptor.core.sets.SoundPattern.of("minecraft:block.*"),
 						null, 150, new Limit(2, 500, true), false)))
 				.withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.hard());
 		Profile p = Profile.empty("Server").withZones(List.of(sphere, box, cylinder, bubble("b1")))

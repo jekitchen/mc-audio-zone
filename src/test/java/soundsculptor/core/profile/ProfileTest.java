@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-1.5 quick actions on exact-ID rules (M4: Mute). */
@@ -17,7 +17,7 @@ class ProfileTest {
 	void muteCreatesOneExactIdRule() {
 		Profile p = Profile.empty("Default").muteExact(VILLAGER);
 		assertEquals(1, p.globalRules().size());
-		Rule rule = p.globalRules().get(0);
+		SetEntry rule = p.globalRules().get(0);
 		assertEquals(VILLAGER, rule.pattern().text());
 		assertEquals(Boolean.TRUE, rule.mute());
 		assertTrue(p.isExactMuted(VILLAGER));
@@ -38,7 +38,7 @@ class ProfileTest {
 
 	@Test
 	void unmuteKeepsOtherPropertiesOfTheRule() {
-		Rule withVolume = Rule.of("r1", VILLAGER).withMute(true).withVolume(50);
+		SetEntry withVolume = SetEntry.of("r1", VILLAGER).withMute(true).withVolume(50);
 		Profile p = new Profile("Default", ProfileSettings.DEFAULTS, java.util.List.of(withVolume)).unmuteExact(VILLAGER);
 		assertEquals(1, p.globalRules().size());
 		assertNull(p.globalRules().get(0).mute());
@@ -47,7 +47,7 @@ class ProfileTest {
 
 	@Test
 	void muteReenablesADisabledExactRule() {
-		Rule disabled = Rule.of("r1", VILLAGER).withMute(true).withEnabled(false);
+		SetEntry disabled = SetEntry.of("r1", VILLAGER).withMute(true).withEnabled(false);
 		Profile p = new Profile("Default", ProfileSettings.DEFAULTS, java.util.List.of(disabled));
 		assertFalse(p.isExactMuted(VILLAGER));
 		assertTrue(p.muteExact(VILLAGER).isExactMuted(VILLAGER));
@@ -55,7 +55,7 @@ class ProfileTest {
 
 	@Test
 	void wildcardRulesAreNotExactRules() {
-		Rule wildcard = Rule.of("r1", "minecraft:entity.villager.*").withMute(true);
+		SetEntry wildcard = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
 		Profile p = new Profile("Default", ProfileSettings.DEFAULTS, java.util.List.of(wildcard));
 		assertNull(p.exactRule(VILLAGER));
 		assertEquals(2, p.muteExact(VILLAGER).globalRules().size());

@@ -1,10 +1,10 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -25,9 +25,9 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.putRule(Rule.of("r1", "minecraft:entity.villager.*").withMute(true))
-					.putRule(Rule.of("r2", AMBIENT).withVolume(30))
-					.putRule(Rule.of("r3", "*villagr*").withMute(true))));
+					.putRule(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))
+					.putRule(SetEntry.of("r2", AMBIENT).withVolume(30))
+					.putRule(SetEntry.of("r3", "*villagr*").withMute(true))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 
@@ -54,22 +54,22 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			check(typo.get(2).equals("⚠ No known sound matches"), "a pattern matching nothing is flagged, was " + typo);
 			context.takeScreenshot("m8-review-rules");
 
-			// Rule editor: an exact rule under the villager mute shows "Unchanged (muted)", not "Not set".
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.create(main(mc))));
-			context.waitForScreen(RuleEditorScreen.class);
+			// SetEntry editor: an exact rule under the villager mute shows "Unchanged (muted)", not "Not set".
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(main(mc))));
+			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("minecraft:entity.villager.celebrate");
 			context.waitTicks(1);
 			check(editor(context).equals(List.of("Mute: Unchanged (muted)", "Volume: Unchanged (muted)")),
 					"unset values should show what the sound gets now, was " + editor(context));
-			check(context.computeOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.RuleDraft.Field.VOLUME)).isEmpty(),
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.EntryDraft.Field.VOLUME)).isEmpty(),
 					"showing the current value must not set a volume");
 			context.takeScreenshot("m8-review-editor-unchanged");
 			// A wildcard pattern shows the plain default.
-			context.runOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).patternField.setValue("*:block.*.step"));
+			context.runOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).patternField.setValue("*:block.*.step"));
 			context.waitTicks(1);
 			check(editor(context).equals(List.of("Mute: Unchanged (not muted)", "Volume: Unchanged (100%)")),
 					"a wildcard shows 100% and not muted, was " + editor(context));
-			check(context.computeOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.RuleDraft.Field.VOLUME)).isEmpty(),
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.EntryDraft.Field.VOLUME)).isEmpty(),
 					"changing the pattern must not set a volume");
 			context.runOnClient(mc -> mc.gui.screen().onClose());
 			context.waitTicks(2);
@@ -105,7 +105,7 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 	/** The Mute dropdown's and the Volume slider's text. */
 	private static List<String> editor(ClientGameTestContext context) {
 		return context.computeOnClient(mc -> {
-			RuleEditorScreen e = (RuleEditorScreen) mc.gui.screen();
+			EntryEditorScreen e = (EntryEditorScreen) mc.gui.screen();
 			return List.of(e.muteDropdown.getMessage().getString(), e.volumeSlider.getMessage().getString());
 		});
 	}

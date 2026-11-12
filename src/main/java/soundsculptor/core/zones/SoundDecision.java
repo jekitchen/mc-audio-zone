@@ -1,7 +1,7 @@
 package soundsculptor.core.zones;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 
 /**
  * The result of {@link Precedence#decide} for one sound: the final value of each property and which rule and zone
@@ -12,14 +12,14 @@ import soundsculptor.core.rules.Rule;
  */
 public final class SoundDecision {
 	float volumePercent;
-	Rule loudnessRule;
+	SetEntry loudnessRule;
 	Zone loudnessZone;
 	float loudnessWeight;
 	Limit limit;
-	Rule limitRule;
+	SetEntry limitRule;
 	Zone limitZone;
 	boolean cueOn;
-	Rule cueRule;
+	SetEntry cueRule;
 	Zone cueZone;
 
 	void reset() {
@@ -44,7 +44,7 @@ public final class SoundDecision {
 		return volumePercent;
 	}
 
-	public Rule loudnessRule() {
+	public SetEntry loudnessRule() {
 		return loudnessRule;
 	}
 
@@ -62,7 +62,7 @@ public final class SoundDecision {
 		return limit;
 	}
 
-	public Rule limitRule() {
+	public SetEntry limitRule() {
 		return limitRule;
 	}
 
@@ -74,7 +74,7 @@ public final class SoundDecision {
 		return cueOn;
 	}
 
-	public Rule cueRule() {
+	public SetEntry cueRule() {
 		return cueRule;
 	}
 

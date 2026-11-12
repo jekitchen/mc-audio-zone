@@ -11,8 +11,8 @@ import java.util.List;
 
 import soundsculptor.core.cue.CueSettings;
 import soundsculptor.core.recent.PlayStatus;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.trace.LastPlay;
 import soundsculptor.core.trace.LastPlays;
 import soundsculptor.core.zones.Point;
@@ -40,15 +40,15 @@ class SoundStartDeciderTest {
 	private final SoundStart in = new SoundStart();
 	private final SoundStartResult out = new SoundStartResult();
 
-	private static Rule villagers(String id) {
-		return Rule.of(id, "minecraft:entity.villager.*");
+	private static SetEntry villagers(String id) {
+		return SetEntry.of(id, "minecraft:entity.villager.*");
 	}
 
-	private static Zone sphere(String id, double x, double radius, Rule... rules) {
+	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
 		return new Zone(id, "Zone " + id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), List.of(rules));
 	}
 
-	private void profile(List<Rule> global, Zone... zones) {
+	private void profile(List<SetEntry> global, Zone... zones) {
 		decider.setProfile(new Precedence(global, List.of(zones)));
 	}
 
@@ -107,7 +107,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p11VanillaCoveredSoundsAreNeverChanged() {
-		profile(List.of(Rule.of("all", "*").withMute(true)));
+		profile(List.of(SetEntry.of("all", "*").withMute(true)));
 		SoundStart s = villagerAt(0);
 		s.soundId = "minecraft:music.game";
 		s.vanillaCovered = true;
@@ -177,7 +177,7 @@ class SoundStartDeciderTest {
 	@Test
 	void p6FadeEdgeBlendsTheVolume() {
 		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
-				List.of(Rule.of("ra", "*").withMute(true))).withEdge(ZoneEdge.fade(4));
+				List.of(SetEntry.of("ra", "*").withMute(true))).withEdge(ZoneEdge.fade(4));
 		profile(List.of(), a);
 		// 2 blocks inside a 4-block fade: half way.
 		assertEquals(0.5F, start(villagerAt(8)).factor(), 1e-3);
@@ -344,8 +344,8 @@ class SoundStartDeciderTest {
 
 	@Test
 	void globalAndZoneRulesWithTheSameIdHaveTheirOwnCounters() {
-		// Rule IDs are unique within one list only, so a global "r1" and zone a's "r1" are different rules (FR-6.7).
-		Rule global = Rule.of("r1", "minecraft:entity.cow.*").withLimit(new Limit(1, 1000, false));
+		// SetEntry IDs are unique within one list only, so a global "r1" and zone a's "r1" are different rules (FR-6.7).
+		SetEntry global = SetEntry.of("r1", "minecraft:entity.cow.*").withLimit(new Limit(1, 1000, false));
 		Zone a = sphere("a", 0, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
 		profile(List.of(global), a);
 
@@ -369,7 +369,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void countersSurviveASaveThatKeepsTheRule() {
-		Rule g1 = villagers("g1").withLimit(new Limit(1, 1000, false));
+		SetEntry g1 = villagers("g1").withLimit(new Limit(1, 1000, false));
 		profile(List.of(g1));
 		start(villagerAt(0), 1_000);
 		profile(List.of(g1.withCue(true))); // the player saves an unrelated change
@@ -378,7 +378,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void countersOfDeletedRulesAreForgotten() {
-		profile(List.of(villagers("g1").withLimit(TWO_PER_SECOND), Rule.of("g2", "*cow*").withLimit(TWO_PER_SECOND)));
+		profile(List.of(villagers("g1").withLimit(TWO_PER_SECOND), SetEntry.of("g2", "*cow*").withLimit(TWO_PER_SECOND)));
 		start(villagerAt(0), 1_000);
 		SoundStart cow = villagerAt(0);
 		cow.soundId = "minecraft:entity.cow.ambient";

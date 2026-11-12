@@ -8,7 +8,7 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -69,10 +69,10 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 			// Edit follows Apply to: it opens Pen's rule for the sound.
 			context.runOnClient(mc -> main(mc).setApplyTarget(main(mc).applyChoices().get(1)));
 			context.runOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(1).onPress(null));
-			context.waitForScreen(RuleEditorScreen.class);
-			check(context.computeOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).target()).equals(RuleTarget.zone("pen")),
+			context.waitForScreen(EntryEditorScreen.class);
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).target()).equals(RuleTarget.zone("pen")),
 					"Edit opens the rule in Pen's list");
-			context.runOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).onClose());
+			context.runOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).onClose());
 			context.waitForScreen(SoundSculptorScreen.class);
 
 			// Undo removes the zone rule again.

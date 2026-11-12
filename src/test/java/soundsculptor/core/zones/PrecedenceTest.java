@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 
 import org.junit.jupiter.api.Test;
 
@@ -23,11 +23,11 @@ class PrecedenceTest {
 	private static final String NETHER = "minecraft:the_nether";
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
 
-	private static Rule villagers(String id) {
-		return Rule.of(id, "minecraft:entity.villager.*");
+	private static SetEntry villagers(String id) {
+		return SetEntry.of(id, "minecraft:entity.villager.*");
 	}
 
-	private static Zone sphere(String id, double x, double y, double z, double radius, Rule... rules) {
+	private static Zone sphere(String id, double x, double y, double z, double radius, SetEntry... rules) {
 		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, y, z), new Shape.Sphere(radius), List.of(rules));
 	}
 
@@ -143,7 +143,7 @@ class PrecedenceTest {
 
 	@Test
 	void p11NonPositionalSoundsIgnoreZones() {
-		Zone a = sphere("a", 0, 0, 0, 10, Rule.of("all", "*").withMute(true));
+		Zone a = sphere("a", 0, 0, 0, 10, SetEntry.of("all", "*").withMute(true));
 		SoundDecision d = new SoundDecision();
 		new Precedence(List.of(), List.of(a)).decide(VILLAGER, false, WORLD, OVERWORLD, 0, 0, 0, d);
 		assertEquals(100, d.volumePercent(), 1e-6);
@@ -169,7 +169,7 @@ class PrecedenceTest {
 	@Test
 	void zoneWhoseRulesDoNotMatchTakesNoPart() {
 		// A closer zone that only has cow rules must not hide a farther zone's villager rule.
-		Zone cows = sphere("cows", 1, 0, 0, 10, Rule.of("rc", "minecraft:entity.cow.*").withMute(true));
+		Zone cows = sphere("cows", 1, 0, 0, 10, SetEntry.of("rc", "minecraft:entity.cow.*").withMute(true));
 		Zone vill = sphere("vill", 8, 0, 0, 10, villagers("rv").withVolume(30));
 		SoundDecision d = decide(new Precedence(List.of(), List.of(cows, vill)));
 		assertEquals(30, d.volumePercent(), 1e-6);
@@ -187,8 +187,8 @@ class PrecedenceTest {
 
 	@Test
 	void decisionReportsTheDecidingRules() {
-		Rule global = villagers("g").withMute(true).withCue(true);
-		Rule zoneRule = villagers("z").withVolume(50);
+		SetEntry global = villagers("g").withMute(true).withCue(true);
+		SetEntry zoneRule = villagers("z").withVolume(50);
 		Zone a = sphere("a", 0, 0, 0, 10, zoneRule);
 		SoundDecision d = decide(new Precedence(List.of(global), List.of(a)));
 		assertSame(zoneRule, d.loudnessRule());

@@ -1,4 +1,4 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -13,20 +13,20 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-4.4 to FR-4.7: resolving one rule list for a sound, per property. */
-class RuleResolverTest {
+class EntryResolverTest {
 	private static final String VILLAGER_AMBIENT = "minecraft:entity.villager.ambient";
 	private static final String VILLAGER_HURT = "minecraft:entity.villager.hurt";
 	private static final String TRADER_AMBIENT = "minecraft:entity.wandering_trader.ambient";
 
-	private static RuleResolver resolver(Rule... rules) {
-		return new RuleResolver(List.of(rules));
+	private static EntryResolver resolver(SetEntry... rules) {
+		return new EntryResolver(List.of(rules));
 	}
 
 	// --- FR-4 acceptance checks ---
 
 	@Test
 	void villagerWildcardMutesAllVillagerSoundsButNotTheTrader() {
-		RuleResolver r = resolver(Rule.of("r1", "minecraft:entity.villager.*").withMute(true));
+		EntryResolver r = resolver(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true));
 		assertTrue(r.resolve(VILLAGER_AMBIENT).muted());
 		assertTrue(r.resolve(VILLAGER_HURT).muted());
 		assertFalse(r.resolve(TRADER_AMBIENT).muted());
@@ -35,7 +35,7 @@ class RuleResolverTest {
 
 	@Test
 	void footstepPatternCoversVanillaAndModdedBlocks() {
-		RuleResolver r = resolver(Rule.of("r1", "*:block.*.step").withVolume(50));
+		EntryResolver r = resolver(SetEntry.of("r1", "*:block.*.step").withVolume(50));
 		assertEquals(50, r.resolve("minecraft:block.stone.step").volumePercent());
 		assertEquals(50, r.resolve("minecraft:block.wood.step").volumePercent());
 		assertEquals(50, r.resolve("somemod:block.marble.step").volumePercent());
@@ -44,11 +44,11 @@ class RuleResolverTest {
 
 	@Test
 	void exactRuleBelowWildcardStillWinsForItsSound() {
-		Rule mute = Rule.of("r1", "minecraft:entity.villager.*").withMute(true);
-		Rule exact = Rule.of("r2", VILLAGER_AMBIENT).withVolume(100);
-		RuleResolver r = resolver(mute, exact);
+		SetEntry mute = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
+		SetEntry exact = SetEntry.of("r2", VILLAGER_AMBIENT).withVolume(100);
+		EntryResolver r = resolver(mute, exact);
 
-		RuleResolution ambient = r.resolve(VILLAGER_AMBIENT);
+		EntryResolution ambient = r.resolve(VILLAGER_AMBIENT);
 		assertFalse(ambient.muted());
 		assertEquals(100, ambient.volumePercent());
 		assertSame(exact, ambient.loudness());
@@ -58,9 +58,9 @@ class RuleResolverTest {
 
 	@Test
 	void wildcardReportsThatItIsPartlyOverridden() {
-		Rule mute = Rule.of("r1", "minecraft:entity.villager.*").withMute(true);
-		Rule exact = Rule.of("r2", VILLAGER_AMBIENT).withVolume(100);
-		RuleResolver r = resolver(mute, exact);
+		SetEntry mute = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
+		SetEntry exact = SetEntry.of("r2", VILLAGER_AMBIENT).withVolume(100);
+		EntryResolver r = resolver(mute, exact);
 		List<String> known = List.of(VILLAGER_AMBIENT, VILLAGER_HURT, TRADER_AMBIENT);
 
 		assertEquals(Set.of(exact), r.overriddenBy(mute, known));
@@ -69,7 +69,7 @@ class RuleResolverTest {
 
 	@Test
 	void disabledRuleHasNoEffect() {
-		Rule mute = Rule.of("r1", "minecraft:entity.villager.*").withMute(true);
+		SetEntry mute = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
 		assertTrue(resolver(mute).resolve(VILLAGER_AMBIENT).muted());
 		assertFalse(resolver(mute.withEnabled(false)).resolve(VILLAGER_AMBIENT).muted());
 	}
@@ -78,16 +78,16 @@ class RuleResolverTest {
 
 	@Test
 	void moreLiteralCharactersBeatFewer() {
-		Rule broad = Rule.of("broad", "*villager*").withVolume(20);
-		Rule narrow = Rule.of("narrow", "minecraft:entity.villager.*").withVolume(70);
+		SetEntry broad = SetEntry.of("broad", "*villager*").withVolume(20);
+		SetEntry narrow = SetEntry.of("narrow", "minecraft:entity.villager.*").withVolume(70);
 		assertEquals(70, resolver(broad, narrow).resolve(VILLAGER_AMBIENT).volumePercent());
 		assertEquals(70, resolver(narrow, broad).resolve(VILLAGER_AMBIENT).volumePercent());
 	}
 
 	@Test
 	void fewerStarsBeatMoreWhenLiteralsAreEqual() {
-		Rule twoStars = Rule.of("two", "a:*b*c").withVolume(20);
-		Rule oneStar = Rule.of("one", "a:b*c").withVolume(70);
+		SetEntry twoStars = SetEntry.of("two", "a:*b*c").withVolume(20);
+		SetEntry oneStar = SetEntry.of("one", "a:b*c").withVolume(70);
 		assertEquals(4, twoStars.pattern().literalCount());
 		assertEquals(4, oneStar.pattern().literalCount());
 		assertEquals(70, resolver(twoStars, oneStar).resolve("a:bxc").volumePercent());
@@ -95,8 +95,8 @@ class RuleResolverTest {
 
 	@Test
 	void listOrderBreaksRemainingTies() {
-		Rule first = Rule.of("first", "minecraft:entity.villager.*").withVolume(30);
-		Rule second = Rule.of("second", "minecraft:entity.villager.*").withVolume(80);
+		SetEntry first = SetEntry.of("first", "minecraft:entity.villager.*").withVolume(30);
+		SetEntry second = SetEntry.of("second", "minecraft:entity.villager.*").withVolume(80);
 		assertEquals(30, resolver(first, second).resolve(VILLAGER_AMBIENT).volumePercent());
 		assertEquals(80, resolver(second, first).resolve(VILLAGER_AMBIENT).volumePercent());
 	}
@@ -105,9 +105,9 @@ class RuleResolverTest {
 
 	@Test
 	void eachPropertyHasItsOwnWinner() {
-		Rule mute = Rule.of("mute", "minecraft:entity.villager.*").withMute(true).withLimit(new Limit(3, 1000, false));
-		Rule cueOnly = Rule.of("cue", VILLAGER_AMBIENT).withCue(false);
-		RuleResolution res = resolver(mute, cueOnly).resolve(VILLAGER_AMBIENT);
+		SetEntry mute = SetEntry.of("mute", "minecraft:entity.villager.*").withMute(true).withLimit(new Limit(3, 1000, false));
+		SetEntry cueOnly = SetEntry.of("cue", VILLAGER_AMBIENT).withCue(false);
+		EntryResolution res = resolver(mute, cueOnly).resolve(VILLAGER_AMBIENT);
 		assertSame(mute, res.loudness());
 		assertSame(mute, res.limit());
 		assertSame(cueOnly, res.cue());
@@ -118,9 +118,9 @@ class RuleResolverTest {
 	@Test
 	void muteAndVolumeCompeteTogetherAsLoudness() {
 		// A rule that sets only volume still beats a less specific rule that sets only mute.
-		Rule mute = Rule.of("mute", "minecraft:entity.villager.*").withMute(true);
-		Rule volume = Rule.of("vol", VILLAGER_AMBIENT).withVolume(60);
-		RuleResolution res = resolver(mute, volume).resolve(VILLAGER_AMBIENT);
+		SetEntry mute = SetEntry.of("mute", "minecraft:entity.villager.*").withMute(true);
+		SetEntry volume = SetEntry.of("vol", VILLAGER_AMBIENT).withVolume(60);
+		EntryResolution res = resolver(mute, volume).resolve(VILLAGER_AMBIENT);
 		assertFalse(res.muted());
 		assertEquals(60, res.volumePercent());
 	}
@@ -128,7 +128,7 @@ class RuleResolverTest {
 	@Test
 	void mutedRuleKeepsItsVolumeForUnmute() {
 		// FR-5.1: mute is separate from the volume value.
-		RuleResolution res = resolver(Rule.of("r", VILLAGER_AMBIENT).withVolume(40).withMute(true)).resolve(VILLAGER_AMBIENT);
+		EntryResolution res = resolver(SetEntry.of("r", VILLAGER_AMBIENT).withVolume(40).withMute(true)).resolve(VILLAGER_AMBIENT);
 		assertTrue(res.muted());
 		assertEquals(40, res.volumePercent());
 		assertEquals(0, res.effectiveVolumePercent());
@@ -136,7 +136,7 @@ class RuleResolverTest {
 
 	@Test
 	void noMatchingRuleMeansVanillaDefaults() {
-		RuleResolution res = resolver(Rule.of("r", "minecraft:entity.cow.*").withMute(true)).resolve(VILLAGER_AMBIENT);
+		EntryResolution res = resolver(SetEntry.of("r", "minecraft:entity.cow.*").withMute(true)).resolve(VILLAGER_AMBIENT);
 		assertNull(res.loudness());
 		assertNull(res.limit());
 		assertNull(res.cue());
@@ -147,8 +147,8 @@ class RuleResolverTest {
 
 	@Test
 	void ruleThatSetsNothingNeverWins() {
-		Rule empty = Rule.of("empty", VILLAGER_AMBIENT);
-		Rule mute = Rule.of("mute", "minecraft:entity.villager.*").withMute(true);
+		SetEntry empty = SetEntry.of("empty", VILLAGER_AMBIENT);
+		SetEntry mute = SetEntry.of("mute", "minecraft:entity.villager.*").withMute(true);
 		assertSame(mute, resolver(empty, mute).resolve(VILLAGER_AMBIENT).loudness());
 	}
 
@@ -156,14 +156,14 @@ class RuleResolverTest {
 
 	@Test
 	void repeatedLookupsReuseTheCachedResult() {
-		RuleResolver r = resolver(Rule.of("r", "minecraft:entity.villager.*").withMute(true));
+		EntryResolver r = resolver(SetEntry.of("r", "minecraft:entity.villager.*").withMute(true));
 		assertSame(r.resolve(VILLAGER_AMBIENT), r.resolve(VILLAGER_AMBIENT));
 	}
 
 	@Test
 	void cacheCountsHitsAndMissesForDiagnostics() {
 		// FR-13.3: pattern cache hit rate.
-		RuleResolver r = resolver(Rule.of("r", "minecraft:entity.villager.*").withMute(true));
+		EntryResolver r = resolver(SetEntry.of("r", "minecraft:entity.villager.*").withMute(true));
 		r.resolve(VILLAGER_AMBIENT);
 		r.resolve(VILLAGER_AMBIENT);
 		r.resolve(VILLAGER_AMBIENT);
@@ -174,18 +174,18 @@ class RuleResolverTest {
 
 	@Test
 	void cacheStaysBoundedForUnboundedIds() {
-		RuleResolver r = resolver(Rule.of("r", "x:*").withVolume(10));
-		for (int i = 0; i < RuleResolver.MAX_CACHED_IDS + 500; i++) {
+		EntryResolver r = resolver(SetEntry.of("r", "x:*").withVolume(10));
+		for (int i = 0; i < EntryResolver.MAX_CACHED_IDS + 500; i++) {
 			assertEquals(10, r.resolve("x:sound" + i).volumePercent());
 		}
-		assertTrue(r.cachedIdCount() <= RuleResolver.MAX_CACHED_IDS);
+		assertTrue(r.cachedIdCount() <= EntryResolver.MAX_CACHED_IDS);
 	}
 
 	// --- Value ranges ---
 
 	@Test
 	void volumeMustBeWithinZeroToTwoHundred() {
-		Rule r = Rule.of("r", VILLAGER_AMBIENT);
+		SetEntry r = SetEntry.of("r", VILLAGER_AMBIENT);
 		assertThrows(IllegalArgumentException.class, () -> r.withVolume(-1));
 		assertThrows(IllegalArgumentException.class, () -> r.withVolume(201));
 		assertEquals(200, r.withVolume(200).volume());

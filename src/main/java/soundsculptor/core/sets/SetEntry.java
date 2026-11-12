@@ -1,4 +1,4 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 /**
  * One rule in the global list or a zone's list (PRD FR-4, section 7.5). Immutable; the {@code with...} methods
@@ -15,11 +15,11 @@ package soundsculptor.core.rules;
  * @param limit   repeat limit, or {@code null}
  * @param cue     show a cue when muted, or {@code null}
  */
-public record Rule(String id, boolean enabled, SoundPattern pattern, Boolean mute, Integer volume, Limit limit, Boolean cue) {
+public record SetEntry(String id, boolean enabled, SoundPattern pattern, Boolean mute, Integer volume, Limit limit, Boolean cue) {
 	public static final int MIN_VOLUME = 0;
 	public static final int MAX_VOLUME = 200;
 
-	public Rule {
+	public SetEntry {
 		if (id == null || pattern == null) {
 			throw new IllegalArgumentException("rule id and pattern are required");
 		}
@@ -29,33 +29,33 @@ public record Rule(String id, boolean enabled, SoundPattern pattern, Boolean mut
 	}
 
 	/** An enabled rule that sets nothing yet. */
-	public static Rule of(String id, String pattern) {
-		return new Rule(id, true, SoundPattern.of(pattern), null, null, null, null);
+	public static SetEntry of(String id, String pattern) {
+		return new SetEntry(id, true, SoundPattern.of(pattern), null, null, null, null);
 	}
 
 	/** The same rule under another ID, e.g. a copy in another list. */
-	public Rule withId(String value) {
-		return new Rule(value, enabled, pattern, mute, volume, limit, cue);
+	public SetEntry withId(String value) {
+		return new SetEntry(value, enabled, pattern, mute, volume, limit, cue);
 	}
 
-	public Rule withEnabled(boolean value) {
-		return new Rule(id, value, pattern, mute, volume, limit, cue);
+	public SetEntry withEnabled(boolean value) {
+		return new SetEntry(id, value, pattern, mute, volume, limit, cue);
 	}
 
-	public Rule withMute(Boolean value) {
-		return new Rule(id, enabled, pattern, value, volume, limit, cue);
+	public SetEntry withMute(Boolean value) {
+		return new SetEntry(id, enabled, pattern, value, volume, limit, cue);
 	}
 
-	public Rule withVolume(Integer value) {
-		return new Rule(id, enabled, pattern, mute, value, limit, cue);
+	public SetEntry withVolume(Integer value) {
+		return new SetEntry(id, enabled, pattern, mute, value, limit, cue);
 	}
 
-	public Rule withLimit(Limit value) {
-		return new Rule(id, enabled, pattern, mute, volume, value, cue);
+	public SetEntry withLimit(Limit value) {
+		return new SetEntry(id, enabled, pattern, mute, volume, value, cue);
 	}
 
-	public Rule withCue(Boolean value) {
-		return new Rule(id, enabled, pattern, mute, volume, limit, value);
+	public SetEntry withCue(Boolean value) {
+		return new SetEntry(id, enabled, pattern, mute, volume, limit, value);
 	}
 
 	public boolean setsLoudness() {

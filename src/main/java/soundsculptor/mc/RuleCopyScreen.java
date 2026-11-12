@@ -2,7 +2,7 @@ package soundsculptor.mc;
 
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptList;
@@ -59,7 +59,7 @@ public final class RuleCopyScreen extends SculptScreen {
 		List<RuleTarget.Sourced> others = target.otherRules(profile);
 		for (int i = 0; i < others.size(); i++) {
 			RuleTarget.Sourced sourced = others.get(i);
-			Rule rule = sourced.rule();
+			SetEntry rule = sourced.rule();
 			String pattern = rule.pattern().text();
 			String status = RuleListPanel.status(rule);
 			String from = sourced.source().isGlobal()
@@ -80,7 +80,7 @@ public final class RuleCopyScreen extends SculptScreen {
 	}
 
 	/** Copies the rule into this zone and returns to its rules, with a toast saying what happened. */
-	public void copy(Rule rule) {
+	public void copy(SetEntry rule) {
 		ProfileManager.update(profile -> target.copyIn(profile, rule));
 		closeNow();
 		if (parent instanceof SculptScreen screen) {

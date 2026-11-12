@@ -2,14 +2,14 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RuleCopyScreen;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.ZoneRulesScreen;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -30,8 +30,8 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.putRule(Rule.of("r1", VILLAGERS).withMute(true))
-					.withZones(List.of(zone("a", key, Rule.of("r1", "*cow*").withVolume(40)), zone("b", key)))));
+					.putRule(SetEntry.of("r1", VILLAGERS).withMute(true))
+					.withZones(List.of(zone("a", key, SetEntry.of("r1", "*cow*").withVolume(40)), zone("b", key)))));
 
 			// The global Rules tab has no "Add existing rule"; a zone's rules do.
 			context.setScreen(SoundSculptorScreen::new);
@@ -62,7 +62,7 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> ((ZoneRulesScreen) mc.gui.screen()).toast() != null
 					&& ((ZoneRulesScreen) mc.gui.screen()).toast().message().getString().equals("Copied " + VILLAGERS + " into this zone")),
 					"a toast should confirm the copy");
-			List<Rule> copied = context.computeOnClient(mc -> RuleTarget.zone("b").rules(ProfileManager.profile()));
+			List<SetEntry> copied = context.computeOnClient(mc -> RuleTarget.zone("b").rules(ProfileManager.profile()));
 			check(copied.size() == 1 && copied.get(0).pattern().text().equals(VILLAGERS) && Boolean.TRUE.equals(copied.get(0).mute()),
 					"zone b should hold a copy of the villager mute, was " + copied);
 			context.takeScreenshot("copy-rule-zone-rules");
@@ -76,12 +76,12 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(ZoneRulesScreen.class);
 
 			// Not linked: change the copy in the editor; the global rule keeps its mute.
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.edit(mc.gui.screen(), RuleTarget.zone("b"),
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(mc.gui.screen(), RuleTarget.zone("b"),
 					RuleTarget.zone("b").rules(ProfileManager.profile()).get(0))));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.waitForScreen(EntryEditorScreen.class);
 			context.runOnClient(mc -> {
-				RuleEditorScreen editor = (RuleEditorScreen) mc.gui.screen();
-				editor.setMute(RuleEditorScreen.MuteChoice.DO_NOT_MUTE);
+				EntryEditorScreen editor = (EntryEditorScreen) mc.gui.screen();
+				editor.setMute(EntryEditorScreen.MuteChoice.DO_NOT_MUTE);
 				editor.save();
 			});
 			context.waitForScreen(ZoneRulesScreen.class);
@@ -98,7 +98,7 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	private static Zone zone(String id, String key, Rule... rules) {
+	private static Zone zone(String id, String key, SetEntry... rules) {
 		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), List.of(rules));
 	}
 

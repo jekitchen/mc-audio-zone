@@ -5,10 +5,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import soundsculptor.core.diag.MemoryEstimate;
-import soundsculptor.core.rules.CacheBudget;
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.RuleResolution;
-import soundsculptor.core.rules.RuleResolver;
+import soundsculptor.core.sets.CacheBudget;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.EntryResolution;
+import soundsculptor.core.sets.EntryResolver;
 
 /**
  * Combines the global rule list and the zones into one decision per sound (PRD FR-9), separately for loudness,
@@ -45,9 +45,9 @@ public final class Precedence {
 	private static final double TIE_DISTANCE = 0.01;
 	private static final float DISCRETE_WEIGHT = 0.5F;
 
-	private final RuleResolver global;
+	private final EntryResolver global;
 	private final Zone[] zones;
-	private final RuleResolver[] zoneRules;
+	private final EntryResolver[] zoneRules;
 	private final double[] volumes;
 	private final ZoneEdge profileEdge;
 	/**
@@ -71,7 +71,7 @@ public final class Precedence {
 	 * one per list. Measured in game, the per-list lookups were most of a sound start's cost with 64 zones (M8). Capped
 	 * like the resolvers' own caches, because servers can send arbitrary IDs.
 	 */
-	private final Map<String, RuleResolution[]> rows = new ConcurrentHashMap<>();
+	private final Map<String, EntryResolution[]> rows = new ConcurrentHashMap<>();
 	/** Which zones are fixed in the last world and dimension decided (bubbles are always "here"). */
 	private String hereWorldKey;
 	private String hereDimension;
@@ -80,21 +80,21 @@ public final class Precedence {
 	private long rowHits;
 
 	/** A profile whose default edge is hard (PRD 7.5). */
-	public Precedence(List<Rule> globalRules, List<Zone> zones) {
+	public Precedence(List<SetEntry> globalRules, List<Zone> zones) {
 		this(globalRules, zones, ZoneEdge.hard());
 	}
 
 	/**
 	 * @param profileEdge the profile's default edge, used by zones whose edge is {@link ZoneEdge#DEFAULT}
 	 */
-	public Precedence(List<Rule> globalRules, List<Zone> zones, ZoneEdge profileEdge) {
+	public Precedence(List<SetEntry> globalRules, List<Zone> zones, ZoneEdge profileEdge) {
 		this.profileEdge = profileEdge.mode() == ZoneEdge.Mode.DEFAULT ? ZoneEdge.hard() : profileEdge;
 		if (zones.size() > MAX_ZONES) {
 			throw new IllegalArgumentException(zones.size() + " zones is more than the maximum " + MAX_ZONES);
 		}
-		this.global = new RuleResolver(globalRules);
+		this.global = new EntryResolver(globalRules);
 		this.zones = zones.toArray(new Zone[0]);
-		this.zoneRules = new RuleResolver[this.zones.length];
+		this.zoneRules = new EntryResolver[this.zones.length];
 		int n = this.zones.length;
 		this.volumes = new double[n];
 		this.enabled = new boolean[n];
@@ -109,7 +109,7 @@ public final class Precedence {
 		CacheBudget zoneCaches = new CacheBudget(ZONE_CACHE_IDS);
 		for (int i = 0; i < n; i++) {
 			Zone zone = this.zones[i];
-			zoneRules[i] = new RuleResolver(zone.rules(), zoneCaches);
+			zoneRules[i] = new EntryResolver(zone.rules(), zoneCaches);
 			volumes[i] = zone.shape().volume();
 			enabled[i] = zone.enabled();
 			bubble[i] = zone.isBubble();
@@ -158,12 +158,12 @@ public final class Precedence {
 	}
 
 	/** The cached resolutions of every list for this sound ID; computed on first sight. */
-	private RuleResolution[] row(String soundId) {
-		RuleResolution[] row = rows.get(soundId);
+	private EntryResolution[] row(String soundId) {
+		EntryResolution[] row = rows.get(soundId);
 		if (row != null) {
 			rowHits++;
 		} else {
-			row = new RuleResolution[zones.length + 1];
+			row = new EntryResolution[zones.length + 1];
 			resolve(soundId, row);
 			if (rows.size() < ROW_CACHE_IDS) {
 				rows.put(soundId, row);
@@ -196,7 +196,7 @@ public final class Precedence {
 	 *
 	 * @param out at least {@link #zoneCount()} + 1 long
 	 */
-	public void resolve(String soundId, RuleResolution[] out) {
+	public void resolve(String soundId, EntryResolution[] out) {
 		out[0] = global.resolve(soundId);
 		for (int i = 0; i < zones.length; i++) {
 			out[i + 1] = zoneRules[i].resolve(soundId);
@@ -207,18 +207,18 @@ public final class Precedence {
 	 * The same decision as {@link #decide(String, boolean, String, String, double, double, double, double, double,
 	 * double, SoundDecision)}, from resolutions {@link #resolve} filled for this snapshot. Skips the per-ID lookups.
 	 */
-	public void decideResolved(RuleResolution[] resolved, boolean positional, String worldKey, String dimension,
+	public void decideResolved(EntryResolution[] resolved, boolean positional, String worldKey, String dimension,
 			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
 		decide(null, resolved, positional, worldKey, dimension, x, y, z, px, py, pz, out);
 	}
 
-	private void decide(String soundId, RuleResolution[] resolved, boolean positional, String worldKey, String dimension,
+	private void decide(String soundId, EntryResolution[] resolved, boolean positional, String worldKey, String dimension,
 			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
 		out.reset();
 		if (resolved == null) {
 			resolved = row(soundId);
 		}
-		RuleResolution g = resolved[0];
+		EntryResolution g = resolved[0];
 		boolean[] inThisWorld = positional ? here(worldKey, dimension) : null;
 
 		int loudIdx = -1;
@@ -230,16 +230,16 @@ public final class Precedence {
 		double loudW = 0;
 		double limitW = 0;
 		double cueW = 0;
-		RuleResolution loudRes = null;
-		RuleResolution limitRes = null;
-		RuleResolution cueRes = null;
+		EntryResolution loudRes = null;
+		EntryResolution limitRes = null;
+		EntryResolution cueRes = null;
 
 		if (positional) {
 			for (int i = 0; i < zones.length; i++) {
 				if (!enabled[i]) {
 					continue;
 				}
-				if (resolved[i + 1] == RuleResolution.NONE) {
+				if (resolved[i + 1] == EntryResolution.NONE) {
 					continue; // nothing in this zone matches the sound: skip the geometry (same result, it is skipped below)
 				}
 				double dx;
@@ -267,7 +267,7 @@ public final class Precedence {
 				if (w <= 0) {
 					continue;
 				}
-				RuleResolution r = resolved[i + 1];
+				EntryResolution r = resolved[i + 1];
 				double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 				if (r.loudness() != null && beats(i, dist, loudIdx, loudDist)) {
 					loudIdx = i;
@@ -345,7 +345,7 @@ public final class Precedence {
 	public long cacheHits() {
 		// A row hit answers the global list and every zone's list at once.
 		long total = global.cacheHits() + rowHits * (zones.length + 1);
-		for (RuleResolver r : zoneRules) {
+		for (EntryResolver r : zoneRules) {
 			total += r.cacheHits();
 		}
 		return total;
@@ -354,7 +354,7 @@ public final class Precedence {
 	/** Cache misses across the global list and every zone's list. */
 	public long cacheMisses() {
 		long total = global.cacheMisses();
-		for (RuleResolver r : zoneRules) {
+		for (EntryResolver r : zoneRules) {
 			total += r.cacheMisses();
 		}
 		return total;
@@ -373,7 +373,7 @@ public final class Precedence {
 				+ MemoryEstimate.CONCURRENT_HASH_MAP + MemoryEstimate.hashTable(rows.size())
 				+ rows.size() * (MemoryEstimate.HASH_NODE + MemoryEstimate.array(MemoryEstimate.REFERENCE, zones.length + 1))
 				+ global.estimatedBytes();
-		for (RuleResolver r : zoneRules) {
+		for (EntryResolver r : zoneRules) {
 			bytes += r.estimatedBytes();
 		}
 		return bytes;
@@ -412,7 +412,7 @@ public final class Precedence {
 	}
 
 	/** The global list's resolver, for the sound trace (FR-14). */
-	public RuleResolver globalRules() {
+	public EntryResolver globalRules() {
 		return global;
 	}
 
@@ -422,7 +422,7 @@ public final class Precedence {
 	}
 
 	/** Resolver for zone {@code i}'s own rule list. */
-	public RuleResolver zoneRules(int i) {
+	public EntryResolver zoneRules(int i) {
 		return zoneRules[i];
 	}
 

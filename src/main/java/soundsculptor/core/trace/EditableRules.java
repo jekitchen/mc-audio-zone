@@ -2,7 +2,7 @@ package soundsculptor.core.trace;
 
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 
 /**
@@ -11,7 +11,7 @@ import soundsculptor.core.zones.Zone;
  *
  * <p>Plain lists, so the editor works the same once the profile model holds zones.
  */
-public record EditableRules(List<Rule> globalRules, List<Zone> zones) {
+public record EditableRules(List<SetEntry> globalRules, List<Zone> zones) {
 	public EditableRules {
 		globalRules = List.copyOf(globalRules);
 		zones = List.copyOf(zones);

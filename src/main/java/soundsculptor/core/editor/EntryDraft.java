@@ -4,17 +4,17 @@ import java.util.EnumMap;
 import java.util.Locale;
 
 import soundsculptor.core.boost.BoostWarning;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.PatternError;
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.PatternError;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundPattern;
 
 /**
  * The rule editor's values (PRD 6.1: pattern, Mute, Volume, Limit with Per source, Cue). Mute and Cue have three
  * states, {@code null} meaning "this rule does not set it"; an empty Volume or Limit count also means "not set".
  * The limit window counts only when a limit count is typed.
  */
-public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
+public final class EntryDraft extends Draft<EntryDraft.Field, SetEntry> {
 	/** The rule editor's fields, for mapping them to widgets. */
 	public enum Field implements DraftField {
 		PATTERN(true),
@@ -49,15 +49,15 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 	/** FR-7.6: the Cue a rule gets when it is set to mute with no Cue chosen, or null to leave Cue alone. */
 	private Boolean cueDefault;
 
-	private RuleDraft(String id, boolean boostAvailable, EnumMap<Field, String> original, EnumMap<Field, String> defaults) {
+	private EntryDraft(String id, boolean boostAvailable, EnumMap<Field, String> original, EnumMap<Field, String> defaults) {
 		super(Field.class, original, defaults);
 		this.id = id;
 		this.maxVolume = BoostWarning.sliderMax(boostAvailable);
 	}
 
 	/** A new rule. */
-	public static RuleDraft blank(String id, boolean boostAvailable) {
-		return of(Rule.of(id, "*"), boostAvailable, "");
+	public static EntryDraft blank(String id, boolean boostAvailable) {
+		return of(SetEntry.of(id, "*"), boostAvailable, "");
 	}
 
 	/**
@@ -65,11 +65,11 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 	 *
 	 * @param boostAvailable whether volumes above 100% are allowed (v1 with driver support, FR-5.4)
 	 */
-	public static RuleDraft of(Rule rule, boolean boostAvailable) {
+	public static EntryDraft of(SetEntry rule, boolean boostAvailable) {
 		return of(rule, boostAvailable, rule.pattern().text());
 	}
 
-	private static RuleDraft of(Rule rule, boolean boostAvailable, String pattern) {
+	private static EntryDraft of(SetEntry rule, boolean boostAvailable, String pattern) {
 		EnumMap<Field, String> values = new EnumMap<>(Field.class);
 		values.put(Field.PATTERN, pattern);
 		values.put(Field.ENABLED, Boolean.toString(rule.enabled()));
@@ -90,7 +90,7 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 		defaults.put(Field.LIMIT_WINDOW, Integer.toString(DEFAULT_WINDOW_MS));
 		defaults.put(Field.PER_SOURCE, "false");
 		defaults.put(Field.CUE, "");
-		return new RuleDraft(rule.id(), boostAvailable, values, defaults);
+		return new EntryDraft(rule.id(), boostAvailable, values, defaults);
 	}
 
 	/** The ID the rule is saved under. */
@@ -124,7 +124,7 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 	 *
 	 * @return this draft
 	 */
-	public RuleDraft useCueDefault(boolean value) {
+	public EntryDraft useCueDefault(boolean value) {
 		this.cueDefault = value;
 		return this;
 	}
@@ -158,7 +158,7 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 				PatternError error = SoundPattern.validate(text);
 				yield error == null ? null : FieldError.of(error.translationKey());
 			}
-			case VOLUME -> text.isBlank() ? null : Numbers.checkWhole(text, Rule.MIN_VOLUME, maxVolume);
+			case VOLUME -> text.isBlank() ? null : Numbers.checkWhole(text, SetEntry.MIN_VOLUME, maxVolume);
 			case LIMIT_COUNT -> text.isBlank() ? null : Numbers.checkWhole(text, Limit.MIN_COUNT, Limit.MAX_COUNT);
 			case LIMIT_WINDOW -> Numbers.checkWhole(text, Limit.MIN_WINDOW_MS, Limit.MAX_WINDOW_MS);
 			default -> null;
@@ -185,12 +185,12 @@ public final class RuleDraft extends Draft<RuleDraft.Field, Rule> {
 	}
 
 	@Override
-	protected Rule create() {
+	protected SetEntry create() {
 		Limit limit = hasLimit()
 				? new Limit(Numbers.whole(text(Field.LIMIT_COUNT)), Numbers.whole(text(Field.LIMIT_WINDOW)), perSource())
 				: null;
 		Integer volume = hasVolume() ? Numbers.whole(text(Field.VOLUME)) : null;
-		return new Rule(id, enabled(), SoundPattern.of(text(Field.PATTERN)), mute(), volume, limit, cue());
+		return new SetEntry(id, enabled(), SoundPattern.of(text(Field.PATTERN)), mute(), volume, limit, cue());
 	}
 
 	private boolean hasVolume() {

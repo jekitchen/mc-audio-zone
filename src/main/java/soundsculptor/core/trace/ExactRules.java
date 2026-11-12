@@ -3,7 +3,7 @@ package soundsculptor.core.trace;
 import java.util.ArrayList;
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 
 /**
@@ -37,8 +37,8 @@ public final class ExactRules {
 	}
 
 	/** The exact-ID rule for {@code soundId} in the global list ({@code zoneId} null) or in that zone, or null. */
-	public static Rule find(EditableRules rules, String zoneId, String soundId) {
-		List<Rule> list = list(rules, zoneId);
+	public static SetEntry find(EditableRules rules, String zoneId, String soundId) {
+		List<SetEntry> list = list(rules, zoneId);
 		if (list == null) {
 			return null;
 		}
@@ -55,13 +55,13 @@ public final class ExactRules {
 	 *             rule nor turns one on, and a rule left setting nothing is removed, so muting and then unmuting leaves
 	 *             the profile as it was.
 	 */
-	public static Change edit(EditableRules rules, String zoneId, String soundId, RuleEdit edit, boolean tidy) {
+	public static Change edit(EditableRules rules, String zoneId, String soundId, EntryEdit edit, boolean tidy) {
 		TraceEditError invalid = edit.validate();
 		if (invalid != null) {
 			return refused(rules, invalid);
 		}
 		int z = -1;
-		List<Rule> list = rules.globalRules();
+		List<SetEntry> list = rules.globalRules();
 		if (zoneId != null) {
 			z = indexOfZone(rules.zones(), zoneId);
 			if (z < 0) {
@@ -69,13 +69,13 @@ public final class ExactRules {
 			}
 			list = rules.zones().get(z).rules();
 		}
-		boolean setsSomething = setsAnything(edit.apply(Rule.of("probe", soundId)));
+		boolean setsSomething = setsAnything(edit.apply(SetEntry.of("probe", soundId)));
 		int existing = indexOfExact(list, soundId);
-		List<Rule> newList;
+		List<SetEntry> newList;
 		Outcome outcome;
 		if (existing >= 0) {
-			Rule old = list.get(existing);
-			Rule changed = tidy && !setsSomething ? edit.apply(old) : edit.apply(old.withEnabled(true));
+			SetEntry old = list.get(existing);
+			SetEntry changed = tidy && !setsSomething ? edit.apply(old) : edit.apply(old.withEnabled(true));
 			if (tidy && !setsAnything(changed)) {
 				newList = new ArrayList<>(list);
 				newList.remove(existing);
@@ -94,7 +94,7 @@ public final class ExactRules {
 				return refused(rules, TraceEditError.TOO_MANY_RULES);
 			}
 			newList = new ArrayList<>(list);
-			newList.add(edit.apply(Rule.of(freeId(rules, TraceEditor.exactRuleId(zoneId, soundId)), soundId)));
+			newList.add(edit.apply(SetEntry.of(freeId(rules, TraceEditor.exactRuleId(zoneId, soundId)), soundId)));
 			outcome = Outcome.ADDED;
 		}
 		EditableRules after = z < 0
@@ -108,11 +108,11 @@ public final class ExactRules {
 		return new Change(error, rules, Outcome.UNCHANGED);
 	}
 
-	private static boolean setsAnything(Rule rule) {
+	private static boolean setsAnything(SetEntry rule) {
 		return rule.setsLoudness() || rule.setsLimit() || rule.setsCue();
 	}
 
-	private static List<Rule> list(EditableRules rules, String zoneId) {
+	private static List<SetEntry> list(EditableRules rules, String zoneId) {
 		if (zoneId == null) {
 			return rules.globalRules();
 		}
@@ -129,7 +129,7 @@ public final class ExactRules {
 		return -1;
 	}
 
-	static int indexOfRule(List<Rule> rules, String id) {
+	static int indexOfRule(List<SetEntry> rules, String id) {
 		for (int i = 0; i < rules.size(); i++) {
 			if (rules.get(i).id().equals(id)) {
 				return i;
@@ -138,9 +138,9 @@ public final class ExactRules {
 		return -1;
 	}
 
-	private static int indexOfExact(List<Rule> rules, String soundId) {
+	private static int indexOfExact(List<SetEntry> rules, String soundId) {
 		for (int i = 0; i < rules.size(); i++) {
-			Rule rule = rules.get(i);
+			SetEntry rule = rules.get(i);
 			if (rule.pattern().isExact() && rule.pattern().text().equals(soundId)) {
 				return i;
 			}

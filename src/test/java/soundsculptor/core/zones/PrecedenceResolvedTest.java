@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.List;
 
-import soundsculptor.core.rules.RuleResolution;
+import soundsculptor.core.sets.EntryResolution;
 import soundsculptor.core.stress.StressProfile;
 
 import org.junit.jupiter.api.Test;
@@ -18,7 +18,7 @@ class PrecedenceResolvedTest {
 	@Test
 	void decideResolvedMatchesDecideEverywhereWithEveryZoneKind() {
 		Precedence p = new Precedence(StressProfile.globalRules(), StressProfile.zones(WORLD, OVERWORLD), ZoneEdge.fade(4));
-		RuleResolution[] resolved = new RuleResolution[Precedence.MAX_ZONES + 1];
+		EntryResolution[] resolved = new EntryResolution[Precedence.MAX_ZONES + 1];
 		SoundDecision a = new SoundDecision();
 		SoundDecision b = new SoundDecision();
 		List<String> ids = StressProfile.soundIds();

@@ -3,10 +3,10 @@ package soundsculptor.core.profile;
 import soundsculptor.core.Message;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.outline.ZoneColors;
-import soundsculptor.core.rules.InvalidPatternException;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.InvalidPatternException;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
@@ -121,15 +121,15 @@ public final class ProfileCodec {
 		return json;
 	}
 
-	private static JsonArray rulesToJson(List<Rule> rules) {
+	private static JsonArray rulesToJson(List<SetEntry> rules) {
 		JsonArray array = new JsonArray();
-		for (Rule rule : rules) {
+		for (SetEntry rule : rules) {
 			array.add(ruleToJson(rule));
 		}
 		return array;
 	}
 
-	private static JsonObject ruleToJson(Rule rule) {
+	private static JsonObject ruleToJson(SetEntry rule) {
 		JsonObject json = new JsonObject();
 		json.addProperty("id", rule.id());
 		json.addProperty("enabled", rule.enabled());
@@ -277,7 +277,7 @@ public final class ProfileCodec {
 		if (zoneArray.size() > Precedence.MAX_ZONES) {
 			throw ProfileText.problem(ProfileText.TOO_MANY_ZONES, zoneArray.size(), Precedence.MAX_ZONES);
 		}
-		List<Rule> rules = new ArrayList<>();
+		List<SetEntry> rules = new ArrayList<>();
 		for (int i = 0; i < ruleArray.size(); i++) {
 			rules.add(readRule(top.element(ruleArray, i, Message.of(ProfileText.PLACE_RULE, i + 1), RULE_FIELDS)));
 		}
@@ -326,7 +326,7 @@ public final class ProfileCodec {
 		return settings;
 	}
 
-	private static Rule readRule(Fields r) throws ProfileFormatException {
+	private static SetEntry readRule(Fields r) throws ProfileFormatException {
 		String id = r.string("id");
 		String patternText = r.string("pattern");
 		SoundPattern pattern;
@@ -337,7 +337,7 @@ public final class ProfileCodec {
 		}
 		boolean enabled = !r.has("enabled") || r.bool("enabled");
 		Boolean mute = r.has("mute") ? r.bool("mute") : null;
-		Integer volume = r.has("volume") ? r.integer("volume", Rule.MIN_VOLUME, Rule.MAX_VOLUME) : null;
+		Integer volume = r.has("volume") ? r.integer("volume", SetEntry.MIN_VOLUME, SetEntry.MAX_VOLUME) : null;
 		Boolean cue = r.has("cue") ? r.bool("cue") : null;
 		Limit limit = null;
 		if (r.has("limit")) {
@@ -346,7 +346,7 @@ public final class ProfileCodec {
 					l.integer("windowMs", Limit.MIN_WINDOW_MS, Limit.MAX_WINDOW_MS),
 					l.has("perSource") && l.bool("perSource"));
 		}
-		return new Rule(id, enabled, pattern, mute, volume, limit, cue);
+		return new SetEntry(id, enabled, pattern, mute, volume, limit, cue);
 	}
 
 	private static Zone readZone(Fields z) throws ProfileFormatException {
@@ -380,7 +380,7 @@ public final class ProfileCodec {
 				default -> ZoneEdge.DEFAULT;
 			};
 		}
-		List<Rule> rules = new ArrayList<>();
+		List<SetEntry> rules = new ArrayList<>();
 		if (z.has("rules")) {
 			JsonArray array = z.array("rules");
 			for (int i = 0; i < array.size(); i++) {

@@ -12,7 +12,7 @@ import soundsculptor.core.editor.ZoneDraft.Field;
 import soundsculptor.core.editor.ZoneDraft.ShapeKind;
 import soundsculptor.core.outline.ColorError;
 import soundsculptor.core.outline.ZoneColor;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
@@ -28,7 +28,7 @@ class ZoneDraftTest {
 	private static final String OVERWORLD = "minecraft:overworld";
 	private static final int ORANGE = ZoneColor.values()[0].rgb();
 	private static final int SKY = ZoneColor.values()[1].rgb();
-	private static final List<Rule> RULES = List.of(Rule.of("zr1", "*villager*").withVolume(50));
+	private static final List<SetEntry> RULES = List.of(SetEntry.of("zr1", "*villager*").withVolume(50));
 
 	@Test
 	void aNewZoneIsATenBlockBoxAtThePlayerOnTheBlockGrid() {

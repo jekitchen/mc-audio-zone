@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -27,12 +27,12 @@ class ImportPlanTest {
 	}
 
 	private static final Profile CURRENT = new Profile("This server", new ProfileSettings(true),
-			List.of(Rule.of("old", "x:old").withMute(true)), List.of(fixed("mine", new Shape.Sphere(4)), bubble("oldBubble")),
+			List.of(SetEntry.of("old", "x:old").withMute(true)), List.of(fixed("mine", new Shape.Sphere(4)), bubble("oldBubble")),
 			java.util.Map.of("mine", 0x111111, "oldBubble", 0x222222));
 
 	@Test
 	void rulesBubblesAndSettingsReplaceThisServers() {
-		Profile file = new Profile("Friend", new ProfileSettings(false), List.of(Rule.of("new", "x:new").withVolume(20)),
+		Profile file = new Profile("Friend", new ProfileSettings(false), List.of(SetEntry.of("new", "x:new").withVolume(20)),
 				List.of(bubble("b1"), fixedOn("theirs", "other.net")), java.util.Map.of("b1", 0x333333));
 		ImportPlan plan = ImportPlan.of(CURRENT, file, SERVER);
 		Profile result = plan.result();
@@ -51,10 +51,10 @@ class ImportPlanTest {
 	@Test
 	void importingABoostAsksForTheBoostConfirmFirst() {
 		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
-		Zone loudBubble = bubble("b1").withRules(List.of(Rule.of("z", "x:z").withVolume(150)));
-		Profile global = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("n", "x:n").withVolume(120)));
+		Zone loudBubble = bubble("b1").withRules(List.of(SetEntry.of("z", "x:z").withVolume(150)));
+		Profile global = new Profile("F", ProfileSettings.DEFAULTS, List.of(SetEntry.of("n", "x:n").withVolume(120)));
 		Profile inZone = new Profile("F", ProfileSettings.DEFAULTS, List.of()).withZones(List.of(loudBubble));
-		Profile quiet = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("n", "x:n").withVolume(100)));
+		Profile quiet = new Profile("F", ProfileSettings.DEFAULTS, List.of(SetEntry.of("n", "x:n").withVolume(100)));
 		assertTrue(ImportPlan.of(CURRENT, global, SERVER).needsBoostConfirm());
 		assertTrue(ImportPlan.of(CURRENT, inZone, SERVER).needsBoostConfirm());
 		assertFalse(ImportPlan.of(CURRENT, quiet, SERVER).needsBoostConfirm());
@@ -115,7 +115,7 @@ class ImportPlanTest {
 
 	@Test
 	void summaryListsWhatHappens() {
-		Profile file = new Profile("F", ProfileSettings.DEFAULTS, List.of(Rule.of("a", "x:a"), Rule.of("b", "x:b")),
+		Profile file = new Profile("F", ProfileSettings.DEFAULTS, List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b")),
 				List.of(bubble("b1"), fixedOn("t1", "other.net"), fixedOn("t2", "other.net"), fixedOn("t3", "other.net")),
 				java.util.Map.of());
 		ImportPlan plan = ImportPlan.of(CURRENT, file, SERVER);

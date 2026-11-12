@@ -2,7 +2,7 @@ package soundsculptor.core.zones;
 
 import java.util.List;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 
 /**
  * A zone (PRD FR-8): an area with its own rule list that changes positional sounds based on where they come from.
@@ -20,7 +20,7 @@ import soundsculptor.core.rules.Rule;
  * @param rules the zone's own rule list, same format as the global list (FR-8.6)
  */
 public record Zone(String id, String name, boolean enabled, String worldKey, String dimension, Point anchor, Shape shape,
-		List<Rule> rules, ZoneMode mode, ZoneEdge edge, AnchorType anchorType) {
+		List<SetEntry> rules, ZoneMode mode, ZoneEdge edge, AnchorType anchorType) {
 	public Zone {
 		if (id == null || worldKey == null || dimension == null || anchor == null || shape == null || mode == null
 				|| edge == null || anchorType == null) {
@@ -31,7 +31,7 @@ public record Zone(String id, String name, boolean enabled, String worldKey, Str
 
 	/** A fixed Inside zone with the profile's default edge: the MVP zone. */
 	public Zone(String id, String name, boolean enabled, String worldKey, String dimension, Point anchor, Shape shape,
-			List<Rule> rules) {
+			List<SetEntry> rules) {
 		this(id, name, enabled, worldKey, dimension, anchor, shape, rules, ZoneMode.INSIDE, ZoneEdge.DEFAULT, AnchorType.FIXED);
 	}
 
@@ -44,7 +44,7 @@ public record Zone(String id, String name, boolean enabled, String worldKey, Str
 	}
 
 	/** The same zone with another rule list (FR-8.6). */
-	public Zone withRules(List<Rule> value) {
+	public Zone withRules(List<SetEntry> value) {
 		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, value, mode, edge, anchorType);
 	}
 

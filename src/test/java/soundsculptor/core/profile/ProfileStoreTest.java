@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -41,10 +41,10 @@ class ProfileStoreTest {
 
 	@Test
 	void saveAndLoadRoundTrip() throws IOException {
-		Rule full = new Rule("r2", false, soundsculptor.core.rules.SoundPattern.of("*villager*"), null, 50,
+		SetEntry full = new SetEntry("r2", false, soundsculptor.core.sets.SoundPattern.of("*villager*"), null, 50,
 				new Limit(3, 1000, true), true);
 		Profile profile = new Profile("My server", new ProfileSettings(false),
-				List.of(Rule.of("r1", VILLAGER).withMute(true), full));
+				List.of(SetEntry.of("r1", VILLAGER).withMute(true), full));
 		store().save("default", profile);
 		ProfileStore.LoadResult result = store().load("default", "ignored");
 		assertFalse(result.failed(), String.valueOf(result.problem()));

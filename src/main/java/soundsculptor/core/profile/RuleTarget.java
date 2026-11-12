@@ -1,7 +1,7 @@
 package soundsculptor.core.profile;
 
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.zones.Zone;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +24,7 @@ public record RuleTarget(String zoneId) {
 	}
 
 	/** The rules of this list, in order; empty if the zone no longer exists. */
-	public List<Rule> rules(Profile profile) {
+	public List<SetEntry> rules(Profile profile) {
 		if (isGlobal()) {
 			return profile.globalRules();
 		}
@@ -33,8 +33,8 @@ public record RuleTarget(String zoneId) {
 	}
 
 	/** The rule with this ID in this list, or null. */
-	public Rule rule(Profile profile, String id) {
-		for (Rule rule : rules(profile)) {
+	public SetEntry rule(Profile profile, String id) {
+		for (SetEntry rule : rules(profile)) {
 			if (rule.id().equals(id)) {
 				return rule;
 			}
@@ -43,9 +43,9 @@ public record RuleTarget(String zoneId) {
 	}
 
 	/** Replaces the rule with the same ID in place, or adds it at the end. */
-	public Profile put(Profile profile, Rule rule) {
-		List<Rule> list = new ArrayList<>(rules(profile));
-		Rule existing = rule(profile, rule.id());
+	public Profile put(Profile profile, SetEntry rule) {
+		List<SetEntry> list = new ArrayList<>(rules(profile));
+		SetEntry existing = rule(profile, rule.id());
 		if (existing == null) {
 			list.add(rule);
 		} else {
@@ -56,19 +56,19 @@ public record RuleTarget(String zoneId) {
 
 	/** Deletes the rule with this ID; returns the profile unchanged if there is none. */
 	public Profile remove(Profile profile, String id) {
-		Rule existing = rule(profile, id);
+		SetEntry existing = rule(profile, id);
 		if (existing == null) {
 			return profile;
 		}
-		List<Rule> list = new ArrayList<>(rules(profile));
+		List<SetEntry> list = new ArrayList<>(rules(profile));
 		list.remove(existing);
 		return with(profile, list);
 	}
 
 	/** Moves a rule up ({@code delta < 0}) or down; unchanged at either end. List order is FR-4.5 step 4. */
 	public Profile move(Profile profile, String id, int delta) {
-		List<Rule> rules = rules(profile);
-		Rule existing = rule(profile, id);
+		List<SetEntry> rules = rules(profile);
+		SetEntry existing = rule(profile, id);
 		if (existing == null) {
 			return profile;
 		}
@@ -77,7 +77,7 @@ public record RuleTarget(String zoneId) {
 		if (to == from) {
 			return profile;
 		}
-		List<Rule> list = new ArrayList<>(rules);
+		List<SetEntry> list = new ArrayList<>(rules);
 		list.remove(from);
 		list.add(to, existing);
 		return with(profile, list);
@@ -94,7 +94,7 @@ public record RuleTarget(String zoneId) {
 	}
 
 	/** A rule and the list it is in, for "Add existing rule". */
-	public record Sourced(RuleTarget source, Rule rule) {
+	public record Sourced(RuleTarget source, SetEntry rule) {
 	}
 
 	/**
@@ -104,13 +104,13 @@ public record RuleTarget(String zoneId) {
 	public List<Sourced> otherRules(Profile profile) {
 		List<Sourced> out = new ArrayList<>();
 		if (!isGlobal()) {
-			for (Rule rule : profile.globalRules()) {
+			for (SetEntry rule : profile.globalRules()) {
 				out.add(new Sourced(GLOBAL, rule));
 			}
 		}
 		for (Zone zone : profile.zones()) {
 			if (!zone.id().equals(zoneId)) {
-				for (Rule rule : zone.rules()) {
+				for (SetEntry rule : zone.rules()) {
 					out.add(new Sourced(zone(zone.id()), rule));
 				}
 			}
@@ -120,7 +120,7 @@ public record RuleTarget(String zoneId) {
 
 	/** Whether this list already has a rule with this pattern. */
 	public boolean hasPattern(Profile profile, SoundPattern pattern) {
-		for (Rule rule : rules(profile)) {
+		for (SetEntry rule : rules(profile)) {
 			if (rule.pattern().equals(pattern)) {
 				return true;
 			}
@@ -132,11 +132,11 @@ public record RuleTarget(String zoneId) {
 	 * "Add existing rule": a copy of {@code rule} at the end of this list, under a new ID. Rules are values, so the
 	 * copy and the original are independent: changing one never changes the other.
 	 */
-	public Profile copyIn(Profile profile, Rule rule) {
+	public Profile copyIn(Profile profile, SetEntry rule) {
 		return put(profile, rule.withId(newRuleId(profile)));
 	}
 
-	private Profile with(Profile profile, List<Rule> rules) {
+	private Profile with(Profile profile, List<SetEntry> rules) {
 		if (isGlobal()) {
 			return profile.withGlobalRules(rules);
 		}

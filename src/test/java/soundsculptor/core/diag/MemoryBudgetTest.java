@@ -14,10 +14,10 @@ import soundsculptor.core.limit.RepeatLimiter;
 import soundsculptor.core.playing.PlayingSounds;
 import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.recent.RecentSounds;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
-import soundsculptor.core.rules.RuleResolver;
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.EntryResolver;
+import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.trace.LastPlays;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
@@ -85,13 +85,13 @@ class MemoryBudgetTest {
 		return playing;
 	}
 
-	private static RuleResolver fullResolver() {
-		List<Rule> rules = new ArrayList<>();
+	private static EntryResolver fullResolver() {
+		List<SetEntry> rules = new ArrayList<>();
 		for (int i = 0; i < 50; i++) {
-			rules.add(new Rule("r" + i, true, SoundPattern.of("minecraft:entity.test_sound.number_" + i + "*"), null, 50,
+			rules.add(new SetEntry("r" + i, true, SoundPattern.of("minecraft:entity.test_sound.number_" + i + "*"), null, 50,
 					null, null));
 		}
-		RuleResolver resolver = new RuleResolver(rules);
+		EntryResolver resolver = new EntryResolver(rules);
 		for (int i = 0; i < 4096; i++) { // the cache's cap
 			resolver.resolve(id(i));
 		}
@@ -144,10 +144,10 @@ class MemoryBudgetTest {
 		List<Zone> zones = new ArrayList<>();
 		for (int z = 0; z < Precedence.MAX_ZONES; z++) {
 			zones.add(new Zone("zone_" + z, "Zone " + z, true, "world", "minecraft:overworld", new Point(z * 100, 0, 0),
-					new Shape.Sphere(10), List.of(Rule.of("r", "minecraft:*").withMute(true))));
+					new Shape.Sphere(10), List.of(SetEntry.of("r", "minecraft:*").withMute(true))));
 		}
-		Precedence precedence = new Precedence(List.of(Rule.of("g", "minecraft:*").withVolume(50)), zones);
-		soundsculptor.core.rules.RuleResolution[] out = new soundsculptor.core.rules.RuleResolution[zones.size() + 1];
+		Precedence precedence = new Precedence(List.of(SetEntry.of("g", "minecraft:*").withVolume(50)), zones);
+		soundsculptor.core.sets.EntryResolution[] out = new soundsculptor.core.sets.EntryResolution[zones.size() + 1];
 		for (int i = 0; i < 4096; i++) { // the global cache's cap; the zones' shared cap fills on the way
 			precedence.resolve(id(i), out);
 		}
@@ -193,7 +193,7 @@ class MemoryBudgetTest {
 
 	@Test
 	void resolverEstimateMatchesAllocation() {
-		estimateMatchesAllocation("pattern cache", MemoryBudgetTest::fullResolver, RuleResolver::estimatedBytes);
+		estimateMatchesAllocation("pattern cache", MemoryBudgetTest::fullResolver, EntryResolver::estimatedBytes);
 	}
 
 	@Test
@@ -234,7 +234,7 @@ class MemoryBudgetTest {
 		EntitySounds linker = fullLinker();
 		LastPlays lastPlays = fullLastPlays();
 		PlayingSounds playing = fullPlaying();
-		RuleResolver global = fullResolver();
+		EntryResolver global = fullResolver();
 		RepeatLimiter limiter = worstLimiter();
 		Precedence profile = worstPrecedence();
 		meter.add("recent", recent::estimatedBytes);
@@ -256,7 +256,7 @@ class MemoryBudgetTest {
 		IntFunction<String> fail = bytes -> "an empty structure should be well under 1 MB, was " + bytes;
 		long empty = new RecentSounds().estimatedBytes() + new EntitySounds().estimatedBytes()
 				+ new LastPlays().estimatedBytes() + new RepeatLimiter().estimatedBytes()
-				+ new RuleResolver(List.of()).estimatedBytes();
+				+ new EntryResolver(List.of()).estimatedBytes();
 		assertTrue(empty < 200_000, fail.apply((int) empty));
 	}
 }

@@ -108,7 +108,7 @@ public final class ZoneListPanel {
 	}
 
 	private static String joinParts(List<SummaryPart> parts) {
-		return soundsculptor.core.lists.RuleSummary.join(parts, TRANSLATOR);
+		return soundsculptor.core.lists.EntrySummary.join(parts, TRANSLATOR);
 	}
 
 	public void setEnabled(String zoneId, boolean enabled) {

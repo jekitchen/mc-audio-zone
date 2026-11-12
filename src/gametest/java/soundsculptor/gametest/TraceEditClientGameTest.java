@@ -1,7 +1,7 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.trace.RuleLocation;
 import soundsculptor.core.trace.TraceText;
 import soundsculptor.core.zones.Point;
@@ -49,7 +49,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			// The sound plays 4 blocks from the zone's anchor, so a 2-block radius no longer holds it.
 			Point spot = new Point(pen.x() + 4, pen.y(), pen.z());
 			Zone penZone = new Zone("pen", "Pen", true, key, OVERWORLD, pen, new Shape.Sphere(10),
-					List.of(Rule.of("zr", "*villager*").withVolume(50)));
+					List.of(SetEntry.of("zr", "*villager*").withVolume(50)));
 
 			// AC: drag the winning zone's volume from 50% to 20%: the result updates at once, marked "Predicted for next
 			// play"; Undo restores 50%; the next villager sound plays at 20%.
@@ -83,8 +83,8 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			closeTrace(context);
 
 			// AC: turn off the winning global rule from the trace: the next rule in line wins at once.
-			Rule exact = Rule.of("e", VILLAGER).withVolume(60);
-			Rule wildcard = Rule.of("w", "*villager*").withVolume(30);
+			SetEntry exact = SetEntry.of("e", VILLAGER).withVolume(60);
+			SetEntry wildcard = SetEntry.of("w", "*villager*").withVolume(30);
 			setRules(context, List.of(wildcard, exact));
 			check(play(context, spot) == 0.6F, "the exact rule should give 60%");
 			openTrace(context);
@@ -115,7 +115,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 				SculptList.Row none = t.row(new TraceText.NoRuleTarget(null));
 				check(none != null && none.buttons().get(0).getMessage().getString().equals("Add rule"), "the global list should offer Add rule");
 				none.buttons().get(0).onPress(null);
-				Rule added = ProfileManager.profile().exactRule(VILLAGER);
+				SetEntry added = ProfileManager.profile().exactRule(VILLAGER);
 				check(added != null, "an exact-ID rule should be added");
 				SculptList.Row row = t.row(new TraceText.RuleTarget(RuleLocation.global(added.id()), added));
 				check(row != null && row.buttons().get(1).getMessage().getString().equals("Mute"), "the new rule's line should offer Mute");
@@ -181,7 +181,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	private static void setRules(ClientGameTestContext context, List<Rule> globalRules, Zone... zones) {
+	private static void setRules(ClientGameTestContext context, List<SetEntry> globalRules, Zone... zones) {
 		context.runOnClient(mc -> ProfileManager.update(p -> p.withGlobalRules(globalRules).withZones(List.of(zones))));
 	}
 

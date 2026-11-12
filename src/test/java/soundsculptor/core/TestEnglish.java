@@ -56,7 +56,7 @@ public final class TestEnglish implements Translator {
 			Map.entry("soundsculptor.profile.problem.copy_too_many_zones", "After copying this profile would have %1$s zones; the maximum is %2$s."),
 			Map.entry("soundsculptor.profile.problem.name_empty", "Enter a name."),
 			Map.entry("soundsculptor.profile.problem.name_too_long", "The name can be at most %s characters."),
-			// Rule summaries (Rules tab chips, PRD 6.1)
+			// SetEntry summaries (Rules tab chips, PRD 6.1)
 			Map.entry("soundsculptor.summary.separator", ", "),
 			Map.entry("soundsculptor.summary.rule.disabled", "Off"),
 			Map.entry("soundsculptor.summary.rule.muted", "Muted"),

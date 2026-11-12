@@ -8,21 +8,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
-import soundsculptor.core.editor.RuleDraft.Field;
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.PatternError;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.editor.EntryDraft.Field;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.PatternError;
+import soundsculptor.core.sets.SetEntry;
 
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-12.4, FR-12.6, FR-12.7 and section 6.2 for the rule editor (FR-4, FR-5, FR-6 limits). */
-class RuleDraftTest {
+class EntryDraftTest {
 	private static final boolean BOOST = true;
 
 	@Test
 	void blankDraftCannotSaveButShowsNoErrorUntilEditedOrSaveIsPressed() {
 		// 6.2: Save stays disabled from the start; the error shows once the field has been edited, or Save is pressed.
-		RuleDraft d = RuleDraft.blank("r1", BOOST);
+		EntryDraft d = EntryDraft.blank("r1", BOOST);
 		assertFalse(d.canSave());
 		assertEquals(PatternError.EMPTY.translationKey(), d.error(Field.PATTERN).translationKey());
 		assertNull(d.shownError(Field.PATTERN));
@@ -32,7 +32,7 @@ class RuleDraftTest {
 
 	@Test
 	void editingAFieldShowsItsErrorAtOnce() {
-		RuleDraft d = RuleDraft.blank("r1", BOOST);
+		EntryDraft d = EntryDraft.blank("r1", BOOST);
 		d.set(Field.PATTERN, "entity.cow.#");
 		assertEquals(PatternError.INVALID_CHARACTER.translationKey(), d.shownError(Field.PATTERN).translationKey());
 		assertNull(d.shownError(Field.VOLUME), "untouched fields stay quiet");
@@ -40,11 +40,11 @@ class RuleDraftTest {
 
 	@Test
 	void uppercasePatternIsAcceptedAndSavedLowercase() {
-		RuleDraft d = RuleDraft.blank("r1", BOOST);
+		EntryDraft d = EntryDraft.blank("r1", BOOST);
 		d.set(Field.PATTERN, "Minecraft:Entity.Cow.*");
 		d.setMute(true);
 		assertTrue(d.canSave());
-		Rule rule = d.build();
+		SetEntry rule = d.build();
 		assertEquals("minecraft:entity.cow.*", rule.pattern().text());
 		assertEquals(Boolean.TRUE, rule.mute());
 		assertEquals("r1", rule.id());
@@ -52,14 +52,14 @@ class RuleDraftTest {
 
 	@Test
 	void volumeIsCheckedAgainstTheSliderRange() {
-		RuleDraft d = draft("*villager*");
+		EntryDraft d = draft("*villager*");
 		d.set(Field.VOLUME, "250");
 		assertEquals(new FieldError(FieldError.OUT_OF_RANGE, List.of("0", "200")), d.error(Field.VOLUME));
 		d.set(Field.VOLUME, "150");
 		assertNull(d.error(Field.VOLUME));
 		assertTrue(d.showsBoostWarning());
 
-		RuleDraft noBoost = RuleDraft.blank("r2", false);
+		EntryDraft noBoost = EntryDraft.blank("r2", false);
 		noBoost.set(Field.PATTERN, "*");
 		noBoost.set(Field.VOLUME, "150");
 		assertEquals(new FieldError(FieldError.OUT_OF_RANGE, List.of("0", "100")), noBoost.error(Field.VOLUME));
@@ -67,7 +67,7 @@ class RuleDraftTest {
 
 	@Test
 	void volumeMustBeAWholeNumberOrEmpty() {
-		RuleDraft d = draft("*");
+		EntryDraft d = draft("*");
 		d.set(Field.VOLUME, "50.5");
 		assertEquals(FieldError.NOT_WHOLE_NUMBER, d.error(Field.VOLUME).translationKey());
 		d.set(Field.VOLUME, "loud");
@@ -81,7 +81,7 @@ class RuleDraftTest {
 
 	@Test
 	void limitIsSetByItsCountAndNeedsAWindow() {
-		RuleDraft d = draft("minecraft:entity.villager.ambient");
+		EntryDraft d = draft("minecraft:entity.villager.ambient");
 		d.set(Field.LIMIT_WINDOW, "nonsense");
 		assertTrue(d.canSave(), "with no count there is no limit, so the window is not checked");
 		assertNull(d.build().limit());
@@ -97,7 +97,7 @@ class RuleDraftTest {
 
 	@Test
 	void limitRangesComeFromFr6() {
-		RuleDraft d = draft("*");
+		EntryDraft d = draft("*");
 		d.set(Field.LIMIT_COUNT, "0");
 		assertEquals(new FieldError(FieldError.OUT_OF_RANGE, List.of("1", "100")), d.error(Field.LIMIT_COUNT));
 		d.set(Field.LIMIT_COUNT, "5");
@@ -111,7 +111,7 @@ class RuleDraftTest {
 	void mutingARuleWithNoCueSetStartsItWithTheCueDefault() {
 		// FR-7.6: new mute rules have Cue on by default; the default can be changed in Settings.
 		for (boolean cueDefault : new boolean[] {true, false}) {
-			RuleDraft d = RuleDraft.blank("r1", true).useCueDefault(cueDefault);
+			EntryDraft d = EntryDraft.blank("r1", true).useCueDefault(cueDefault);
 			d.setMute(true);
 			assertEquals(cueDefault, d.cue());
 		}
@@ -119,36 +119,36 @@ class RuleDraftTest {
 
 	@Test
 	void theCueDefaultLeavesAChosenCueAndOtherEditsAlone() {
-		RuleDraft chosen = RuleDraft.blank("r1", true).useCueDefault(true);
+		EntryDraft chosen = EntryDraft.blank("r1", true).useCueDefault(true);
 		chosen.setCue(false);
 		chosen.setMute(true);
 		assertEquals(Boolean.FALSE, chosen.cue(), "a Cue the player set is kept");
-		RuleDraft notMuting = RuleDraft.blank("r1", true).useCueDefault(true);
+		EntryDraft notMuting = EntryDraft.blank("r1", true).useCueDefault(true);
 		notMuting.setMute(false);
 		assertNull(notMuting.cue(), "only muting brings the default");
-		RuleDraft without = RuleDraft.blank("r1", true);
+		EntryDraft without = EntryDraft.blank("r1", true);
 		without.setMute(true);
 		assertNull(without.cue(), "without useCueDefault (the alpha, before cues) nothing changes");
 	}
 
 	@Test
 	void anExistingRuleRoundTrips() {
-		Rule rule = new Rule("r7", false, soundsculptor.core.rules.SoundPattern.of("*:block.*.step"), false, 40,
+		SetEntry rule = new SetEntry("r7", false, soundsculptor.core.sets.SoundPattern.of("*:block.*.step"), false, 40,
 				new Limit(2, 500, true), true);
-		RuleDraft d = RuleDraft.of(rule, BOOST);
+		EntryDraft d = EntryDraft.of(rule, BOOST);
 		assertEquals("40", d.text(Field.VOLUME));
 		assertFalse(d.enabled());
 		assertEquals(Boolean.FALSE, d.mute());
 		assertEquals(Boolean.TRUE, d.cue());
 		assertTrue(d.canSave());
 		assertEquals(rule, d.build());
-		assertEquals(Rule.of("r8", "*"), RuleDraft.of(Rule.of("r8", "*"), BOOST).build());
+		assertEquals(SetEntry.of("r8", "*"), EntryDraft.of(SetEntry.of("r8", "*"), BOOST).build());
 	}
 
 	@Test
 	void dirtyMeansAValueReallyChanged() {
 		// FR-12.4: Esc with unsaved changes opens Save / Discard / Keep editing.
-		RuleDraft d = RuleDraft.of(Rule.of("r1", "*villager*").withVolume(50), BOOST);
+		EntryDraft d = EntryDraft.of(SetEntry.of("r1", "*villager*").withVolume(50), BOOST);
 		assertFalse(d.isDirty());
 		d.set(Field.VOLUME, "050");
 		assertFalse(d.isDirty(), "the same number typed differently");
@@ -167,7 +167,7 @@ class RuleDraftTest {
 	@Test
 	void resetToDefaultPerValue() {
 		// FR-12.6. Values with no app-wide default (the pattern) go back to what they were when the editor opened.
-		RuleDraft d = RuleDraft.of(new Rule("r1", true, soundsculptor.core.rules.SoundPattern.of("*cow*"), true, 30,
+		EntryDraft d = EntryDraft.of(new SetEntry("r1", true, soundsculptor.core.sets.SoundPattern.of("*cow*"), true, 30,
 				new Limit(4, 2000, true), true), BOOST);
 		d.set(Field.PATTERN, "*pig*");
 		d.resetToDefault(Field.PATTERN);
@@ -177,7 +177,7 @@ class RuleDraftTest {
 			d.resetToDefault(f);
 			assertTrue(d.isDefault(f), f.name());
 		}
-		Rule reset = d.build();
+		SetEntry reset = d.build();
 		assertNull(reset.mute());
 		assertNull(reset.volume());
 		assertNull(reset.limit());
@@ -188,7 +188,7 @@ class RuleDraftTest {
 
 	@Test
 	void togglesAreSetThroughTheirOwnMethods() {
-		RuleDraft d = draft("*");
+		EntryDraft d = draft("*");
 		assertThrows(IllegalArgumentException.class, () -> d.set(Field.MUTE, "maybe"));
 		d.setMute(null);
 		assertNull(d.mute());
@@ -198,13 +198,13 @@ class RuleDraftTest {
 
 	@Test
 	void buildRefusesAnInvalidDraft() {
-		RuleDraft d = draft("*");
+		EntryDraft d = draft("*");
 		d.set(Field.VOLUME, "999");
 		assertThrows(IllegalStateException.class, d::build);
 	}
 
-	private static RuleDraft draft(String pattern) {
-		RuleDraft d = RuleDraft.blank("r1", BOOST);
+	private static EntryDraft draft(String pattern) {
+		EntryDraft d = EntryDraft.blank("r1", BOOST);
 		d.set(Field.PATTERN, pattern);
 		return d;
 	}
