@@ -1,16 +1,17 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.i18n.PseudoLocale;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RuleCopyScreen;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
 import soundsculptor.mc.ZoneRulesScreen;
@@ -80,8 +81,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.putRule(Rule.of("r1", "minecraft:entity.villager.*").withMute(true))
-					.putRule(Rule.of("r2", "minecraft:entity.villager.ambient").withVolume(30))
+					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
+							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))))
 					.withZones(List.of(zone("z1", "Trading hall", key), zone("z2", "Very long zone name for the bee farm by the river", key)))));
 
 			// A-4: every control on the Rules and Zones tabs has something to read out.
@@ -99,7 +100,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				TraceScreen trace = new TraceScreen(null, "minecraft:entity.villager.ambient");
 				mc.gui.setScreen(trace);
 				List<String> silent = new ArrayList<>(silentControls(trace));
-				trace.openVolume(soundsculptor.core.trace.RuleLocation.global("r2"), ProfileManager.profile().rule("r2"));
+				trace.openVolume(soundsculptor.core.trace.RuleLocation.global("r2"), RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
 				silent.addAll(silentControls(trace));
 				return silent;
 			});
@@ -181,7 +182,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		SETTINGS_GENERAL(mc -> settings(SoundSculptorScreen.SettingsPage.GENERAL), null),
 		SETTINGS_ZONES(mc -> settings(SoundSculptorScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(SoundSculptorScreen.SettingsPage.DIAGNOSTICS), null),
-		RULE_EDITOR(mc -> RuleEditorScreen.edit(null, ProfileManager.profile().rule("r1")), null),
+		RULE_EDITOR(mc -> EntryEditorScreen.edit(null, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r1")), null),
 		ZONE_EDITOR_NEW(mc -> ZoneEditorScreen.create(null), null),
 		ZONE_EDITOR(mc -> ZoneEditorScreen.edit(null, ProfileManager.profile().zone("z1")), null),
 		ZONE_EDITOR_BOX(mc -> ZoneEditorScreen.edit(null, ProfileManager.profile().zone("z1")), s -> {
@@ -192,7 +193,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		RULE_COPY(mc -> new RuleCopyScreen(null, RuleTarget.zone("z2")), null),
 		TRACE(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), null),
 		TRACE_VOLUME(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), s -> {
-			((TraceScreen) s).openVolume(soundsculptor.core.trace.RuleLocation.global("r2"), ProfileManager.profile().rule("r2"));
+			((TraceScreen) s).openVolume(soundsculptor.core.trace.RuleLocation.global("r2"), RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
 			return null;
 		});
 
@@ -321,7 +322,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 	private static Zone zone(String id, String name, String key) {
 		return new Zone(id, name, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8),
-				List.of(Rule.of("r1", "*cow*").withVolume(40)));
+				PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "*cow*").withVolume(40))));
 	}
 
 	/** Every Sound Sculptor text through {@link PseudoLocale#pseudo}; everything else unchanged. */

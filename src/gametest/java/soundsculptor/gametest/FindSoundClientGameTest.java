@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.zones.Point;
@@ -7,7 +8,7 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import java.util.List;
 import java.util.function.Function;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
@@ -28,13 +29,13 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(
-					new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(0.5, -59.5, 0.5), new Shape.Box(9, 3, 9), List.of())))));
+					new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(0.5, -59.5, 0.5), new Shape.Box(9, 3, 9), PlaceSets.EMPTY)))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 
 			// Words in the pattern field: matching sounds, no pattern error, Save off until a sound is picked.
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.create(mc.gui.screen())));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(mc.gui.screen())));
+			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("villager hurt");
 			context.waitTicks(1);
 			check(editor(context, e -> e.searching() && !e.patternField.isErrorShown() && !e.saveButton.active),
@@ -67,31 +68,31 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 			check(editor(context, e -> !e.preview().matches().isEmpty() && e.preview().matches().stream().allMatch(id -> id.startsWith("minecraft:entity.cow."))),
 					"the preview lists only cow sounds");
 			context.runOnClient(mc -> {
-				editorScreen(mc).setMute(RuleEditorScreen.MuteChoice.MUTE);
+				editorScreen(mc).setMute(EntryEditorScreen.MuteChoice.MUTE);
 				editorScreen(mc).save();
 			});
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().stream()
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).stream()
 					.anyMatch(r -> r.pattern().text().equals("minecraft:entity.cow.*"))), "the family rule is saved");
 
 			// In a zone's rules too, and readable names count: "basalt deltas" finds a sound without a subtitle.
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.create(mc.gui.screen(), RuleTarget.zone("z1"))));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(mc.gui.screen(), RuleTarget.zone("z1"))));
+			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("basalt deltas additions");
 			context.waitTicks(1);
 			check(editor(context, e -> e.matchList.findRow(BASALT) != null), "readable names should be searched too");
 			context.runOnClient(mc -> {
 				editorScreen(mc).matchList.findRow(BASALT).buttons().get(0).onPress(null);
-				editorScreen(mc).setMute(RuleEditorScreen.MuteChoice.MUTE);
+				editorScreen(mc).setMute(EntryEditorScreen.MuteChoice.MUTE);
 				editorScreen(mc).save();
 			});
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().zone("z1").rules().stream()
+			check(context.computeOnClient(mc -> ProfileManager.profile().zone("z1").sets().quickEntries().stream()
 					.anyMatch(r -> r.pattern().text().equals(BASALT) && Boolean.TRUE.equals(r.mute()))), "the zone gets the rule");
 
 			// Patterns still work as before: a typo with a colon is an error, not a search.
-			context.runOnClient(mc -> mc.gui.setScreen(RuleEditorScreen.create(mc.gui.screen())));
-			context.waitForScreen(RuleEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(mc.gui.screen())));
+			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("minecraft:entity.cow.#");
 			context.waitTicks(1);
 			check(editor(context, e -> !e.searching() && e.patternField.isErrorShown()), "a pattern with a bad character still shows an error");
@@ -122,12 +123,12 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	private static RuleEditorScreen editorScreen(net.minecraft.client.Minecraft mc) {
-		check(mc.gui.screen() instanceof RuleEditorScreen, "expected the rule editor, found " + mc.gui.screen());
-		return (RuleEditorScreen) mc.gui.screen();
+	private static EntryEditorScreen editorScreen(net.minecraft.client.Minecraft mc) {
+		check(mc.gui.screen() instanceof EntryEditorScreen, "expected the rule editor, found " + mc.gui.screen());
+		return (EntryEditorScreen) mc.gui.screen();
 	}
 
-	private static <T> T editor(ClientGameTestContext context, Function<RuleEditorScreen, T> read) {
+	private static <T> T editor(ClientGameTestContext context, Function<EntryEditorScreen, T> read) {
 		return context.computeOnClient(mc -> read.apply(editorScreen(mc)));
 	}
 

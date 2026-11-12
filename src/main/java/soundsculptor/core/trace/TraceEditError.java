@@ -1,7 +1,7 @@
 package soundsculptor.core.trace;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 
 /**
  * Why an edit from the trace panel was refused (PRD FR-14.4: validated like the full editors, FR-12.7). The panel
@@ -9,7 +9,7 @@ import soundsculptor.core.rules.Rule;
  */
 public enum TraceEditError {
 	/** Volume must be 0 to 200 (AC: type 250 into a volume field, an error shows and nothing changes). */
-	VOLUME_OUT_OF_RANGE("volume_out_of_range", Rule.MIN_VOLUME, Rule.MAX_VOLUME),
+	VOLUME_OUT_OF_RANGE("volume_out_of_range", SetEntry.MIN_VOLUME, SetEntry.MAX_VOLUME),
 	/** Limit count must be 1 to 100. */
 	LIMIT_COUNT_OUT_OF_RANGE("limit_count_out_of_range", Limit.MIN_COUNT, Limit.MAX_COUNT),
 	/** Limit window must be 50 to 10,000 ms. */

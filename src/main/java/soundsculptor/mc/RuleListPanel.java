@@ -1,10 +1,10 @@
 package soundsculptor.mc;
 
 import soundsculptor.core.Translator;
-import soundsculptor.core.lists.RuleSummary;
+import soundsculptor.core.lists.EntrySummary;
 import soundsculptor.core.lists.SummaryPart;
 import soundsculptor.core.profile.RuleTarget;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
@@ -50,7 +50,7 @@ public final class RuleListPanel {
 	/** Adds Add rule (and, for a zone, Add existing rule), a hint line and the list to the body. */
 	public void build(SculptScreen.Body body) {
 		addButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.rules.add"),
-				() -> setScreen(RuleEditorScreen.create(host, target))), Component.translatable("soundsculptor.rules.add.tip"));
+				() -> setScreen(EntryEditorScreen.create(host, target))), Component.translatable("soundsculptor.rules.add.tip"));
 		if (target.isGlobal()) {
 			body.row(addButton);
 		} else {
@@ -72,10 +72,10 @@ public final class RuleListPanel {
 			return;
 		}
 		List<String> known = KnownSounds.ids();
-		List<Rule> rules = target.rules(ProfileManager.profile());
+		List<SetEntry> rules = target.rules(ProfileManager.profile());
 		List<SculptList.Row> rows = new ArrayList<>(rules.size());
 		for (int i = 0; i < rules.size(); i++) {
-			Rule rule = rules.get(i);
+			SetEntry rule = rules.get(i);
 			String pattern = rule.pattern().text();
 			String status = status(rule);
 			String details = details(rule, known);
@@ -88,7 +88,7 @@ public final class RuleListPanel {
 					.narrationContext(() -> Component.translatable("soundsculptor.rules.enabled")),
 					Component.translatable(rule.enabled() ? "soundsculptor.rules.turn_off" : "soundsculptor.rules.turn_on")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.rules.edit"),
-					() -> setScreen(RuleEditorScreen.edit(host, target, rule))));
+					() -> setScreen(EntryEditorScreen.edit(host, target, rule))));
 			SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.rules.move_up"), () -> move(rule.id(), -1));
 			up.active = i > 0;
 			buttons.add(up);
@@ -105,7 +105,7 @@ public final class RuleListPanel {
 	 * What the rule does to loudness, in the same style as the Recently Played status (M8 review): "✖ Muted",
 	 * "▶ Volume 30%", "▶ Not muted", or "○ Off" for a rule that is turned off. Empty if it does not set loudness.
 	 */
-	static String status(Rule rule) {
+	static String status(SetEntry rule) {
 		if (!rule.enabled()) {
 			return Component.translatable("soundsculptor.rules.status.off").getString();
 		}
@@ -126,29 +126,29 @@ public final class RuleListPanel {
 	 * many known sounds it matches, so a typo shows up as "No known sound matches" (FR-4.3). An exact-ID rule always
 	 * matches its one sound, so it has no count.
 	 */
-	static String details(Rule rule, List<String> known) {
+	static String details(SetEntry rule, List<String> known) {
 		List<SummaryPart> parts = new ArrayList<>();
-		for (SummaryPart part : RuleSummary.parts(rule)) {
+		for (SummaryPart part : EntrySummary.parts(rule)) {
 			if (!LOUDNESS_PARTS.contains(part.key())) {
 				parts.add(part);
 			}
 		}
 		if (!rule.pattern().isExact()) {
-			int count = RuleSummary.matchCount(rule, known);
+			int count = EntrySummary.matchCount(rule, known);
 			parts.add(SummaryPart.of(count == 0 ? "soundsculptor.rules.matches.none"
 					: count == 1 ? "soundsculptor.rules.matches.one" : "soundsculptor.rules.matches", Integer.toString(count)));
 		}
-		return RuleSummary.join(parts, TRANSLATOR);
+		return EntrySummary.join(parts, TRANSLATOR);
 	}
 
 	/** Summary chips the status column already shows. */
-	private static final java.util.Set<String> LOUDNESS_PARTS = java.util.Set.of(RuleSummary.DISABLED, RuleSummary.MUTED,
-			RuleSummary.NOT_MUTED, RuleSummary.VOLUME);
+	private static final java.util.Set<String> LOUDNESS_PARTS = java.util.Set.of(EntrySummary.DISABLED, EntrySummary.MUTED,
+			EntrySummary.NOT_MUTED, EntrySummary.VOLUME);
 
 	/** FR-4.7: a rule can be turned off without deleting it; the effect stops at once. */
 	public void setEnabled(String ruleId, boolean enabled) {
 		QuickUndo.apply(host, this::refresh, profile -> {
-			Rule rule = target.rule(profile, ruleId);
+			SetEntry rule = target.rule(profile, ruleId);
 			return rule == null ? profile : target.put(profile, rule.withEnabled(enabled));
 		}, enabled ? "soundsculptor.rules.toast.on" : "soundsculptor.rules.toast.off", patternOf(ruleId));
 		refresh();
@@ -161,7 +161,7 @@ public final class RuleListPanel {
 		refresh();
 	}
 
-	public void confirmDelete(Rule rule) {
+	public void confirmDelete(SetEntry rule) {
 		setScreen(new SculptDialog(host,
 				Component.translatable("soundsculptor.rules.delete.title"),
 				Component.translatable("soundsculptor.rules.delete.message", rule.pattern().text()),
@@ -178,7 +178,7 @@ public final class RuleListPanel {
 
 	/** The rule's pattern for its toast, or its ID if it is gone. */
 	private String patternOf(String ruleId) {
-		Rule rule = target.rule(ProfileManager.profile(), ruleId);
+		SetEntry rule = target.rule(ProfileManager.profile(), ruleId);
 		return rule == null ? ruleId : rule.pattern().text();
 	}
 

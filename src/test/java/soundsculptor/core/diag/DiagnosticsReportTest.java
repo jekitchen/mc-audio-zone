@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 class DiagnosticsReportTest {
 	@Test
 	void reportNamesVersionsCountsAndTimings() {
-		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0-alpha", "26.3", false, 12, 3, 2,
+		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0-alpha", "26.3", false, 5, 4, 12, 3, 2,
 				new TimingWindow.Stats(310, 2.4, 41.0), 55.5,
 				new TimingWindow.Stats(20, 80.0, 150.0),
 				new TimingWindow.Stats(60, 120.0, 260.0), 0.987, 4);
@@ -16,7 +16,8 @@ class DiagnosticsReportTest {
 		assertTrue(text.contains("Sound Sculptor 0.1.0-alpha"), text);
 		assertTrue(text.contains("Minecraft 26.3"), text);
 		assertTrue(text.contains("Bypass: off"), text);
-		assertTrue(text.contains("Global rules: 12"), text);
+		assertTrue(text.contains("Sound Sets: 5 in the library, 4 active"), text);
+		assertTrue(text.contains("Entries active: 12"), text);
 		assertTrue(text.contains("Zones: 3 (2 active here)"), text);
 		assertTrue(text.contains("Sounds per second: 310"), text);
 		assertTrue(text.contains("Per sound: avg 2.4 µs, max 41.0 µs (peak 55.5 µs)"), text);
@@ -28,7 +29,7 @@ class DiagnosticsReportTest {
 
 	@Test
 	void bypassAndUnknownHitRateAreShownPlainly() {
-		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.2", true, 0, 0, 0,
+		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.2", true, 0, 0, 0, 0, 0,
 				TimingWindow.Stats.EMPTY, 0, TimingWindow.Stats.EMPTY, TimingWindow.Stats.EMPTY, Double.NaN, 0);
 		String text = DiagnosticsReport.format(data);
 		assertTrue(text.contains("Bypass: on"), text);
@@ -37,7 +38,7 @@ class DiagnosticsReportTest {
 
 	@Test
 	void memoryIsShownAgainstTheBudget() {
-		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.3", false, 0, 0, 0,
+		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.3", false, 0, 0, 0, 0, 0,
 				TimingWindow.Stats.EMPTY, 0, TimingWindow.Stats.EMPTY, TimingWindow.Stats.EMPTY, Double.NaN, 0,
 				3 * 512 * 1024);
 		assertTrue(DiagnosticsReport.format(data).contains("Memory (estimate): 1.5 MB of 8.0 MB"),
@@ -46,7 +47,7 @@ class DiagnosticsReportTest {
 
 	@Test
 	void memoryIsNotApplicableWhenNotMeasured() {
-		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.3", false, 0, 0, 0,
+		DiagnosticsReport.Data data = new DiagnosticsReport.Data("0.1.0", "26.3", false, 0, 0, 0, 0, 0,
 				TimingWindow.Stats.EMPTY, 0, TimingWindow.Stats.EMPTY, TimingWindow.Stats.EMPTY, Double.NaN, 0);
 		assertTrue(DiagnosticsReport.format(data).contains("Memory (estimate): n/a"), DiagnosticsReport.format(data));
 	}

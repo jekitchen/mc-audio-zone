@@ -1,6 +1,6 @@
 package soundsculptor.core.trace;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 
 /** The three settings that are decided separately (PRD FR-4.5, FR-9): loudness (mute + volume), limit and cue. */
 public enum TraceProperty {
@@ -9,7 +9,7 @@ public enum TraceProperty {
 	CUE;
 
 	/** Whether {@code rule} sets this property. */
-	public boolean setBy(Rule rule) {
+	public boolean setBy(SetEntry rule) {
 		return switch (this) {
 			case LOUDNESS -> rule.setsLoudness();
 			case LIMIT -> rule.setsLimit();

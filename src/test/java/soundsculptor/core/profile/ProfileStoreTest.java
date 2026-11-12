@@ -1,13 +1,15 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -35,16 +37,16 @@ class ProfileStoreTest {
 	void missingFileGivesAnEmptyProfileWithoutAProblem() {
 		ProfileStore.LoadResult result = store().load("default", "Default");
 		assertFalse(result.failed());
-		assertTrue(result.profile().globalRules().isEmpty());
+		assertTrue(result.profile().everywhere().quickEntries().isEmpty());
 		assertEquals("Default", result.profile().name());
 	}
 
 	@Test
 	void saveAndLoadRoundTrip() throws IOException {
-		Rule full = new Rule("r2", false, soundsculptor.core.rules.SoundPattern.of("*villager*"), null, 50,
+		SetEntry full = new SetEntry("r2", false, soundsculptor.core.sets.SoundPattern.of("*villager*"), null, 50,
 				new Limit(3, 1000, true), true);
 		Profile profile = new Profile("My server", new ProfileSettings(false),
-				List.of(Rule.of("r1", VILLAGER).withMute(true), full));
+				quick(List.of(SetEntry.of("r1", VILLAGER).withMute(true), full)));
 		store().save("default", profile);
 		ProfileStore.LoadResult result = store().load("default", "ignored");
 		assertFalse(result.failed(), String.valueOf(result.problem()));
@@ -53,9 +55,9 @@ class ProfileStoreTest {
 
 	@Test
 	void fileHasSchemaVersionAndOmitsUnsetProperties() throws IOException {
-		store().save("default", Profile.empty("Default").muteExact(VILLAGER));
+		store().save("default", Profile.empty("Default").withEverywhere(quick(SetEntry.of("exact:" + VILLAGER, VILLAGER).withMute(true))));
 		String json = Files.readString(store().fileFor("default"));
-		assertTrue(json.contains("\"schemaVersion\": 2"), json);
+		assertTrue(json.contains("\"schemaVersion\": 3"), json);
 		assertTrue(json.contains("\"mute\": true"), json);
 		assertFalse(json.contains("\"volume\""), "unset properties must be omitted: " + json);
 	}
@@ -80,7 +82,7 @@ class ProfileStoreTest {
 		ProfileStore.LoadResult result = store().load("default", "Default");
 		assertTrue(result.failed());
 		assertEquals("The file is not valid JSON (line 1, column 9).", result.problem().text(EN));
-		assertTrue(result.profile().globalRules().isEmpty());
+		assertTrue(result.profile().everywhere().quickEntries().isEmpty());
 		assertNotNull(result.brokenCopy());
 		assertTrue(Files.exists(result.brokenCopy()));
 		assertFalse(Files.exists(file), "the broken file must be moved aside so it is not overwritten");
@@ -96,19 +98,33 @@ class ProfileStoreTest {
 	}
 
 	@Test
-	void badRuleNamesTheRuleAndField() throws IOException {
+	void badEntryNamesThePlaceAndField() throws IOException {
 		Files.createDirectories(dir);
-		Files.writeString(store().fileFor("default"),
-				"{\"schemaVersion\": 1, \"globalRules\": [{\"id\": \"r1\", \"pattern\": \"minecraft:a\", \"volume\": 900}]}");
+		Files.writeString(store().fileFor("default"), "{\"schemaVersion\": 3, \"everywhere\": {\"sets\": [{\"set\": \"quick\"}],"
+				+ " \"quickChanges\": {\"id\": \"quick\", \"entries\": [{\"id\": \"r1\", \"target\": \"minecraft:a\", \"volume\": 900}]}}}");
 		ProfileStore.LoadResult result = store().load("default", "Default");
 		assertTrue(result.failed());
-		assertTrue(result.problem().text(EN).startsWith("Rule 1"), result.problem().text(EN));
+		assertTrue(result.problem().text(EN).startsWith("Everywhere, Quick changes, entry 1, level: 900"), result.problem().text(EN));
+	}
+
+	@Test
+	void olderSchemaIsSetAsideAsBrokenAsAnEarlierBuild() throws IOException {
+		// PRD 7.5: profiles from the schema 1 and 2 test builds are not migrated.
+		Files.createDirectories(dir);
+		Path file = store().fileFor("default");
+		Files.writeString(file, "{\"schemaVersion\": 2, \"globalRules\": [{\"id\": \"r1\", \"pattern\": \"minecraft:a\"}]}");
+		ProfileStore.LoadResult result = store().load("default", "Default");
+		assertTrue(result.failed());
+		assertEquals("This profile was made by an earlier test build of Sound Sculptor and can't be read.", result.problem().text(EN));
+		assertEquals(Profile.empty("Default"), result.profile());
+		assertTrue(Files.exists(result.brokenCopy()));
+		assertFalse(Files.exists(file));
 	}
 
 	@Test
 	void unknownFieldsAreIgnored() throws ProfileFormatException {
-		Profile p = ProfileCodec.fromJson("{\"schemaVersion\": 1, \"fromTheFuture\": 3, \"globalRules\": []}");
-		assertTrue(p.globalRules().isEmpty());
+		Profile p = ProfileCodec.fromJson("{\"schemaVersion\": 3, \"fromTheFuture\": 3, \"everywhere\": {\"sets\": []}}");
+		assertTrue(p.everywhere().quickEntries().isEmpty());
 	}
 
 	@Test

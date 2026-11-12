@@ -12,7 +12,7 @@ import java.util.Random;
 import java.util.Set;
 
 import soundsculptor.core.Allocations;
-import soundsculptor.core.rules.Limit;
+import soundsculptor.core.sets.Limit;
 
 import org.junit.jupiter.api.Test;
 

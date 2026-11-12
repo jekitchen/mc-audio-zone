@@ -1,7 +1,7 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 /**
- * A cap on cached sound IDs shared by several {@link RuleResolver}s, such as all of a profile's zones (PRD 9.1 memory
+ * A cap on cached sound IDs shared by several {@link EntryResolver}s, such as all of a profile's zones (PRD 9.1 memory
  * budget). Each resolver also keeps its own cap; this one bounds them together. Once used up, resolvers still answer
  * correctly but match patterns again for IDs they did not cache.
  *

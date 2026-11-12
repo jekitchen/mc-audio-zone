@@ -1,5 +1,7 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -9,8 +11,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 
-import soundsculptor.core.rules.Limit;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.PlaceSets;
+import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -26,18 +29,18 @@ class ProfileZonesTest {
 
 	static Zone fixed(String id, Shape shape) {
 		return new Zone(id, "Zone " + id, true, SERVER, OVERWORLD, new Point(120.5, 64, -33.5), shape,
-				List.of(Rule.of(id + "r1", "*villager*").withVolume(50)));
+				quick(List.of(SetEntry.of(id + "r1", "*villager*").withVolume(50))));
 	}
 
 	/** A bubble as the file stores it: no world key, dimension or position. */
 	static Zone bubble(String id) {
 		return new Zone(id, "Bubble " + id, true, "", "", new Point(0, 0, 0), new Shape.Sphere(8),
-				List.of(Rule.of(id + "r1", "*").withMute(true))).asBubble();
+				quick(List.of(SetEntry.of(id + "r1", "*").withMute(true)))).asBubble();
 	}
 
 	@Test
 	void threeArgumentConstructorStillWorksWithNoZones() {
-		Profile p = new Profile("A", ProfileSettings.DEFAULTS, List.of());
+		Profile p = new Profile("A", ProfileSettings.DEFAULTS, PlaceSets.EMPTY);
 		assertTrue(p.zones().isEmpty());
 		assertTrue(p.zoneColors().isEmpty());
 	}
@@ -46,14 +49,15 @@ class ProfileZonesTest {
 	void quickActionsKeepTheZones() {
 		Profile p = Profile.empty("A").withZones(List.of(fixed("z1", new Shape.Sphere(10))))
 				.withZoneColor("z1", 0xE69F00);
-		Profile muted = p.muteExact("minecraft:a").withSettings(new ProfileSettings(false)).unmuteExact("minecraft:a");
+		Profile muted = RuleTarget.GLOBAL.remove(RuleTarget.GLOBAL.put(p, SetEntry.of("q1", "minecraft:a").withMute(true))
+				.withSettings(new ProfileSettings(false)), "q1");
 		assertEquals(p.zones(), muted.zones());
 		assertEquals(p.zoneColors(), muted.zoneColors());
 	}
 
 	@Test
 	void colorsMustBelongToAZone() {
-		assertThrows(IllegalArgumentException.class, () -> new Profile("A", ProfileSettings.DEFAULTS, List.of(),
+		assertThrows(IllegalArgumentException.class, () -> new Profile("A", ProfileSettings.DEFAULTS, PlaceSets.EMPTY,
 				List.of(), Map.of("nope", 0xE69F00)));
 	}
 
@@ -72,8 +76,8 @@ class ProfileZonesTest {
 		Zone sphere = fixed("z1", new Shape.Sphere(12.5));
 		Zone box = fixed("z2", new Shape.Box(20, 8, 30)).withEdge(ZoneEdge.fade(6));
 		Zone cylinder = new Zone("z3", "Tower", false, SERVER, "minecraft:the_nether", new Point(-5, 70, 9),
-				new Shape.Cylinder(4, 40), List.of(new Rule("r9", false, soundsculptor.core.rules.SoundPattern.of("minecraft:block.*"),
-						null, 150, new Limit(2, 500, true), false)))
+				new Shape.Cylinder(4, 40), quick(List.of(new SetEntry("r9", false, soundsculptor.core.sets.SoundPattern.of("minecraft:block.*"),
+						null, 150, new Limit(2, 500, true), false))))
 				.withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.hard());
 		Profile p = Profile.empty("Server").withZones(List.of(sphere, box, cylinder, bubble("b1")))
 				.withZoneColor("z1", 0xE69F00).withZoneColor("b1", 0x123456);

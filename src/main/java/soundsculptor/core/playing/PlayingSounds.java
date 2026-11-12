@@ -2,7 +2,7 @@ package soundsculptor.core.playing;
 
 import soundsculptor.core.boost.Gain;
 import soundsculptor.core.diag.MemoryEstimate;
-import soundsculptor.core.rules.RuleResolution;
+import soundsculptor.core.sets.EntryResolution;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.SoundDecision;
 import soundsculptor.core.zones.Zone;
@@ -63,7 +63,7 @@ public final class PlayingSounds {
 	private final float[] gains = new float[CAPACITY];
 	private final boolean[] dirty = new boolean[CAPACITY];
 	/** Per sound, what each rule list resolves its ID to, for the current snapshot; see {@link Precedence#resolve}. */
-	private final RuleResolution[][] resolved = new RuleResolution[CAPACITY][Precedence.MAX_ZONES + 1];
+	private final EntryResolution[][] resolved = new EntryResolution[CAPACITY][Precedence.MAX_ZONES + 1];
 	private final boolean[] isResolved = new boolean[CAPACITY];
 	private int size;
 
@@ -156,7 +156,7 @@ public final class PlayingSounds {
 			gains[i] = gains[last];
 			dirty[i] = dirty[last];
 			isResolved[i] = isResolved[last];
-			RuleResolution[] row = resolved[i]; // swap the rows, so no array is ever allocated
+			EntryResolution[] row = resolved[i]; // swap the rows, so no array is ever allocated
 			resolved[i] = resolved[last];
 			resolved[last] = row;
 			slotIndexes[findSlot(handles[i])] = i;

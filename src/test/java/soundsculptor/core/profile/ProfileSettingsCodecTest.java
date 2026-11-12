@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 import soundsculptor.core.outline.OutlineMode;
@@ -68,24 +67,24 @@ class ProfileSettingsCodecTest {
 
 	@Test
 	void missingSettingsUseTheDefaults() throws ProfileFormatException {
-		assertEquals(ProfileSettings.DEFAULTS, read("{\"schemaVersion\": 2, \"settings\": {}}").settings());
+		assertEquals(ProfileSettings.DEFAULTS, read("{\"schemaVersion\": 3, \"settings\": {}}").settings());
 		assertEquals(ProfileSettings.DEFAULTS.withOutlines(OutlineMode.NEVER),
-				read("{\"schemaVersion\": 2, \"settings\": {\"outlines\": \"never\"}}").settings());
+				read("{\"schemaVersion\": 3, \"settings\": {\"outlines\": \"never\"}}").settings());
 		assertEquals(ProfileSettings.DEFAULTS.withDefaultEdge(ZoneEdge.fade(ZoneEdge.DEFAULT_FADE)),
-				read("{\"schemaVersion\": 2, \"settings\": {\"edge\": {\"mode\": \"fade\"}}}").settings(),
+				read("{\"schemaVersion\": 3, \"settings\": {\"edge\": {\"mode\": \"fade\"}}}").settings(),
 				"a fade edge without a distance fades over the default 4 blocks");
 	}
 
 	@Test
 	void badSettingsNameTheFieldInPlainWords() {
 		assertEquals("Settings, field outlines: \"sometimes\" is not one of: always, editing, never.",
-				problem("{\"schemaVersion\": 2, \"settings\": {\"outlines\": \"sometimes\"}}"));
+				problem("{\"schemaVersion\": 3, \"settings\": {\"outlines\": \"sometimes\"}}"));
 		assertEquals("Settings, field edge mode: \"default\" is not one of: hard, fade.",
-				problem("{\"schemaVersion\": 2, \"settings\": {\"edge\": {\"mode\": \"default\"}}}"));
+				problem("{\"schemaVersion\": 3, \"settings\": {\"edge\": {\"mode\": \"default\"}}}"));
 		assertEquals("Settings, field fade: 40 is above the maximum 32.",
-				problem("{\"schemaVersion\": 2, \"settings\": {\"edge\": {\"mode\": \"fade\", \"fade\": 40}}}"));
+				problem("{\"schemaVersion\": 3, \"settings\": {\"edge\": {\"mode\": \"fade\", \"fade\": 40}}}"));
 		assertEquals("Settings, field cueDefault: \"yes\" is not true or false.",
-				problem("{\"schemaVersion\": 2, \"settings\": {\"cueDefault\": \"yes\"}}"));
+				problem("{\"schemaVersion\": 3, \"settings\": {\"cueDefault\": \"yes\"}}"));
 	}
 
 	@Test
@@ -102,7 +101,7 @@ class ProfileSettingsCodecTest {
 		JsonObject json = written(Profile.empty("A"));
 		assertFalse(json.has("lastJoined"));
 		assertFalse(json.get("boostConfirmed").getAsBoolean());
-		Profile p = read("{\"schemaVersion\": 2}");
+		Profile p = read("{\"schemaVersion\": 3}");
 		assertNull(p.lastJoined());
 		assertFalse(p.boostConfirmed());
 	}
@@ -110,35 +109,14 @@ class ProfileSettingsCodecTest {
 	@Test
 	void aBadDateIsRefused() {
 		assertEquals("Field lastJoined: \"yesterday\" is not a date and time like 2026-11-09T13:37:46Z.",
-				problem("{\"schemaVersion\": 2, \"lastJoined\": \"yesterday\"}"));
-		assertEquals("Field boostConfirmed: 1 is not true or false.", problem("{\"schemaVersion\": 2, \"boostConfirmed\": 1}"));
+				problem("{\"schemaVersion\": 3, \"lastJoined\": \"yesterday\"}"));
+		assertEquals("Field boostConfirmed: 1 is not true or false.", problem("{\"schemaVersion\": 3, \"boostConfirmed\": 1}"));
 	}
 
 	@Test
-	void filesAreWrittenAtSchemaVersion2() {
-		assertEquals(2, Profile.SCHEMA_VERSION);
-		assertEquals(2, written(Profile.empty("A")).get("schemaVersion").getAsInt());
+	void filesAreWrittenAtSchemaVersion3() {
+		assertEquals(3, Profile.SCHEMA_VERSION);
+		assertEquals(3, written(Profile.empty("A")).get("schemaVersion").getAsInt());
 		assertEquals(Profile.SCHEMA_VERSION, ProfileMigrations.CURRENT.target());
-	}
-
-	@Test
-	void aVersion1FileIsBackedUpThenLoadsWithTheNewDefaults() throws ProfileFormatException {
-		List<Integer> backedUp = new ArrayList<>();
-		ProfileCodec.Read read = ProfileCodec.read(
-				"{\"schemaVersion\": 1, \"name\": \"Old\", \"settings\": {\"showDistance\": false}, \"globalRules\": []}",
-				backedUp::add);
-		assertEquals(List.of(1), backedUp);
-		assertEquals(ProfileSettings.DEFAULTS.withShowDistance(false), read.profile().settings());
-		assertNull(read.profile().lastJoined());
-		assertFalse(read.profile().boostConfirmed());
-		assertTrue(read.warnings().isEmpty(), read.warnings().toString());
-	}
-
-	@Test
-	void aVersion1FileThatAlreadyUsesAVersion2NameIsNotMisread() throws ProfileFormatException {
-		// Version 1 readers ignored unknown fields, so a hand-edited v1 file could hold "boostConfirmed". The
-		// migration drops it: the player confirmed nothing in the version that wrote the file.
-		Profile p = read("{\"schemaVersion\": 1, \"boostConfirmed\": true}");
-		assertFalse(p.boostConfirmed());
 	}
 }

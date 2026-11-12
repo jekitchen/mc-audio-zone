@@ -233,8 +233,9 @@ public final class SoundHook {
 			}
 			float factor = 1.0F;
 			if (ProfileManager.isLoaded() && !ProfileManager.isBypassed() && !isVanillaCovered(instance.getSource())) {
-				// Not tracked (non-positional, or the table was full): only global rules apply.
-				factor = Math.min(ProfileManager.rules().resolve(idString(instance.getIdentifier())).effectiveVolumePercent(), 100) / 100.0F;
+				// Not tracked (non-positional, or the table was full): only Everywhere applies.
+				String id = idString(instance.getIdentifier());
+				factor = Math.min(ProfileManager.precedence().everywhere().resolve(id).effectiveVolumePercent(), 100) / 100.0F;
 			}
 			lastAppliedFactor = factor;
 			return vanillaVolume * factor;

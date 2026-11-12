@@ -1,5 +1,7 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static soundsculptor.core.profile.ProfileZonesTest.SERVER;
 import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
@@ -13,7 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.PlaceSets;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -27,16 +31,16 @@ class ProfileOpsTest {
 	private static final TestEnglish EN = new TestEnglish();
 
 	private static Zone fixedOn(String id, String worldKey) {
-		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), List.of());
+		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), PlaceSets.EMPTY);
 	}
 
 	/** Server A: 2 global rules, a fixed zone and a bubble. */
 	private static final Profile A = new Profile("Server A", new ProfileSettings(false),
-			List.of(Rule.of("a1", "x:one").withMute(true), Rule.of("a2", "x:two").withVolume(30)),
+			quick(List.of(SetEntry.of("a1", "x:one").withMute(true), SetEntry.of("a2", "x:two").withVolume(30))),
 			List.of(fixedOn("aFixed", "a.net"), bubble("aBubble")), Map.of("aFixed", 1, "aBubble", 2));
 
 	/** Server B: its own rule, fixed zone and bubble. */
-	private static final Profile B = new Profile("Server B", ProfileSettings.DEFAULTS, List.of(Rule.of("b1", "x:b")),
+	private static final Profile B = new Profile("Server B", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("b1", "x:b"))),
 			List.of(fixed("bFixed", new Shape.Sphere(6)), bubble("bBubble")), Map.of("bFixed", 3, "bBubble", 4));
 
 	@Test
@@ -44,7 +48,7 @@ class ProfileOpsTest {
 		ProfileOps.Copy copy = ProfileOps.copyFrom(A, B);
 		Profile result = copy.result();
 		assertEquals("Server B", result.name());
-		assertEquals(A.globalRules(), result.globalRules());
+		assertEquals(A.everywhere().quickEntries(), result.everywhere().quickEntries());
 		assertEquals(A.settings(), result.settings());
 		assertEquals(List.of("bFixed", "aBubble"), result.zones().stream().map(Zone::id).toList());
 		assertEquals(3, result.colorOf("bFixed"), "B's fixed zone is untouched");
@@ -64,18 +68,18 @@ class ProfileOpsTest {
 	@Test
 	void copyingABoostAsksForTheBoostConfirmFirst() {
 		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
-		Profile loud = A.withGlobalRules(List.of(Rule.of("a1", "x:one").withVolume(200)));
-		assertTrue(ProfileOps.copyFrom(loud, B).needsBoostConfirm());
-		assertFalse(ProfileOps.copyFrom(loud, B.withBoostConfirmed(true)).needsBoostConfirm());
-		assertFalse(ProfileOps.copyFrom(A, B).needsBoostConfirm());
+		Profile loud = A.withEverywhere(quick(List.of(SetEntry.of("a1", "x:one").withVolume(200))));
+		assertTrue(ProfileOps.copyFrom(loud, B).needsBoostConfirm(SetLibrary.EMPTY));
+		assertFalse(ProfileOps.copyFrom(loud, B.withBoostConfirmed(true)).needsBoostConfirm(SetLibrary.EMPTY));
+		assertFalse(ProfileOps.copyFrom(A, B).needsBoostConfirm(SetLibrary.EMPTY));
 	}
 
 	@Test
 	void copyIsOneTime() {
 		Profile copied = ProfileOps.copyFrom(A, B).result();
-		Profile aChanged = A.muteExact("x:new");
-		assertEquals(A.globalRules(), copied.globalRules());
-		assertFalse(copied.globalRules().equals(aChanged.globalRules()));
+		Profile aChanged = A.withEverywhere(quick(SetEntry.of("exact:" + "x:new", "x:new").withMute(true)));
+		assertEquals(A.everywhere().quickEntries(), copied.everywhere().quickEntries());
+		assertFalse(copied.everywhere().quickEntries().equals(aChanged.everywhere().quickEntries()));
 	}
 
 	@Test
@@ -127,7 +131,7 @@ class ProfileOpsTest {
 	void resetGoesBackToEmptyDefaultsAndKeepsTheName() {
 		Profile reset = ProfileOps.reset(A);
 		assertEquals(Profile.empty("Server A"), reset);
-		assertTrue(reset.globalRules().isEmpty());
+		assertTrue(reset.everywhere().quickEntries().isEmpty());
 		assertTrue(reset.zones().isEmpty());
 		assertEquals(ProfileSettings.DEFAULTS, reset.settings());
 	}

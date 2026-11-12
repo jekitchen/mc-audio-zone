@@ -5,7 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.PlaceSets;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -15,7 +16,7 @@ import org.junit.jupiter.api.Test;
 /** The Zones tab's list operations and zone rule lists (PRD 6.1 Zones, FR-8.6, FR-9 step 5). */
 class ProfileZoneListTest {
 	private static Zone zone(String id) {
-		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10), List.of());
+		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10), PlaceSets.EMPTY);
 	}
 
 	private static List<String> ids(Profile p) {
@@ -30,7 +31,7 @@ class ProfileZoneListTest {
 	void putAddsOrReplacesInPlace() {
 		Profile p = profile(zone("z1"), zone("z2")).putZone(zone("z3"));
 		assertEquals(List.of("z1", "z2", "z3"), ids(p));
-		Zone renamed = new Zone("z2", "Hall", true, "world:1", "minecraft:overworld", new Point(1, 2, 3), new Shape.Box(4, 5, 6), List.of());
+		Zone renamed = new Zone("z2", "Hall", true, "world:1", "minecraft:overworld", new Point(1, 2, 3), new Shape.Box(4, 5, 6), PlaceSets.EMPTY);
 		p = p.putZone(renamed);
 		assertEquals(List.of("z1", "z2", "z3"), ids(p));
 		assertSame(renamed, p.zone("z2"));
@@ -63,26 +64,26 @@ class ProfileZoneListTest {
 	@Test
 	void zoneRuleListsWorkLikeTheGlobalList() {
 		RuleTarget target = RuleTarget.zone("z1");
-		Profile p = profile(zone("z1"), zone("z2")).putRule(Rule.of("r1", "*cow*").withMute(true));
+		Profile p = RuleTarget.GLOBAL.put(profile(zone("z1"), zone("z2")), SetEntry.of("r1", "*cow*").withMute(true));
 		assertEquals("r1", target.newRuleId(p), "IDs are unique per list, so the zone starts at r1");
-		p = target.put(p, Rule.of(target.newRuleId(p), "*villager*").withVolume(50));
-		p = target.put(p, Rule.of(target.newRuleId(p), "*bell*").withMute(true));
-		assertEquals(List.of("r1", "r2"), p.zone("z1").rules().stream().map(Rule::id).toList());
-		assertTrue(p.zone("z2").rules().isEmpty(), "other zones are untouched");
-		assertEquals(1, p.globalRules().size(), "the global list is untouched");
+		p = target.put(p, SetEntry.of(target.newRuleId(p), "*villager*").withVolume(50));
+		p = target.put(p, SetEntry.of(target.newRuleId(p), "*bell*").withMute(true));
+		assertEquals(List.of("r1", "r2"), p.zone("z1").sets().quickEntries().stream().map(SetEntry::id).toList());
+		assertTrue(p.zone("z2").sets().quickEntries().isEmpty(), "other zones are untouched");
+		assertEquals(1, p.everywhere().quickEntries().size(), "the global list is untouched");
 		p = target.move(p, "r2", -1);
-		assertEquals("*:*bell*", p.zone("z1").rules().get(0).pattern().text());
+		assertEquals("*:*bell*", p.zone("z1").sets().quickEntries().get(0).pattern().text());
 		p = target.put(p, target.rule(p, "r1").withVolume(20));
 		assertEquals(20, target.rule(p, "r1").volume());
 		p = target.remove(p, "r2");
-		assertEquals(List.of("r1"), p.zone("z1").rules().stream().map(Rule::id).toList());
+		assertEquals(List.of("r1"), p.zone("z1").sets().quickEntries().stream().map(SetEntry::id).toList());
 	}
 
 	@Test
 	void globalTargetUsesTheGlobalList() {
-		Profile p = RuleTarget.GLOBAL.put(Profile.empty("Default"), Rule.of("r1", "*cow*").withMute(true));
-		assertEquals(1, p.globalRules().size());
+		Profile p = RuleTarget.GLOBAL.put(Profile.empty("Default"), SetEntry.of("r1", "*cow*").withMute(true));
+		assertEquals(1, p.everywhere().quickEntries().size());
 		assertEquals(List.of(), RuleTarget.zone("missing").rules(p));
-		assertSame(p, RuleTarget.zone("missing").put(p, Rule.of("r1", "*")), "a missing zone changes nothing");
+		assertSame(p, RuleTarget.zone("missing").put(p, SetEntry.of("r1", "*")), "a missing zone changes nothing");
 	}
 }

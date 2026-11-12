@@ -1,6 +1,7 @@
 package soundsculptor.core.profile;
 
 import soundsculptor.core.Message;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Zone;
 import java.util.ArrayList;
@@ -16,7 +17,7 @@ import java.util.Set;
  * to show before anything changes.
  *
  * <ul>
- *   <li>The file's global rules, personal bubbles and settings replace this profile's.</li>
+ *   <li>The file's Everywhere sets, personal bubbles and settings replace this profile's.</li>
  *   <li>Fixed zones are imported only if they were made for this server (same world key, ignoring case); one with the
  *       same ID as an existing zone replaces it, so restoring a backup does not duplicate zones. The others are
  *       skipped and counted.</li>
@@ -24,7 +25,7 @@ import java.util.Set;
  * </ul>
  *
  * @param result        the profile after the import (the current profile, unchanged, if there is a problem)
- * @param ruleCount     global rules imported
+ * @param ruleCount     entries in Everywhere's Quick changes imported
  * @param bubbleCount   personal bubbles imported
  * @param fixedImported fixed zones imported (made for this server)
  * @param fixedSkipped  fixed zones skipped (made for another server)
@@ -36,11 +37,12 @@ public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fix
 	 * Whether the boost dialog (FR-5.4) must be confirmed before this is done: the result sets a volume above 100%
 	 * and this profile has not confirmed boost yet. After the confirm, save {@code result().withBoostConfirmed(true)}.
 	 */
-	public boolean needsBoostConfirm() {
-		return problem == null && !result.boostConfirmed() && result.hasBoost();
+	public boolean needsBoostConfirm(SetLibrary library) {
+		return problem == null && !result.boostConfirmed() && result.hasBoost(library);
 	}
 
 	public static ImportPlan of(Profile current, Profile file, String currentWorldKey) {
+		int rules = file.everywhere().quickEntries().size(); // M8c shim: removed in Task 9
 		String here = currentWorldKey.toLowerCase(Locale.ROOT);
 		List<Zone> imported = new ArrayList<>();
 		int bubbles = 0;
@@ -82,12 +84,12 @@ public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fix
 			}
 		}
 		if (zones.size() > Precedence.MAX_ZONES) {
-			return new ImportPlan(current, file.globalRules().size(), bubbles, fixedIn, skipped,
+			return new ImportPlan(current, rules, bubbles, fixedIn, skipped,
 					Message.of(ProfileText.IMPORT_TOO_MANY_ZONES, zones.size(), Precedence.MAX_ZONES));
 		}
-		Profile result = new Profile(current.name(), file.settings(), file.globalRules(), zones, colors, current.lastJoined(),
+		Profile result = new Profile(current.name(), file.settings(), file.everywhere(), zones, colors, current.lastJoined(),
 				current.boostConfirmed());
-		return new ImportPlan(result, file.globalRules().size(), bubbles, fixedIn, skipped, null);
+		return new ImportPlan(result, rules, bubbles, fixedIn, skipped, null);
 	}
 
 	/** {@code id}, or {@code id-2}, {@code id-3}... if it is taken. */
@@ -104,7 +106,7 @@ public record ImportPlan(Profile result, int ruleCount, int bubbleCount, int fix
 	}
 
 	static Zone withId(Zone z, String id) {
-		return new Zone(id, z.name(), z.enabled(), z.worldKey(), z.dimension(), z.anchor(), z.shape(), z.rules(), z.mode(),
+		return new Zone(id, z.name(), z.enabled(), z.worldKey(), z.dimension(), z.anchor(), z.shape(), z.sets(), z.mode(),
 				z.edge(), z.anchorType());
 	}
 }

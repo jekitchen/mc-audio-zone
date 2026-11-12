@@ -10,6 +10,9 @@ public final class DiagnosticsReport {
 	/**
 	 * Everything the report shows.
 	 *
+	 * @param librarySets     Sound Sets in the library
+	 * @param activeSets      sets applying in some place: enabled attachments, Quick changes included, once per place
+	 * @param activeEntries   enabled entries in those sets, once per place
 	 * @param activeZonesHere zones in the current world and dimension
 	 * @param sounds          per sound start; its count is sounds per second
 	 * @param peakSoundMicros worst single sound start since the last reset
@@ -19,15 +22,15 @@ public final class DiagnosticsReport {
 	 * @param memoryBytes     estimated bytes of Sound Sculptor's data ({@link MemoryMeter#totalBytes}), or -1 if not
 	 *                        measured
 	 */
-	public record Data(String modVersion, String minecraftVersion, boolean bypass, int globalRules, int zones,
-			int activeZonesHere, TimingWindow.Stats sounds, double peakSoundMicros, TimingWindow.Stats tick,
-			TimingWindow.Stats outlines, double cacheHitRate, long errors, long memoryBytes) {
+	public record Data(String modVersion, String minecraftVersion, boolean bypass, int librarySets, int activeSets,
+			int activeEntries, int zones, int activeZonesHere, TimingWindow.Stats sounds, double peakSoundMicros,
+			TimingWindow.Stats tick, TimingWindow.Stats outlines, double cacheHitRate, long errors, long memoryBytes) {
 		/** Without a memory figure; the report then says n/a. */
-		public Data(String modVersion, String minecraftVersion, boolean bypass, int globalRules, int zones,
-				int activeZonesHere, TimingWindow.Stats sounds, double peakSoundMicros, TimingWindow.Stats tick,
-				TimingWindow.Stats outlines, double cacheHitRate, long errors) {
-			this(modVersion, minecraftVersion, bypass, globalRules, zones, activeZonesHere, sounds, peakSoundMicros, tick,
-					outlines, cacheHitRate, errors, -1);
+		public Data(String modVersion, String minecraftVersion, boolean bypass, int librarySets, int activeSets,
+				int activeEntries, int zones, int activeZonesHere, TimingWindow.Stats sounds, double peakSoundMicros,
+				TimingWindow.Stats tick, TimingWindow.Stats outlines, double cacheHitRate, long errors) {
+			this(modVersion, minecraftVersion, bypass, librarySets, activeSets, activeEntries, zones, activeZonesHere, sounds,
+					peakSoundMicros, tick, outlines, cacheHitRate, errors, -1);
 		}
 	}
 
@@ -38,7 +41,8 @@ public final class DiagnosticsReport {
 		StringBuilder out = new StringBuilder();
 		line(out, "Sound Sculptor %s, Minecraft %s", d.modVersion(), d.minecraftVersion());
 		line(out, "Bypass: %s", d.bypass() ? "on" : "off");
-		line(out, "Global rules: %d", d.globalRules());
+		line(out, "Sound Sets: %d in the library, %d active", d.librarySets(), d.activeSets());
+		line(out, "Entries active: %d", d.activeEntries());
 		line(out, "Zones: %d (%d active here)", d.zones(), d.activeZonesHere());
 		line(out, "Sounds per second: %d", d.sounds().count());
 		line(out, "Per sound: avg %.1f µs, max %.1f µs (peak %.1f µs)", d.sounds().averageMicros(), d.sounds().maxMicros(),

@@ -3,7 +3,7 @@ package soundsculptor.mc;
 import soundsculptor.core.diag.DiagnosticsReport;
 import soundsculptor.core.diag.MemoryMeter;
 import soundsculptor.core.diag.TimingWindow;
-import soundsculptor.core.rules.RuleResolver;
+import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Zone;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.util.Util;
@@ -26,7 +26,7 @@ public final class Diagnostics {
 		MEMORY.add("Playing sounds", () -> PlayingChannels.get().estimatedBytes());
 		MEMORY.add("Last plays", () -> SoundHook.lastPlays().estimatedBytes());
 		MEMORY.add("Repeat limits", () -> SoundHook.limiter().estimatedBytes());
-		MEMORY.add("Rule caches", Diagnostics::ruleCacheBytes);
+		MEMORY.add("Sound Set caches", Diagnostics::cacheBytes);
 	}
 
 	private Diagnostics() {
@@ -37,17 +37,18 @@ public final class Diagnostics {
 		return MEMORY.totalBytes(Util.getMillis());
 	}
 
-	private static long ruleCacheBytes() {
+	private static long cacheBytes() {
 		return ProfileManager.precedence().estimatedBytes();
 	}
 
 	public static DiagnosticsReport.Data data() {
 		long now = Util.getMillis();
-		RuleResolver rules = ProfileManager.rules();
-		long lookups = rules.cacheHits() + rules.cacheMisses();
-		double hitRate = lookups == 0 ? Double.NaN : rules.cacheHits() / (double) lookups;
+		Precedence precedence = ProfileManager.precedence();
+		long lookups = precedence.cacheHits() + precedence.cacheMisses();
+		double hitRate = lookups == 0 ? Double.NaN : precedence.cacheHits() / (double) lookups;
 		return new DiagnosticsReport.Data(version("soundsculptor"), version("minecraft"), ProfileManager.isBypassed(),
-				rules.ruleCount(), ProfileManager.profile().zones().size(), activeZonesHere(),
+				ProfileManager.library().size(), precedence.activeSetCount(), precedence.activeEntryCount(),
+				ProfileManager.profile().zones().size(), activeZonesHere(),
 				SoundHook.soundTiming().stats(now), SoundHook.soundTiming().peakMaxMicros(),
 				TICK.stats(now), OUTLINES.stats(now), hitRate, SoundHook.errorCount());
 	}

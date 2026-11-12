@@ -414,9 +414,9 @@ public final class ZoneEditorScreen extends SculptScreen {
 		Zone built = draft.build();
 		int color = draft.color();
 		ProfileManager.update(profile -> {
-			// Keep rules edited since this editor opened (on the zone rules screen).
+			// Keep sets changed since this editor opened (on the zone rules screen).
 			Zone saved = profile.zone(zoneId);
-			Zone zone = saved == null ? built : built.withRules(saved.rules());
+			Zone zone = saved == null ? built : built.withSets(saved.sets());
 			return profile.putZone(zone).withZoneColor(zoneId, color);
 		});
 		return true;

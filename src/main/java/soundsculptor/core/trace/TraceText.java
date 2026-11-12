@@ -6,9 +6,9 @@ import java.util.Objects;
 
 import soundsculptor.core.Translator;
 import soundsculptor.core.lists.Numbers;
-import soundsculptor.core.lists.RuleSummary;
+import soundsculptor.core.lists.EntrySummary;
 import soundsculptor.core.lists.ZoneSummary;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 
 /**
@@ -59,7 +59,7 @@ public final class TraceText {
 	}
 
 	/** A matched rule: in the global list ({@link RuleLocation#isGlobal()}) or in a zone's own list. */
-	public record RuleTarget(RuleLocation where, Rule rule) implements Target {
+	public record RuleTarget(RuleLocation where, SetEntry rule) implements Target {
 	}
 
 	/** A zone that contains the sound. */
@@ -118,11 +118,11 @@ public final class TraceText {
 
 		line(out, 0, tr.translate(RESULT));
 		line(out, 1, tr.translate(VOLUME, Numbers.plain(trace.volumePercent())));
-		line(out, 1, trace.limit() == null ? tr.translate(NO_LIMIT) : RuleSummary.limitPart(trace.limit()).text(tr));
+		line(out, 1, trace.limit() == null ? tr.translate(NO_LIMIT) : EntrySummary.limitPart(trace.limit()).text(tr));
 		if (trace.playAllowed() != null) {
 			line(out, 1, tr.translate(trace.playAllowed() ? PLAY_ALLOWED : PLAY_DROPPED));
 		}
-		line(out, 1, tr.translate(trace.cueOn() ? RuleSummary.CUE_ON : RuleSummary.CUE_OFF));
+		line(out, 1, tr.translate(trace.cueOn() ? EntrySummary.CUE_ON : EntrySummary.CUE_OFF));
 		if (trace.cueShown() != null) {
 			line(out, 1, tr.translate(trace.cueShown() ? CUE_SHOWN : CUE_NOT_SHOWN));
 		}
@@ -135,16 +135,16 @@ public final class TraceText {
 			line(out, level, tr.translate(NO_RULES), new NoRuleTarget(zoneId));
 			return;
 		}
-		for (Rule rule : list.matched()) {
+		for (SetEntry rule : list.matched()) {
 			RuleLocation where = zoneId == null ? RuleLocation.global(rule.id()) : RuleLocation.inZone(zoneId, rule.id());
-			line(out, level, tr.translate(RULE, rule.pattern().text(), RuleSummary.text(rule, tr)), new RuleTarget(where, rule));
+			line(out, level, tr.translate(RULE, rule.pattern().text(), EntrySummary.text(rule, tr)), new RuleTarget(where, rule));
 			for (TraceProperty property : TraceProperty.values()) {
-				RuleWinner winner = list.winners().get(property);
+				EntryWinner winner = list.winners().get(property);
 				if (winner != null && winner.rule() == rule) {
 					line(out, level + 1, tr.translate(WINS, property(property, tr), tr.translate(winner.reason().translationKey())));
 					continue;
 				}
-				Rule by = list.overriddenBy(rule, property);
+				SetEntry by = list.overriddenBy(rule, property);
 				if (by != null) {
 					line(out, level + 1, tr.translate(OVERRIDDEN, property(property, tr), by.pattern().text()));
 				}

@@ -3,18 +3,19 @@ package soundsculptor.core.quick;
 import java.util.List;
 
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.trace.EditableRules;
 import soundsculptor.core.trace.ExactRules;
-import soundsculptor.core.trace.RuleEdit;
+import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.trace.TraceEditor;
 
+// M8c shim: removed in Task 7 (edits Quick changes through the trace's EditableRules)
 /**
  * Recently Played quick actions (PRD FR-1.5): Mute/Unmute, Volume, Limit and Cue create or edit the sound's exact-ID
  * rule in the list the "Apply to" selector chose. Values are checked like the full editors (FR-12.7), and the result
  * carries the before-state for the 5-second Undo toast. Not on the hot path.
  *
- * <p>Rule IDs match the trace panel's ({@link TraceEditor#exactRuleId}): {@code exact:<id>} in the global list, the
+ * <p>SetEntry IDs match the trace panel's ({@link TraceEditor#exactRuleId}): {@code exact:<id>} in the global list, the
  * ID quick actions have always used, and {@code <zone id>/exact:<id>} in a zone.
  *
  * <p>An edit that clears a value never adds a rule or turns one on, and a rule left setting nothing is removed, so
@@ -28,13 +29,13 @@ public final class QuickActions {
 	}
 
 	/** The sound's exact-ID rule in the target's list, or null (also when the zone no longer exists). */
-	public static Rule exactRule(Profile profile, ApplyTarget target, String soundId) {
+	public static SetEntry exactRule(Profile profile, ApplyTarget target, String soundId) {
 		return ExactRules.find(rules(profile), target.zoneId(), soundId);
 	}
 
 	/** Whether the target's exact-ID rule for the sound is on and mutes it: the row then offers Unmute. */
 	public static boolean isMuted(Profile profile, ApplyTarget target, String soundId) {
-		Rule rule = exactRule(profile, target, soundId);
+		SetEntry rule = exactRule(profile, target, soundId);
 		return rule != null && rule.enabled() && Boolean.TRUE.equals(rule.mute());
 	}
 
@@ -42,13 +43,13 @@ public final class QuickActions {
 	 * The row's Mute/Unmute button: clears mute when {@link #isMuted}, else mutes. Muting starts a rule that does not
 	 * set Cue with the profile's Cue default (FR-7.6); unmuting takes that Cue away again.
 	 */
-	public static RuleEdit toggleMute(Profile profile, ApplyTarget target, String soundId) {
+	public static EntryEdit toggleMute(Profile profile, ApplyTarget target, String soundId) {
 		boolean cueDefault = profile.settings().cueDefault();
-		return isMuted(profile, target, soundId) ? new RuleEdit.UnmuteWithCue(cueDefault) : new RuleEdit.MuteWithCue(cueDefault);
+		return isMuted(profile, target, soundId) ? new EntryEdit.UnmuteWithCue(cueDefault) : new EntryEdit.MuteWithCue(cueDefault);
 	}
 
 	/** Applies one quick action to the sound's exact-ID rule in the target's list. */
-	public static QuickActionResult apply(Profile profile, ApplyTarget target, String soundId, RuleEdit edit) {
+	public static QuickActionResult apply(Profile profile, ApplyTarget target, String soundId, EntryEdit edit) {
 		ExactRules.Change change = ExactRules.edit(rules(profile), target.zoneId(), soundId, edit, true);
 		if (change.error() != null) {
 			return new QuickActionResult(change.error(), profile, profile, null, List.of());
@@ -62,11 +63,12 @@ public final class QuickActions {
 		if (toastKey == null) {
 			return new QuickActionResult(null, profile, profile, null, List.of());
 		}
-		Profile after = profile.withGlobalRules(change.after().globalRules()).withZones(change.after().zones());
+		Profile after = profile.withEverywhere(profile.everywhere().withQuickEntries(change.after().globalRules()))
+				.withZones(change.after().zones());
 		return new QuickActionResult(null, profile, after, toastKey, List.of(soundId));
 	}
 
 	private static EditableRules rules(Profile profile) {
-		return new EditableRules(profile.globalRules(), profile.zones());
+		return new EditableRules(profile.everywhere().quickEntries(), profile.zones());
 	}
 }

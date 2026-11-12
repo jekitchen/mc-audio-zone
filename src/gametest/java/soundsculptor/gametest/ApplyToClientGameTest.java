@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
@@ -8,7 +9,7 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.RuleEditorScreen;
+import soundsculptor.mc.EntryEditorScreen;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -30,9 +31,9 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			Vec3 eye = context.computeOnClient(mc -> mc.player.getEyePosition());
-			Zone pen = new Zone("pen", "Pen", true, key, "minecraft:overworld", new Point(eye.x, eye.y, eye.z), new Shape.Box(9, 9, 9), List.of());
+			Zone pen = new Zone("pen", "Pen", true, key, "minecraft:overworld", new Point(eye.x, eye.y, eye.z), new Shape.Box(9, 9, 9), PlaceSets.EMPTY);
 			Zone far = new Zone("far", "Far barn", true, key, "minecraft:overworld", new Point(eye.x + 500, eye.y, eye.z),
-					new Shape.Sphere(8), List.of());
+					new Shape.Sphere(8), PlaceSets.EMPTY);
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(pen, far))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
@@ -54,8 +55,8 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> main(mc).applyToDropdown.getMessage().getString()).contains("Zone: Pen"),
 					"the selector shows the zone");
 			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().isEmpty()), "the global list stays empty");
-			check(context.computeOnClient(mc -> ProfileManager.profile().zone("pen").rules().stream()
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).isEmpty()), "the global list stays empty");
+			check(context.computeOnClient(mc -> ProfileManager.profile().zone("pen").sets().quickEntries().stream()
 					.anyMatch(r -> r.pattern().text().equals(VILLAGER) && Boolean.TRUE.equals(r.mute()))), "the mute rule is in Pen's rules");
 			String toast = context.computeOnClient(mc -> main(mc).toast().message().getString());
 			check(toast.startsWith("Muted ") && toast.endsWith(" in Pen"), "the toast names the zone, was " + toast);
@@ -69,16 +70,16 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 			// Edit follows Apply to: it opens Pen's rule for the sound.
 			context.runOnClient(mc -> main(mc).setApplyTarget(main(mc).applyChoices().get(1)));
 			context.runOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(1).onPress(null));
-			context.waitForScreen(RuleEditorScreen.class);
-			check(context.computeOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).target()).equals(RuleTarget.zone("pen")),
+			context.waitForScreen(EntryEditorScreen.class);
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).target()).equals(RuleTarget.zone("pen")),
 					"Edit opens the rule in Pen's list");
-			context.runOnClient(mc -> ((RuleEditorScreen) mc.gui.screen()).onClose());
+			context.runOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).onClose());
 			context.waitForScreen(SoundSculptorScreen.class);
 
 			// Undo removes the zone rule again.
 			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
 			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> ProfileManager.profile().zone("pen").rules().stream()
+			check(context.computeOnClient(mc -> ProfileManager.profile().zone("pen").sets().quickEntries().stream()
 					.anyMatch(r -> Boolean.TRUE.equals(r.mute()))), "undoing Unmute in Pen mutes there again");
 
 			// Recently Played shares the choice.
@@ -88,7 +89,7 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 
 			// The player is no longer in Pen (it moved away): the selector drops it and falls back to Everywhere.
 			context.runOnClient(mc -> ProfileManager.update(p -> p.putZone(new Zone("pen", "Pen", true, key, "minecraft:overworld",
-					new Point(eye.x + 900, eye.y, eye.z), new Shape.Box(9, 9, 9), p.zone("pen").rules()))));
+					new Point(eye.x + 900, eye.y, eye.z), new Shape.Box(9, 9, 9), p.zone("pen").sets()))));
 			context.waitTicks(SoundSculptorScreen.REFRESH_TICKS * 2);
 			check(context.computeOnClient(mc -> main(mc).applyChoices().size()) == 1, "only Everywhere is left");
 			check(context.computeOnClient(mc -> main(mc).applyTarget().isEverywhere()), "Apply to falls back to Everywhere");

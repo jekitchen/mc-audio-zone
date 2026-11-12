@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-import soundsculptor.core.rules.Limit;
+import soundsculptor.core.sets.Limit;
 
 import org.junit.jupiter.api.Test;
 

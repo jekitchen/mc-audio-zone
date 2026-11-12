@@ -136,7 +136,7 @@ public final class ProfileTransfer {
 				Component.translatable("soundsculptor.transfer.import.title", name),
 				planMessage(plan, checked.warnings().size()),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.transfer.import.confirm"),
-						() -> ProfileListPanel.confirmBoostThen(host, plan.needsBoostConfirm(), () -> apply(host, name, checked))),
+						() -> ProfileListPanel.confirmBoostThen(host, plan.needsBoostConfirm(ProfileManager.library()), () -> apply(host, name, checked))),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
 				1, 1));
 	}
@@ -166,7 +166,7 @@ public final class ProfileTransfer {
 				return current;
 			}
 			// Boosted rules were confirmed in the boost dialog (FR-5.4) before this runs.
-			return plan.needsBoostConfirm() ? plan.result().withBoostConfirmed(true) : plan.result();
+			return plan.needsBoostConfirm(ProfileManager.library()) ? plan.result().withBoostConfirmed(true) : plan.result();
 		});
 		if (host instanceof SoundSculptorScreen main && main.profilesPanel() != null) {
 			main.profilesPanel().refresh();

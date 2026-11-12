@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import soundsculptor.core.TestEnglish;
 import soundsculptor.core.editor.FieldError;
-import soundsculptor.core.rules.PatternError;
+import soundsculptor.core.sets.PatternError;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.IOException;

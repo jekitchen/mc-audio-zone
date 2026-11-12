@@ -28,7 +28,8 @@ class HotPathBudgetTest {
 	private static final double BUDGET_NANOS = 5_000;
 	private static final Point PLAYER = StressProfile.PLAYER;
 
-	private final Precedence precedence = new Precedence(StressProfile.globalRules(), StressProfile.zones(WORLD, OVERWORLD));
+	private final Precedence precedence = new Precedence(StressProfile.everywhere(), StressProfile.zones(WORLD, OVERWORLD),
+			StressProfile.library());
 	private final String[] ids = StressProfile.soundIds().toArray(new String[0]);
 	private final double[] xs = new double[ids.length];
 	private final double[] zs = new double[ids.length];

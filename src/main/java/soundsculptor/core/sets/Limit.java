@@ -1,4 +1,4 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 /**
  * A rule's repeat limit (PRD FR-6.1): at most {@code count} plays per {@code windowMs}, counted per rule or, with

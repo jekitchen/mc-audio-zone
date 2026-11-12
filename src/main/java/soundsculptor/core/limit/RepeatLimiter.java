@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 import soundsculptor.core.diag.MemoryEstimate;
-import soundsculptor.core.rules.Limit;
+import soundsculptor.core.sets.Limit;
 
 /**
  * Repeat limiting (PRD FR-6): caps how often the sounds a rule decides may start.

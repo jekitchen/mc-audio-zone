@@ -1,4 +1,4 @@
-package soundsculptor.core.rules;
+package soundsculptor.core.sets;
 
 /** Thrown by {@link SoundPattern#of} for text that is not a valid pattern. */
 public final class InvalidPatternException extends IllegalArgumentException {

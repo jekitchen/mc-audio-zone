@@ -1,7 +1,11 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.profile.RuleTarget;
+import soundsculptor.core.quick.QuickActions;
+import soundsculptor.core.quick.ApplyTarget;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.trace.RuleLocation;
 import soundsculptor.core.trace.TraceText;
 import soundsculptor.core.zones.Point;
@@ -49,7 +53,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			// The sound plays 4 blocks from the zone's anchor, so a 2-block radius no longer holds it.
 			Point spot = new Point(pen.x() + 4, pen.y(), pen.z());
 			Zone penZone = new Zone("pen", "Pen", true, key, OVERWORLD, pen, new Shape.Sphere(10),
-					List.of(Rule.of("zr", "*villager*").withVolume(50)));
+					PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("zr", "*villager*").withVolume(50))));
 
 			// AC: drag the winning zone's volume from 50% to 20%: the result updates at once, marked "Predicted for next
 			// play"; Undo restores 50%; the next villager sound plays at 20%.
@@ -59,19 +63,19 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				TraceScreen t = trace(mc);
 				check(!t.isPredicted() && t.trace().volumePercent() == 50, "the trace should show the last play at 50%");
-				t.openVolume(RuleLocation.inZone("pen", "zr"), ProfileManager.profile().zone("pen").rules().get(0));
+				t.openVolume(RuleLocation.inZone("pen", "zr"), ProfileManager.profile().zone("pen").sets().quickEntries().get(0));
 				t.volumeSlider.setTypedValue(35);
 				t.volumeSlider.setTypedValue(20);
 				check(t.trace().volumePercent() == 20, "the result should update at once, was " + t.trace().volumePercent());
 				check(t.isPredicted() && t.text().contains("Predicted for next play"), "the result should be a prediction:\n" + t.text());
-				check(ProfileManager.profile().zone("pen").rules().get(0).volume() == 20, "the change should be saved at once");
+				check(ProfileManager.profile().zone("pen").sets().quickEntries().get(0).volume() == 20, "the change should be saved at once");
 				t.closeOverlay();
 				check(t.toast() != null && t.toast().undoButton() != null, "closing the Volume panel should offer Undo");
 				check(t.toast().message().getString().equals("Changed *:*villager*"), "toast was " + t.toast().message().getString());
 				t.toast().undoButton().onPress(null);
-				check(ProfileManager.profile().zone("pen").rules().get(0).volume() == 50, "Undo should restore 50% (not 35%)");
+				check(ProfileManager.profile().zone("pen").sets().quickEntries().get(0).volume() == 50, "Undo should restore 50% (not 35%)");
 				check(t.trace().volumePercent() == 50, "the trace should follow Undo");
-				t.openVolume(RuleLocation.inZone("pen", "zr"), ProfileManager.profile().zone("pen").rules().get(0));
+				t.openVolume(RuleLocation.inZone("pen", "zr"), ProfileManager.profile().zone("pen").sets().quickEntries().get(0));
 				t.volumeSlider.setTypedValue(20);
 				t.closeOverlay();
 			});
@@ -83,8 +87,8 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			closeTrace(context);
 
 			// AC: turn off the winning global rule from the trace: the next rule in line wins at once.
-			Rule exact = Rule.of("e", VILLAGER).withVolume(60);
-			Rule wildcard = Rule.of("w", "*villager*").withVolume(30);
+			SetEntry exact = SetEntry.of("e", VILLAGER).withVolume(60);
+			SetEntry wildcard = SetEntry.of("w", "*villager*").withVolume(30);
 			setRules(context, List.of(wildcard, exact));
 			check(play(context, spot) == 0.6F, "the exact rule should give 60%");
 			openTrace(context);
@@ -95,10 +99,10 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 				row.buttons().get(0).onPress(null);
 				check(t.trace().volumePercent() == 30, "the wildcard should win now, volume " + t.trace().volumePercent());
 				check(t.text().contains("  *:*villager*: Volume 30%\n    Decides loudness"), "the wildcard should decide:\n" + t.text());
-				check(!ProfileManager.profile().rule("e").enabled(), "the exact rule should be off");
+				check(!RuleTarget.GLOBAL.rule(ProfileManager.profile(), "e").enabled(), "the exact rule should be off");
 				// The shared quick-action Undo (FR-12.5): Ctrl+Z presses the toast's Undo.
 				t.pressUndo();
-				check(ProfileManager.profile().rule("e").enabled() && t.trace().volumePercent() == 60, "Undo should turn the exact rule back on");
+				check(RuleTarget.GLOBAL.rule(ProfileManager.profile(), "e").enabled() && t.trace().volumePercent() == 60, "Undo should turn the exact rule back on");
 				check(t.toast() != null && t.toast().message().getString().equals("Undone"), "the toast should say Undone");
 				row = t.row(new TraceText.RuleTarget(RuleLocation.global("e"), exact));
 				row.buttons().get(0).onPress(null);
@@ -115,12 +119,12 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 				SculptList.Row none = t.row(new TraceText.NoRuleTarget(null));
 				check(none != null && none.buttons().get(0).getMessage().getString().equals("Add rule"), "the global list should offer Add rule");
 				none.buttons().get(0).onPress(null);
-				Rule added = ProfileManager.profile().exactRule(VILLAGER);
+				SetEntry added = QuickActions.exactRule(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER);
 				check(added != null, "an exact-ID rule should be added");
 				SculptList.Row row = t.row(new TraceText.RuleTarget(RuleLocation.global(added.id()), added));
 				check(row != null && row.buttons().get(1).getMessage().getString().equals("Mute"), "the new rule's line should offer Mute");
 				row.buttons().get(1).onPress(null);
-				check(ProfileManager.profile().isExactMuted(VILLAGER), "Mute should mute the new rule");
+				check(QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER), "Mute should mute the new rule");
 				check(t.trace().volumePercent() == 0, "the trace should show it muted");
 			});
 			closeTrace(context);
@@ -130,7 +134,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				SoundSculptorScreen main = (SoundSculptorScreen) mc.gui.screen();
 				main.selectTab(SoundSculptorScreen.TAB_RULES);
-				String id = ProfileManager.profile().exactRule(VILLAGER).id();
+				String id = QuickActions.exactRule(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER).id();
 				check(main.bodyWidgets().stream().anyMatch(w -> w instanceof SculptList list && list.findRow(id) != null),
 						"the new rule should be on the Rules tab");
 			});
@@ -142,13 +146,13 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			openTrace(context);
 			context.runOnClient(mc -> {
 				TraceScreen t = trace(mc);
-				t.openVolume(RuleLocation.inZone("pen", "zr"), ProfileManager.profile().zone("pen").rules().get(0));
+				t.openVolume(RuleLocation.inZone("pen", "zr"), ProfileManager.profile().zone("pen").sets().quickEntries().get(0));
 				t.setFocused(t.volumeField);
 				t.volumeField.setValue("250");
 				t.volumeField.revealError();
 				check(t.volumeField.isErrorShown(), "250 should show an error");
 				check(t.volumeField.error().getString().contains("100"), "the error should give the range, was " + t.volumeField.error().getString());
-				check(ProfileManager.profile().zone("pen").rules().get(0).volume() == 50, "250 must not change the rule");
+				check(ProfileManager.profile().zone("pen").sets().quickEntries().get(0).volume() == 50, "250 must not change the rule");
 				t.closeOverlay();
 				check(t.toast() == null, "nothing changed, so there is nothing to undo");
 			});
@@ -181,8 +185,8 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	private static void setRules(ClientGameTestContext context, List<Rule> globalRules, Zone... zones) {
-		context.runOnClient(mc -> ProfileManager.update(p -> p.withGlobalRules(globalRules).withZones(List.of(zones))));
+	private static void setRules(ClientGameTestContext context, List<SetEntry> globalRules, Zone... zones) {
+		context.runOnClient(mc -> ProfileManager.update(p -> p.withEverywhere(PlaceSets.EMPTY.withQuickEntries(globalRules)).withZones(List.of(zones))));
 	}
 
 	/** Plays the villager sound at {@code at}; returns the start factor (0 when it did not start). */

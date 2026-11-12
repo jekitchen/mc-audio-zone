@@ -6,8 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
-
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -23,7 +22,7 @@ class OutlineFullZonesTest {
 	private static final ZoneEdge HARD = ZoneEdge.hard();
 
 	private static Zone zone(Shape shape) {
-		return new Zone("z", "Z", true, WORLD, OVERWORLD, new Point(0, 64, 0), shape, List.of());
+		return new Zone("z", "Z", true, WORLD, OVERWORLD, new Point(0, 64, 0), shape, PlaceSets.EMPTY);
 	}
 
 	@Test
@@ -112,7 +111,7 @@ class OutlineFullZonesTest {
 
 	@Test
 	void cylinderDistanceCullingUsesItsNearestPoint() {
-		Zone c = new Zone("c", "C", true, WORLD, OVERWORLD, new Point(200, 0, 0), new Shape.Cylinder(80, 10), List.of());
+		Zone c = new Zone("c", "C", true, WORLD, OVERWORLD, new Point(200, 0, 0), new Shape.Cylinder(80, 10), PlaceSets.EMPTY);
 		assertTrue(OutlineVisibility.shouldDraw(c, OutlineMode.ALWAYS, null, WORLD, OVERWORLD, 0, 0, 0), "rim is 120 away");
 	}
 }

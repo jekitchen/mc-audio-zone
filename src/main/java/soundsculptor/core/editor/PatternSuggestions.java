@@ -6,7 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import soundsculptor.core.rules.SoundPattern;
+import soundsculptor.core.sets.SoundPattern;
 
 /**
  * Wildcard patterns to offer for one sound ID in "Make pattern…" (PRD FR-1.5), closest family first.

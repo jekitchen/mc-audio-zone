@@ -1,5 +1,7 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -10,8 +12,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.outline.OutlineMode;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.ZoneEdge;
 
 import org.junit.jupiter.api.Test;
@@ -26,7 +29,7 @@ class ProfileStateTest {
 			.withDefaultEdge(ZoneEdge.fade(6));
 
 	private static Profile joinedAndConfirmed(String name) {
-		return new Profile(name, SETTINGS, List.of(Rule.of("r1", "x:a").withVolume(150)), List.of(bubble("b")), Map.of())
+		return new Profile(name, SETTINGS, quick(List.of(SetEntry.of("r1", "x:a").withVolume(150))), List.of(bubble("b")), Map.of())
 				.withLastJoined(JOINED).withBoostConfirmed(true);
 	}
 
@@ -50,9 +53,9 @@ class ProfileStateTest {
 	@Test
 	void everyChangeKeepsLastJoinedAndTheBoostConfirm() {
 		Profile p = joinedAndConfirmed("A");
-		for (Profile changed : List.of(p.withName("B"), p.withSettings(ProfileSettings.DEFAULTS), p.withGlobalRules(List.of()),
-				p.withZones(List.of()), p.withZoneColor("b", 7), p.muteExact("x:b"), p.putRule(Rule.of("r2", "x:c")),
-				p.removeRule("r1"), p.withZones(List.of(bubble("b"), bubble("c"))).withZoneColor("c", 1))) {
+		for (Profile changed : List.of(p.withName("B"), p.withSettings(ProfileSettings.DEFAULTS), p.withEverywhere(quick(List.of())),
+				p.withZones(List.of()), p.withZoneColor("b", 7), p.withEverywhere(quick(SetEntry.of("q1", "x:b").withMute(true))),
+				p.withEverywhere(PlaceSets.EMPTY.attach("set-farm")), p.withZones(List.of(bubble("b"), bubble("c"))).withZoneColor("c", 1))) {
 			assertEquals(JOINED, changed.lastJoined());
 			assertTrue(changed.boostConfirmed());
 		}
@@ -60,10 +63,10 @@ class ProfileStateTest {
 
 	@Test
 	void theOlderConstructorsStartUnjoinedAndUnconfirmed() {
-		Profile five = new Profile("A", SETTINGS, List.of(), List.of(), Map.of());
+		Profile five = new Profile("A", SETTINGS, PlaceSets.EMPTY, List.of(), Map.of());
 		assertNull(five.lastJoined());
 		assertFalse(five.boostConfirmed());
-		assertEquals(five, new Profile("A", SETTINGS, List.of()));
+		assertEquals(five, new Profile("A", SETTINGS, PlaceSets.EMPTY));
 	}
 
 	@Test

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileSettings;
 import soundsculptor.core.zones.Point;
@@ -24,11 +25,11 @@ class ApplyToTest {
 	private static final Point HOME = new Point(100, 64, 100);
 
 	private static Zone sphere(String id, String world, String dimension, Point anchor, double radius) {
-		return new Zone(id, "Zone " + id, true, world, dimension, anchor, new Shape.Sphere(radius), List.of());
+		return new Zone(id, "Zone " + id, true, world, dimension, anchor, new Shape.Sphere(radius), PlaceSets.EMPTY);
 	}
 
 	private static Profile profile(Zone... zones) {
-		return new Profile("p", ProfileSettings.DEFAULTS, List.of()).withZones(List.of(zones));
+		return new Profile("p", ProfileSettings.DEFAULTS, PlaceSets.EMPTY).withZones(List.of(zones));
 	}
 
 	private static List<String> ids(List<ApplyTarget> targets) {
@@ -96,7 +97,7 @@ class ApplyToTest {
 
 	@Test
 	void disabledZonesAreNotOffered() {
-		Zone off = new Zone("off", "Off", false, WORLD, OVERWORLD, HOME, new Shape.Sphere(50), List.of());
+		Zone off = new Zone("off", "Off", false, WORLD, OVERWORLD, HOME, new Shape.Sphere(50), PlaceSets.EMPTY);
 		assertEquals(List.of("everywhere"), ids(ApplyTo.choices(profile(off), WORLD, OVERWORLD, HOME)));
 	}
 

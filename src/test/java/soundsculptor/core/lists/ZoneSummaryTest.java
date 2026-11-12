@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.List;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.TestEnglish;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
@@ -21,7 +22,7 @@ class ZoneSummaryTest {
 	private static final ZoneEdge HARD = ZoneEdge.hard();
 
 	private static Zone sphere(double radius) {
-		return new Zone("z", "Hall", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(radius), List.of());
+		return new Zone("z", "Hall", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(radius), PlaceSets.EMPTY);
 	}
 
 	private static String where(Zone zone, String world, String dimension, double x) {
@@ -69,10 +70,10 @@ class ZoneSummaryTest {
 	@Test
 	void shapeModeAndBubbleChips() {
 		assertEquals(List.of("Sphere, radius 10", "Inside", "Here"), chips(sphere(10)));
-		Zone box = new Zone("b", "Farm", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Box(20, 8, 30.5), List.of())
+		Zone box = new Zone("b", "Farm", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Box(20, 8, 30.5), PlaceSets.EMPTY)
 				.withMode(ZoneMode.OUTSIDE);
 		assertEquals(List.of("Box 20 × 8 × 30.5", "Outside", "5 blocks away"), chipsAt(box, 5));
-		Zone cylinder = new Zone("c", "Tower", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Cylinder(6, 40), List.of())
+		Zone cylinder = new Zone("c", "Tower", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Cylinder(6, 40), PlaceSets.EMPTY)
 				.asBubble();
 		assertEquals(List.of("Cylinder, radius 6, height 40", "Inside", "Personal bubble", "Here"), chips(cylinder));
 	}

@@ -5,7 +5,7 @@ import java.util.List;
 
 import soundsculptor.core.outline.ColorError;
 import soundsculptor.core.outline.ZoneColors;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.BoxEdit;
 import soundsculptor.core.zones.Point;
@@ -73,30 +73,30 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 	public static final double DEFAULT_SIZE = 10;
 
 	private final String id;
-	private final List<Rule> rules;
+	private final PlaceSets sets;
 	private final Point storedAnchor;
 	/** The shape when the editor opened: a sphere stays on offer for a zone that already was one (FR-8.3). */
 	private final ShapeKind openedShape;
 
-	private ZoneDraft(String id, List<Rule> rules, Point storedAnchor, EnumMap<Field, String> values,
+	private ZoneDraft(String id, PlaceSets sets, Point storedAnchor, EnumMap<Field, String> values,
 			EnumMap<Field, String> defaults) {
 		super(Field.class, values, defaults);
 		this.id = id;
-		this.rules = List.copyOf(rules);
+		this.sets = sets;
 		this.storedAnchor = storedAnchor;
 		this.openedShape = ShapeKind.valueOf(values.get(Field.SHAPE));
 	}
 
 	/**
 	 * A new fixed Inside zone (FR-8.1a, FR-8.3): a {@value #DEFAULT_SIZE}-block box around {@code position} (normally
-	 * "my position"), with the profile's default edge and no rules yet. The fields show the position as given; the
+	 * "my position"), with the profile's default edge and no sets yet. The fields show the position as given; the
 	 * saved box is snapped to the block grid like every box.
 	 *
 	 * @param rgb the next palette color ({@link ZoneColors#next}), also the color's reset value
 	 */
 	public static ZoneDraft blank(String id, String name, String worldKey, String dimension, Point position, int rgb) {
 		Shape.Box box = new Shape.Box(DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);
-		Zone zone = new Zone(id, name, true, worldKey, dimension, position, box, List.of());
+		Zone zone = new Zone(id, name, true, worldKey, dimension, position, box, PlaceSets.EMPTY);
 		return of(zone, rgb, rgb);
 	}
 
@@ -155,7 +155,7 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		defaults.put(Field.MODE, ZoneMode.INSIDE.name());
 		defaults.put(Field.EDGE, ZoneEdge.Mode.DEFAULT.name());
 		defaults.put(Field.FADE, Numbers.format(ZoneEdge.DEFAULT_FADE));
-		return new ZoneDraft(zone.id(), zone.rules(), zone.anchor(), values, defaults);
+		return new ZoneDraft(zone.id(), zone.sets(), zone.anchor(), values, defaults);
 	}
 
 	public boolean enabled() {
@@ -328,7 +328,7 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 			anchor = BoxEdit.snap(anchor, box).center();
 		}
 		return new Zone(id, text(Field.NAME).trim(), enabled(), text(Field.WORLD_KEY), text(Field.DIMENSION), anchor, shape,
-				rules, mode(), edge, anchorType);
+				sets, mode(), edge, anchorType);
 	}
 
 	private double number(Field field) {

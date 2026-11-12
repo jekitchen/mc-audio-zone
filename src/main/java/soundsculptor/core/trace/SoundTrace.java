@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import soundsculptor.core.rules.Limit;
+import soundsculptor.core.sets.Limit;
 
 /**
  * Everything the "Why?" panel shows for one sound, in the order FR-9 applies it (PRD FR-14.2). Structured data:

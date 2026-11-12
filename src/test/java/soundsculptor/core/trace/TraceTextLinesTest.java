@@ -1,5 +1,8 @@
 package soundsculptor.core.trace;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -7,9 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import soundsculptor.core.TestEnglish;
-import soundsculptor.core.rules.Rule;
+import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
-import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 
@@ -23,18 +25,18 @@ class TraceTextLinesTest {
 	private static final String AMBIENT = "minecraft:entity.villager.ambient";
 	private static final LastPlay PLAY = new LastPlay(true, WORLD, OVERWORLD, 0, 0, 0, 60, false, false);
 
-	private static Zone sphere(String id, Rule... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), List.of(rules));
+	private static Zone sphere(String id, SetEntry... rules) {
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), quick(List.of(rules)));
 	}
 
-	private static SoundTrace trace(List<Rule> global, List<Zone> zones) {
-		return SoundTracer.trace(new Precedence(global, zones, soundsculptor.core.zones.ZoneEdge.hard()), AMBIENT, PLAY, false, false);
+	private static SoundTrace trace(List<SetEntry> global, List<Zone> zones) {
+		return SoundTracer.trace(precedence(global, zones, soundsculptor.core.zones.ZoneEdge.hard()), AMBIENT, PLAY, false, false);
 	}
 
 	@Test
 	void linesJoinToTheCopyTraceText() {
-		SoundTrace t = trace(List.of(Rule.of("w", "*villager*").withMute(true), Rule.of("e", AMBIENT).withVolume(60)),
-				List.of(sphere("z", Rule.of("zr", "*villager*").withVolume(20)), sphere("empty")));
+		SoundTrace t = trace(List.of(SetEntry.of("w", "*villager*").withMute(true), SetEntry.of("e", AMBIENT).withVolume(60)),
+				List.of(sphere("z", SetEntry.of("zr", "*villager*").withVolume(20)), sphere("empty")));
 		StringBuilder joined = new StringBuilder();
 		for (TraceText.Line line : TraceText.lines(t, EN)) {
 			joined.append(line.text()).append('\n');
@@ -44,9 +46,9 @@ class TraceTextLinesTest {
 
 	@Test
 	void ruleZoneAndNoRuleLinesCarryTheirTargets() {
-		Rule wildcard = Rule.of("w", "*villager*").withMute(true);
-		Rule exact = Rule.of("e", AMBIENT).withVolume(60);
-		Rule zoneRule = Rule.of("zr", "*villager*").withVolume(20);
+		SetEntry wildcard = SetEntry.of("w", "*villager*").withMute(true);
+		SetEntry exact = SetEntry.of("e", AMBIENT).withVolume(60);
+		SetEntry zoneRule = SetEntry.of("zr", "*villager*").withVolume(20);
 		Zone z = sphere("z", zoneRule);
 		Zone empty = sphere("empty");
 		List<TraceText.Line> lines = TraceText.lines(trace(List.of(wildcard, exact), List.of(z, empty)), EN);

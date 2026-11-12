@@ -1,6 +1,7 @@
 package soundsculptor.core.profile;
 
 import soundsculptor.core.Message;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Zone;
 import java.util.ArrayList;
@@ -24,7 +25,7 @@ public final class ProfileOps {
 	 * fixed zones are kept).
 	 *
 	 * @param result      the target profile after copying (unchanged if there is a problem)
-	 * @param ruleCount   global rules copied
+	 * @param ruleCount   entries in Everywhere's Quick changes copied
 	 * @param bubbleCount personal bubbles copied
 	 * @param fixedKept   the target's own fixed zones, which are kept
 	 * @param problem     why the copy cannot be done (too many zones), or null
@@ -34,13 +35,13 @@ public final class ProfileOps {
 		 * Whether the boost dialog (FR-5.4) must be confirmed before this is done: the result sets a volume above 100%
 		 * and this profile has not confirmed boost yet. After the confirm, save {@code result().withBoostConfirmed(true)}.
 		 */
-		public boolean needsBoostConfirm() {
-			return problem == null && !result.boostConfirmed() && result.hasBoost();
+		public boolean needsBoostConfirm(SetLibrary library) {
+			return problem == null && !result.boostConfirmed() && result.hasBoost(library);
 		}
 	}
 
 	/**
-	 * Copies the parts of {@code source} that are not tied to a place (FR-11.2): its global rules, personal bubbles and
+	 * Copies the parts of {@code source} that are not tied to a place (FR-11.2): Everywhere's attached sets (the same library sets, linked) and its Quick changes, personal bubbles and
 	 * settings replace {@code target}'s. Fixed zones are never copied; the target's own fixed zones and display name are
 	 * kept. A one-time copy: profiles are immutable, so later changes to either do not reach the other.
 	 */
@@ -73,13 +74,13 @@ public final class ProfileOps {
 				}
 			}
 		}
-		int rules = source.globalRules().size();
+		int rules = source.everywhere().quickEntries().size(); // M8c shim: removed in Task 9
 		if (zones.size() > Precedence.MAX_ZONES) {
 			return new Copy(target, rules, bubbles, fixedKept,
 					Message.of(ProfileText.COPY_TOO_MANY_ZONES, zones.size(), Precedence.MAX_ZONES));
 		}
 		// Last joined and the boost confirm describe this server and this player's choices, so they stay.
-		Profile result = new Profile(target.name(), source.settings(), source.globalRules(), zones, colors, target.lastJoined(),
+		Profile result = new Profile(target.name(), source.settings(), source.everywhere(), zones, colors, target.lastJoined(),
 				target.boostConfirmed());
 		return new Copy(result, rules, bubbles, fixedKept, null);
 	}
