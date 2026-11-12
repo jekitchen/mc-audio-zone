@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileSettings;
@@ -106,6 +107,12 @@ class ApplyToTest {
 		ApplyTarget target = ApplyTo.choices(profile(sphere("z1", WORLD, OVERWORLD, HOME, 5)), WORLD, OVERWORLD, HOME).get(1);
 		assertEquals("soundsculptor.recent.apply_to.zone", target.translationKey());
 		assertEquals(List.of("Zone z1"), target.args());
+	}
+
+	@Test
+	void eachChoiceIsAPlaceWhoseQuickChangesTheActionsEdit() {
+		List<ApplyTarget> choices = ApplyTo.choices(profile(sphere("z1", WORLD, OVERWORLD, HOME, 5)), WORLD, OVERWORLD, HOME);
+		assertEquals(List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("z1")), choices.stream().map(ApplyTarget::place).toList());
 	}
 
 	@Test

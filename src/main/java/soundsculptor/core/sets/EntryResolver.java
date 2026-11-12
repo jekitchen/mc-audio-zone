@@ -229,6 +229,14 @@ public final class EntryResolver {
 	}
 
 	/**
+	 * The set ID of each entry in {@link #rulesInOrder()}, by position. For the sound trace (FR-14): a set and its
+	 * duplicate share entry instances, so only the position tells which set an entry is listed and wins in.
+	 */
+	public List<String> setIdsInOrder() {
+		return List.of(orderedSets);
+	}
+
+	/**
 	 * Rules that take over at least one of {@code rule}'s properties for at least one of {@code knownIds}, for the
 	 * rule editor's "Partly overridden by" line (FR-4.6). Not for the hot path. Entries are compared by instance, so
 	 * use it on a one-layer resolver from {@link #of}: a set and its duplicate share entry instances.

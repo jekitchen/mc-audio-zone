@@ -11,7 +11,7 @@ import soundsculptor.core.sets.Limit;
  * the panel turns it into translated text.
  *
  * @param notices       special cases, most important first
- * @param global        global rules that matched and the winner per setting
+ * @param everywhere    Everywhere's sets that matched and the winner per setting
  * @param zones         zones containing the sound, in zone-list order
  * @param zoneWinners   the deciding zone per setting; absent when no zone sets it
  * @param volumePercent final volume, 0 when muted
@@ -20,7 +20,7 @@ import soundsculptor.core.sets.Limit;
  * @param playAllowed   whether the last play got past the repeat limit, or {@code null} if not heard yet
  * @param cueShown      whether the last play showed a cue, or {@code null} if not heard yet
  */
-public record SoundTrace(String soundId, Set<TraceNotice> notices, ListTrace global, List<ZoneLine> zones,
+public record SoundTrace(String soundId, Set<TraceNotice> notices, PlaceTrace everywhere, List<ZoneLine> zones,
 		Map<TraceProperty, ZoneWinner> zoneWinners, float volumePercent, Limit limit, boolean cueOn, Boolean playAllowed,
 		Boolean cueShown) {
 }

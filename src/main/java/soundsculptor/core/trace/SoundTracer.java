@@ -3,21 +3,27 @@ package soundsculptor.core.trace;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ToIntFunction;
 
-import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.EntryResolver;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SoundPattern;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.SoundDecision;
 import soundsculptor.core.zones.Zone;
 
 /**
- * Builds the sound trace (PRD FR-14, read-only MVP) when the "Why?" panel opens. Not on the hot path: it allocates
- * freely. The final result comes from {@link Precedence#decide} and the zone tie-break from
+ * Builds the sound trace (PRD FR-14) when the "Why?" panel opens, in Sound Set terms: for Everywhere and each zone,
+ * the attached sets with entries that match the sound, the winning entry per setting and the set it won in. Not on the
+ * hot path: it allocates freely. Entries are listed and picked in the order the place's resolver uses, the final
+ * result comes from {@link Precedence#decide} and the zone tie-break from
  * {@link Precedence#beats(double, double, double, double)}, so the trace can never disagree with what was played.
  */
 public final class SoundTracer {
@@ -26,18 +32,28 @@ public final class SoundTracer {
 	private SoundTracer() {
 	}
 
+	/** {@link #trace(Precedence, SetLibrary, ToIntFunction, String, LastPlay, boolean, boolean)} with no place counts. */
+	public static SoundTrace trace(Precedence p, SetLibrary lib, String soundId, LastPlay play, boolean bypass,
+			boolean vanillaCovered) {
+		return trace(p, lib, setId -> 0, soundId, play, bypass, vanillaCovered);
+	}
+
 	/**
+	 * @param p              the places, built from {@code lib}
+	 * @param lib            the library the places' set IDs refer to, for set names
+	 * @param placesUsing    for a library set ID, how many places use the set ("used in 3 places", FR-14.4)
 	 * @param play           the sound's last play, or {@code null} if it has not played this session
 	 * @param bypass         whether Bypass Sound Sculptor is on
 	 * @param vanillaCovered whether the sound belongs to Music, UI or Voice/Speech
 	 */
-	public static SoundTrace trace(Precedence p, String soundId, LastPlay play, boolean bypass, boolean vanillaCovered) {
+	public static SoundTrace trace(Precedence p, SetLibrary lib, ToIntFunction<String> placesUsing, String soundId,
+			LastPlay play, boolean bypass, boolean vanillaCovered) {
 		Set<TraceNotice> notices = EnumSet.noneOf(TraceNotice.class);
 		Boolean playAllowed = play == null ? null : !play.dropped();
 		Boolean cueShown = play == null ? null : play.cueShown();
 		if (vanillaCovered) {
 			notices.add(TraceNotice.VANILLA_COVERED);
-			return new SoundTrace(soundId, notices, ListTrace.EMPTY, List.of(), Map.of(), 100, null, false, playAllowed, cueShown);
+			return new SoundTrace(soundId, notices, PlaceTrace.EMPTY, List.of(), Map.of(), 100, null, false, playAllowed, cueShown);
 		}
 		if (bypass) {
 			notices.add(TraceNotice.BYPASS);
@@ -48,8 +64,7 @@ public final class SoundTracer {
 			notices.add(TraceNotice.NON_POSITIONAL);
 		}
 
-		// M8c shim: removed in Task 10 (every set's entries are listed as one list)
-		ListTrace global = explain(p.everywhere(), soundId);
+		PlaceTrace everywhere = explain(p.everywhere(), soundId, lib, placesUsing);
 		List<ZoneLine> lines = new ArrayList<>();
 		List<Integer> indices = new ArrayList<>();
 		if (play != null && play.positional()) {
@@ -78,7 +93,8 @@ public final class SoundTracer {
 				if (w <= 0) {
 					continue;
 				}
-				lines.add(new ZoneLine(zone, w, Math.sqrt(dx * dx + dy * dy + dz * dz), explain(p.zoneResolver(i), soundId)));
+				PlaceTrace sets = explain(p.zoneResolver(i), soundId, lib, placesUsing);
+				lines.add(new ZoneLine(zone, w, Math.sqrt(dx * dx + dy * dy + dz * dz), sets));
 				indices.add(i);
 			}
 		}
@@ -104,44 +120,64 @@ public final class SoundTracer {
 		if (play != null && !bypass && Math.abs(volume - play.volumePercent()) > SAME_VOLUME) {
 			notices.add(TraceNotice.CHANGED_SINCE_PLAY);
 		}
-		return new SoundTrace(soundId, notices, global, lines, zoneWinners, volume, bypass ? null : d.limit(),
+		return new SoundTrace(soundId, notices, everywhere, lines, zoneWinners, volume, bypass ? null : d.limit(),
 				!bypass && d.cueOn(), playAllowed, cueShown);
 	}
 
-	/** The matched rules of one list and the winner per setting, with the specificity step that decided it. */
-	static ListTrace explain(EntryResolver rules, String soundId) {
-		List<SetEntry> matched = new ArrayList<>();
-		for (SetEntry rule : rules.rulesInOrder()) {
-			if (rule.pattern().matches(soundId)) {
-				matched.add(rule);
+	/**
+	 * The sets of one place with entries that match the sound, and the winner per setting with the step that decided
+	 * it. Works on the resolver's positions, so each entry stays with the set it is listed in even when a set and its
+	 * duplicate share entry instances.
+	 */
+	static PlaceTrace explain(EntryResolver place, String soundId, SetLibrary lib, ToIntFunction<String> placesUsing) {
+		List<SetEntry> entries = place.rulesInOrder();
+		List<String> setIds = place.setIdsInOrder();
+		List<Integer> matched = new ArrayList<>();
+		Map<String, List<SetEntry>> bySet = new LinkedHashMap<>();
+		for (int i = 0; i < entries.size(); i++) {
+			if (entries.get(i).pattern().matches(soundId)) {
+				matched.add(i);
+				bySet.computeIfAbsent(setIds.get(i), id -> new ArrayList<>()).add(entries.get(i));
 			}
 		}
+		List<SetLine> sets = new ArrayList<>(bySet.size());
+		bySet.forEach((setId, list) -> sets.add(setLine(setId, list, lib, placesUsing)));
+
 		Map<TraceProperty, EntryWinner> winners = new EnumMap<>(TraceProperty.class);
 		for (TraceProperty property : TraceProperty.values()) {
-			SetEntry winner = null;
-			SetEntry runnerUp = null;
-			for (SetEntry rule : matched) {
-				if (!property.setBy(rule)) {
+			int winner = -1;
+			int runnerUp = -1;
+			for (int i : matched) {
+				if (!property.setBy(entries.get(i))) {
 					continue;
 				}
-				if (winner == null) {
-					winner = rule;
+				if (winner < 0) {
+					winner = i;
 				} else {
-					runnerUp = rule;
+					runnerUp = i;
 					break;
 				}
 			}
-			if (winner != null) {
-				winners.put(property, new EntryWinner(winner, ruleReason(winner, runnerUp)));
+			if (winner >= 0) {
+				EntryWinReason reason = runnerUp < 0 ? EntryWinReason.ONLY_MATCH
+						: !setIds.get(winner).equals(setIds.get(runnerUp)) ? EntryWinReason.HIGHER_SET
+						: specificityReason(entries.get(winner), entries.get(runnerUp));
+				winners.put(property, new EntryWinner(entries.get(winner), setIds.get(winner), reason));
 			}
 		}
-		return new ListTrace(matched, winners);
+		return new PlaceTrace(sets, winners);
 	}
 
-	private static EntryWinReason ruleReason(SetEntry winner, SetEntry runnerUp) {
-		if (runnerUp == null) {
-			return EntryWinReason.ONLY_MATCH;
+	private static SetLine setLine(String setId, List<SetEntry> matched, SetLibrary lib, ToIntFunction<String> placesUsing) {
+		if (setId.equals(SoundSet.QUICK_ID)) {
+			return new SetLine(setId, "", true, matched, 1);
 		}
+		SoundSet set = lib.get(setId);
+		return new SetLine(setId, set == null ? setId : set.name(), false, matched, placesUsing.applyAsInt(setId));
+	}
+
+	/** Why {@code winner} beat {@code runnerUp} within one set: the FR-4.5 specificity step that decided. */
+	private static EntryWinReason specificityReason(SetEntry winner, SetEntry runnerUp) {
 		SoundPattern w = winner.pattern();
 		SoundPattern r = runnerUp.pattern();
 		if (w.isExact() && !r.isExact()) {
@@ -189,7 +225,7 @@ public final class SoundTracer {
 	}
 
 	private static boolean sets(ZoneLine line, TraceProperty property) {
-		return line.rules().winners().containsKey(property);
+		return line.sets().winners().containsKey(property);
 	}
 
 	private static boolean beats(Precedence p, List<ZoneLine> lines, List<Integer> indices, int k, int best) {

@@ -2,7 +2,7 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
-import soundsculptor.core.quick.ApplyTarget;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetCodec;
@@ -51,8 +51,8 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 				main(mc).runSearch();
 				main(mc).toggleMute(VILLAGER);
 			});
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "Mute should apply at once");
-			check(context.computeOnClient(mc -> Boolean.TRUE.equals(QuickActions.exactRule(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER).cue())),
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Mute should apply at once");
+			check(context.computeOnClient(mc -> Boolean.TRUE.equals(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER).cue())),
 					"a new mute rule should start with the profile's Cue default (on)");
 			String toast = toastText(context);
 			check(toast.startsWith("Muted "), "the toast should say what was muted, was " + toast);
@@ -67,7 +67,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			check(narration.contains("Muted ") && narration.contains("Undo"), "Undo should be narrated with its action, was " + narration);
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitTicks(2);
-			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "Undo should unmute");
+			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Undo should unmute");
 			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).isEmpty()), "Undo should leave no rule behind");
 			check(toastText(context).equals("Undone"), "a toast should confirm the undo");
 			check(context.computeOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(0).getMessage().getString())
@@ -77,12 +77,12 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
 			context.runOnClient(mc -> main(mc).setFocused(main(mc).searchField));
 			context.runOnClient(mc -> main(mc).keyPressed(ctrlZ()));
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "Ctrl+Z in the search field does not undo");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Ctrl+Z in the search field does not undo");
 			context.runOnClient(mc -> {
 				main(mc).setFocused(main(mc).searchList);
 				main(mc).keyPressed(ctrlZ());
 			});
-			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "Ctrl+Z should undo the mute");
+			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Ctrl+Z should undo the mute");
 
 			// Unmute has Undo too.
 			context.runOnClient(mc -> {
@@ -91,7 +91,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			});
 			check(toastText(context).startsWith("Unmuted "), "Unmute should show its own toast, was " + toastText(context));
 			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "undoing Unmute mutes again");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "undoing Unmute mutes again");
 
 			// The toast stays while Undo has focus, past 5 seconds, and Undo still works then.
 			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
@@ -99,7 +99,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			context.waitTicks(130);
 			check(context.computeOnClient(mc -> main(mc).toast()) != null, "the toast should stay while Undo has focus");
 			context.runOnClient(mc -> main(mc).pressUndo());
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "a held Undo still works after 5 seconds");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "a held Undo still works after 5 seconds");
 
 			// Without focus the toast goes after 5 seconds.
 			context.runOnClient(mc -> {
@@ -114,7 +114,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ProfileManager.update(p -> RuleTarget.GLOBAL.put(p, SetEntry.of("other", "minecraft:entity.cow.*").withVolume(40))));
 			context.runOnClient(mc -> main(mc).pressUndo());
 			check(toastText(context).startsWith("Can't undo"), "a stale Undo should say it can't undo, was " + toastText(context));
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)
 					&& RuleTarget.GLOBAL.rule(ProfileManager.profile(), "other") != null), "a refused Undo changes nothing");
 
 			// Rules tab: On/Off, Move and Delete each offer Undo.

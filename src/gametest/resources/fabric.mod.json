@@ -31,7 +31,8 @@
 			"soundsculptor.gametest.ApplyToClientGameTest",
 			"soundsculptor.gametest.TraceEditClientGameTest",
 			"soundsculptor.gametest.AccessibilityClientGameTest",
-			"soundsculptor.gametest.M8StressClientGameTest"
+			"soundsculptor.gametest.M8StressClientGameTest",
+			"soundsculptor.gametest.SetUsageClientGameTest"
 		]
 	},
 	"depends": {

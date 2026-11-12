@@ -4,7 +4,10 @@ import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.i18n.PseudoLocale;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundSet;
+import soundsculptor.core.trace.EntryLocation;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -54,6 +57,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final int[] GUI_SCALES = {1, 2, 3, 4, 0};
 	/** Room a button needs around its text (vanilla's 4 px each side). */
 	private static final int BUTTON_PADDING = 8;
+	/** The Rules tab fixture's second entry, in Everywhere's Quick changes, as the trace lists it. */
+	private static final EntryLocation QUICK_R2 = new EntryLocation(PlaceRef.EVERYWHERE, SoundSet.QUICK_ID, "r2");
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -100,7 +105,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				TraceScreen trace = new TraceScreen(null, "minecraft:entity.villager.ambient");
 				mc.gui.setScreen(trace);
 				List<String> silent = new ArrayList<>(silentControls(trace));
-				trace.openVolume(soundsculptor.core.trace.RuleLocation.global("r2"), RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
+				trace.openVolume(QUICK_R2, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
 				silent.addAll(silentControls(trace));
 				return silent;
 			});
@@ -193,7 +198,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		RULE_COPY(mc -> new RuleCopyScreen(null, RuleTarget.zone("z2")), null),
 		TRACE(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), null),
 		TRACE_VOLUME(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), s -> {
-			((TraceScreen) s).openVolume(soundsculptor.core.trace.RuleLocation.global("r2"), RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
+			((TraceScreen) s).openVolume(QUICK_R2, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
 			return null;
 		});
 

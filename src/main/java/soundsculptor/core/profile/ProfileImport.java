@@ -1,7 +1,6 @@
 package soundsculptor.core.profile;
 
 import soundsculptor.core.Message;
-import com.google.gson.JsonObject;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
@@ -9,32 +8,25 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 /**
  * Checks a file before it is imported (PRD FR-11.6): valid JSON, 1 MB or less, a known schema version (older ones are
- * migrated), every value in range and every pattern valid. On any problem nothing is imported, and the exception's
- * message names it in plain words with its place. Unknown fields are ignored and listed as warnings.
+ * migrated), every value in range and every pattern valid, in the profile and in each Sound Set the file carries
+ * ({@link ExportCodec}). On any problem nothing is imported, and the exception's message names it in plain words with its
+ * place. Unknown fields are ignored and listed as warnings.
  *
- * <p>What the checked profile then changes is worked out by {@link ImportPlan}.
+ * <p>What the checked file then changes is worked out by {@link ImportPlan}.
  */
 public final class ProfileImport {
-	/** A profile that passed every check, and the unknown fields that were ignored. */
-	public record Checked(Profile profile, List<Message> warnings) {
-		public Checked {
-			warnings = List.copyOf(warnings);
-		}
-	}
-
 	private ProfileImport() {
 	}
 
 	/** Checks a file on disk; its size is checked before it is read. */
-	public static Checked check(Path file) throws ProfileFormatException {
+	public static ExportCodec.Read check(Path file) throws ProfileFormatException {
 		byte[] bytes;
 		try {
 			if (Files.size(file) > ProfileStore.MAX_FILE_BYTES) {
-				throw tooLarge();
+				throw ProfileText.problem(ProfileText.TOO_LARGE);
 			}
 			bytes = Files.readAllBytes(file);
 		} catch (IOException e) {
@@ -50,24 +42,8 @@ public final class ProfileImport {
 		return check(text);
 	}
 
-	/** Checks the text of a file. */
-	public static Checked check(String text) throws ProfileFormatException {
-		if (text.getBytes(StandardCharsets.UTF_8).length > ProfileStore.MAX_FILE_BYTES) {
-			throw tooLarge();
-		}
-		if (text.isBlank()) {
-			throw ProfileText.problem(ProfileText.EMPTY);
-		}
-		JsonObject root = ProfileCodec.parse(text);
-		if (ProfileMigrations.versionOf(root) > ProfileMigrations.CURRENT.target()) {
-			throw ProfileText.problem(ProfileText.NEWER_IMPORT);
-		}
-		// An import file is not one of the stored profiles: there is nothing to back up before migrating it.
-		ProfileCodec.Read read = ProfileCodec.read(root, version -> { });
-		return new Checked(read.profile(), read.warnings());
-	}
-
-	private static ProfileFormatException tooLarge() {
-		return ProfileText.problem(ProfileText.TOO_LARGE);
+	/** Checks the text of a file: {@link ExportCodec#read}. */
+	public static ExportCodec.Read check(String text) throws ProfileFormatException {
+		return ExportCodec.read(text);
 	}
 }

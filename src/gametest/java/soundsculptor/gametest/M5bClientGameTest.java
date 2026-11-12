@@ -50,7 +50,8 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 				main(mc).setPaused(false);
 			});
 
-			// FR-14 AC 1: *villager* muted plus the exact ID at 60%: Why? shows both, the exact rule wins, final 60%.
+			// FR-14 AC 1: *villager* muted plus the exact ID at 60% in one set: Why? shows both, the single-sound entry
+			// wins, final 60%.
 			play(context, AMBIENT, false);
 			context.waitTicks(10);
 			context.runOnClient(mc -> {
@@ -61,8 +62,9 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			});
 			context.waitForScreen(TraceScreen.class);
 			String trace = context.computeOnClient(mc -> trace(mc).text());
-			check(trace.contains("  minecraft:entity.villager.ambient: Volume 60%\n    Decides loudness (Exact sound ID)\n"), "the exact rule should win:\n" + trace);
-			check(trace.contains("  *:*villager*: Muted\n    loudness overridden by minecraft:entity.villager.ambient\n"),
+			check(trace.contains("Everywhere\n  Quick changes\n    minecraft:entity.villager.ambient: Volume 60%\n      Decides loudness (Exact sound ID)\n"),
+					"the single-sound entry should win:\n" + trace);
+			check(trace.contains("    *:*villager*: Muted\n      loudness overridden by Quick changes: minecraft:entity.villager.ambient\n"),
 					"the wildcard should be shown as overridden:\n" + trace);
 			check(trace.contains("Result\n  Volume 60%\n"), "the final volume should be 60%:\n" + trace);
 			check(context.computeOnClient(mc -> trace(mc).lines.children().size()) == trace.split("\n").length,
@@ -97,11 +99,11 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> trace(mc).onClose());
 			context.waitForScreen(SoundSculptorScreen.class);
 
-			// FR-14.1: a sound not heard this session shows the rules that would match.
+			// FR-14.1: a sound not heard this session shows what Everywhere's sets would do.
 			context.runOnClient(mc -> mc.gui.setScreen(new TraceScreen(main(mc), NEVER_PLAYED)));
 			context.waitForScreen(TraceScreen.class);
 			String notHeard = context.computeOnClient(mc -> trace(mc).text());
-			check(notHeard.contains("Not heard yet; zones depend on where it plays") && notHeard.contains("No rule matches this sound"),
+			check(notHeard.contains("Not heard yet; zones depend on where it plays") && notHeard.contains("No entry matches this sound"),
 					"an unheard sound should say so:\n" + notHeard);
 			context.runOnClient(mc -> trace(mc).onClose());
 			context.waitForScreen(SoundSculptorScreen.class);

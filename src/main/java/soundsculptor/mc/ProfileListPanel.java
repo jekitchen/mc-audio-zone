@@ -3,6 +3,7 @@ package soundsculptor.mc;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileOps;
 import soundsculptor.core.profile.ProfileSummary;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
@@ -164,31 +165,35 @@ public final class ProfileListPanel {
 	// ---- Copy from another server (FR-11.2) ----
 
 	public void confirmCopy(ProfileManager.Stored source) {
-		ProfileOps.Copy copy = ProfileOps.copyFrom(source.profile(), ProfileManager.profile());
+		ProfileOps.Copy copy = ProfileOps.copyFrom(source.profile(), ProfileManager.profile(), ProfileManager.library());
 		if (copy.problem() != null) {
 			host.showToast(Component.literal(ProfileManager.text(copy.problem())), null);
 			return;
 		}
 		setScreen(new SculptDialog(host,
 				Component.translatable("soundsculptor.profiles.copy.title", source.profile().name()),
-				Component.translatable("soundsculptor.profiles.copy.message", copy.ruleCount(), copy.bubbleCount(), copy.fixedKept()),
+				Component.translatable("soundsculptor.profiles.copy.message", copy.setCount(), copy.bubbleCount(), copy.fixedKept()),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.copy.confirm"),
 						() -> confirmBoostThen(host, copy.needsBoostConfirm(ProfileManager.library()), () -> copy(source))),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
 				1, 1));
 	}
 
-	/** Copies the source's global rules, bubbles and settings into this world's profile; fixed zones stay. */
+	/**
+	 * Copies the source's Sound Sets on Everywhere (library sets linked, Quick changes copied), bubbles and settings into
+	 * this world's profile; fixed zones stay.
+	 */
 	public void copy(ProfileManager.Stored source) {
 		Profile latest = ProfileManager.storedProfile(source.key());
 		Profile from = latest != null ? latest : source.profile();
 		// A copy that brings boosted rules was confirmed in the boost dialog (FR-5.4), so it is saved as confirmed.
-		ProfileManager.update(target -> {
-			ProfileOps.Copy copy = ProfileOps.copyFrom(from, target);
+		ProfileManager.change(ws -> {
+			ProfileOps.Copy copy = ProfileOps.copyFrom(from, ws.profile(), ws.library());
 			if (copy.problem() != null) {
-				return target;
+				return ws;
 			}
-			return copy.needsBoostConfirm(ProfileManager.library()) ? copy.result().withBoostConfirmed(true) : copy.result();
+			Profile result = copy.needsBoostConfirm(ws.library()) ? copy.result().withBoostConfirmed(true) : copy.result();
+			return new Workspace(result, ws.library());
 		});
 		refresh();
 		host.showToast(Component.translatable("soundsculptor.profiles.copied", source.profile().name()), null);

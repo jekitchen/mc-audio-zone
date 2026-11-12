@@ -21,6 +21,9 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -70,6 +73,8 @@ public final class ProfileManager {
 	 * lacks are kept, since those sets may load at the next start (PRD 9.2).
 	 */
 	private static boolean libraryComplete = true;
+	/** Files whose failed write was already reported with a toast; they are reported again only after a write succeeds. */
+	private static final Set<Path> reportedFailures = ConcurrentHashMap.newKeySet();
 
 	private ProfileManager() {
 	}
@@ -80,6 +85,7 @@ public final class ProfileManager {
 		store = new ProfileStore(root.resolve("profiles"));
 		setStore = new SetStore(root.resolve("sets"));
 		setWriter = new LibraryWriter(setStore);
+		reportedFailures.clear();
 		SetStore.LoadAll loaded = setStore.loadAll();
 		for (Message problem : loaded.problems()) {
 			SoundSculptorClient.LOGGER.warn("Sound Sculptor: {}", problem);
@@ -91,6 +97,7 @@ public final class ProfileManager {
 					+ "attachments to sets it lacks are kept until a start where it does");
 		}
 		current = snapshot(null, Profile.empty(NO_WORLD_NAME), loaded.library());
+		reindex();
 	}
 
 	/**
@@ -117,11 +124,13 @@ public final class ProfileManager {
 		}
 		// Always a change, so the profile is saved, pruned or not.
 		update(profile -> profile.withLastJoined(Instant.now()));
+		reindex();
 	}
 
 	/** The player left the world: back to vanilla until the next join. */
 	public static synchronized void leave() {
 		current = snapshot(null, Profile.empty(NO_WORLD_NAME), current.library());
+		reindex(); // the profile just left is now read from its file
 	}
 
 	/** Reads the current world's profile file again (tests use it to check what was saved). */
@@ -171,6 +180,20 @@ public final class ProfileManager {
 		return current.precedence();
 	}
 
+	/**
+	 * The loaded profile with its world key, read together from one snapshot, or {@code null} outside a world. For
+	 * {@link SetUsageIndex}, which must not mix a key with another snapshot's profile.
+	 */
+	static Map.Entry<String, Profile> liveProfile() {
+		Snapshot snapshot = current;
+		return snapshot.key() == null ? null : Map.entry(snapshot.key(), snapshot.profile());
+	}
+
+	/** Rebuilds the usage index once the saves queued so far are written. */
+	private static void reindex() {
+		SAVER.execute(SetUsageIndex::rebuild);
+	}
+
 	/** Applies a change to the profile; see {@link #change}. */
 	public static synchronized void update(UnaryOperator<Profile> f) {
 		change(ws -> new Workspace(f.apply(ws.profile()), ws.library()));
@@ -215,6 +238,7 @@ public final class ProfileManager {
 			}
 			if (setWriter != null) {
 				setWriter.delete(library, deleted, ProfileManager::setWriteFailed);
+				forgetRecoveredFailures();
 			}
 		});
 	}
@@ -228,10 +252,25 @@ public final class ProfileManager {
 		}
 	}
 
+	/** Logs every failure, but shows the toast once per file until a write of that file works again. */
 	private static void setWriteFailed(Path file, boolean deleting, IOException e) {
 		SoundSculptorClient.LOGGER.error("Sound Sculptor could not {} {}; it is tried again with the next change",
 				deleting ? "delete" : "save", file, e);
-		saveFailed(e);
+		if (reportedFailures.add(file)) {
+			saveFailed(e);
+		}
+	}
+
+	/** After a write pass: files that no longer fail may toast again if they fail later. */
+	private static void forgetRecoveredFailures() {
+		if (setWriter == null || setStore == null) {
+			return;
+		}
+		Set<Path> stillFailing = new java.util.HashSet<>();
+		for (String id : setWriter.pending()) {
+			stillFailing.add(setStore.fileFor(id));
+		}
+		reportedFailures.retainAll(stillFailing);
 	}
 
 	private static void saveFailed(IOException e) {
@@ -248,6 +287,7 @@ public final class ProfileManager {
 			SAVER.submit(() -> {
 				if (setWriter != null) {
 					setWriter.retry(ProfileManager::setWriteFailed);
+					forgetRecoveredFailures();
 				}
 			}).get(10, TimeUnit.SECONDS);
 		} catch (Exception e) {
@@ -349,7 +389,10 @@ public final class ProfileManager {
 			update(p -> profile);
 			return;
 		}
-		SAVER.execute(() -> save(key, profile));
+		SAVER.execute(() -> {
+			save(key, profile);
+			SetUsageIndex.rebuild();
+		});
 	}
 
 	/**
@@ -368,6 +411,7 @@ public final class ProfileManager {
 				Notices.show(Component.translatable("soundsculptor.notice.save_failed.title"),
 						Component.translatable("soundsculptor.notice.save_failed.message", e.getMessage()));
 			}
+			SetUsageIndex.rebuild();
 		});
 	}
 
@@ -378,6 +422,7 @@ public final class ProfileManager {
 	static synchronized void moveTo(String newKey, Profile profile) {
 		current = snapshot(newKey, profile, current.library());
 		SAVER.execute(() -> save(newKey, profile));
+		reindex();
 	}
 
 	private static Snapshot snapshot(String key, Profile profile, SetLibrary library) {

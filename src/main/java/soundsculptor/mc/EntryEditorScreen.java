@@ -120,12 +120,12 @@ public final class EntryEditorScreen extends SculptScreen {
 	}
 
 	/**
-	 * Opens the editor on the sound's exact-ID rule in the list "Apply to" chose (FR-1.5, FR-3.7), or a new exact-ID
-	 * rule for it there.
+	 * Opens the editor on the sound's single-sound entry in the Quick changes of the place "Apply to" chose (FR-1.5,
+	 * FR-3.7), or a new single-sound entry for it there.
 	 */
 	public static EntryEditorScreen forSound(Screen parent, ApplyTarget applyTo, String soundId) {
 		RuleTarget target = applyTo.isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(applyTo.zoneId());
-		SetEntry exact = QuickActions.exactRule(ProfileManager.profile(), applyTo, soundId);
+		SetEntry exact = QuickActions.quickEntry(ProfileManager.workspace(), applyTo.place(), soundId);
 		if (exact != null) {
 			return edit(parent, target, exact);
 		}

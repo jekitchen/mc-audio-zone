@@ -1,8 +1,8 @@
 package soundsculptor.core.trace;
 
-/** Why a rule won a setting within one list (PRD FR-14.2 item 1, mirroring the FR-4.5 steps). */
+/** Why an entry won a setting at one place (PRD FR-14.2 item 1, mirroring the FR-4.5 steps). */
 public enum EntryWinReason {
-	/** No other matching rule sets this. */
+	/** No other matching entry sets this. */
 	ONLY_MATCH("only_match"),
 	/** An exact sound ID beats any pattern. */
 	EXACT_ID("exact_id"),
@@ -10,8 +10,10 @@ public enum EntryWinReason {
 	MORE_LITERAL("more_literal"),
 	/** Same literal characters, fewer {@code *}. */
 	FEWER_STARS("fewer_stars"),
-	/** Equally specific; higher in the list. */
-	LIST_ORDER("list_order");
+	/** Equally specific; higher in the set. */
+	LIST_ORDER("list_order"),
+	/** Its set is higher in the place's list than the set of the next entry that sets this ("higher in the list"). */
+	HIGHER_SET("higher_set");
 
 	private final String key;
 

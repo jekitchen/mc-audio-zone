@@ -7,6 +7,8 @@ import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileSettings;
 import soundsculptor.core.profile.WorldIds;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundSet;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -30,12 +32,15 @@ import net.minecraft.world.level.storage.LevelResource;
 
 /**
  * M14 Profiles tab (PRD FR-11.2, FR-11.3, FR-11.1 "Give this copy its own profile"): the list shows every profile;
- * Copy brings over global rules, bubbles and settings but not fixed zones, and is a one-time copy; Rename changes the
+ * Copy brings over Everywhere's Sound Sets (library sets linked, Quick changes copied), bubbles with their sets and
+ * settings but not fixed zones, and is a one-time copy; Rename changes the
  * display name only; Reset empties a profile without touching the others; Delete removes another server's profile but is
  * not offered for the world you are in.
  */
 public final class ProfilesClientGameTest implements FabricClientGameTest {
 	private static final String A = "a.example.net";
+	private static final SoundSet FARM = new SoundSet("set-gametest-farm", "Gametest farm",
+			List.of(SetEntry.of("e1", "*sheep*").withVolume(50)));
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -52,8 +57,8 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			Profile serverA = Profile.empty("Server A")
 					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
-							SetEntry.of("r2", "*cow*").withVolume(40))))
-					.withZones(List.of(zone("fa", A), zone("ba", A).asBubble()))
+							SetEntry.of("r2", "*cow*").withVolume(40))).attach(FARM.id()))
+					.withZones(List.of(zone("fa", A), zone("ba", A).asBubble().withSets(PlaceSets.EMPTY.attach(FARM.id()))))
 					.withSettings(new ProfileSettings(false))
 					.withLastJoined(Instant.parse("2026-11-01T12:00:00Z"));
 			context.runOnClient(mc -> {
@@ -62,7 +67,8 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 				} catch (java.io.IOException e) {
 					throw new AssertionError(e);
 				}
-				ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(zone("home", key))));
+				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()).withZones(List.of(zone("home", key))),
+						ws.library().put(FARM)));
 			});
 
 			context.setScreen(SoundSculptorScreen::new);
@@ -84,6 +90,9 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> panel(mc).confirmCopy(panel(mc).find(A)));
 			context.waitForScreen(SculptDialog.class);
 			check(context.computeOnClient(mc -> mc.gui.screen().getTitle().getString().equals("Copy from Server A?")), "the copy dialog");
+			String copyMessage = context.computeOnClient(mc -> mc.gui.screen().getNarrationMessage().getString());
+			check(copyMessage.contains("Its 2 Sound Sets on Everywhere, 1 bubble zones and settings"), "the dialog lists what is copied, was " + copyMessage);
+			int librarySize = context.computeOnClient(mc -> ProfileManager.library().size());
 			context.takeScreenshot("profiles-copy-dialog");
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
@@ -92,6 +101,9 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			check(copied.zones().stream().map(Zone::id).toList().equals(List.of("home", "ba")),
 					"this world's fixed zone stays and A's bubble arrives; A's fixed zone does not, was " + copied.zones());
 			check(!copied.settings().showDistance(), "A's settings are copied");
+			check(copied.everywhere().uses(FARM.id()) && copied.zone("ba").sets().uses(FARM.id()),
+					"Everywhere and the bubble attach A's library set, was " + copied);
+			check(context.computeOnClient(mc -> ProfileManager.library().size()) == librarySize, "library sets are linked, not copied");
 			check(context.computeOnClient(mc -> main(mc).toast() != null
 					&& main(mc).toast().message().getString().equals("Copied from Server A")), "a toast confirms the copy");
 
@@ -134,6 +146,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(context.computeOnClient(mc -> panel(mc).find(A)) == null, "A is gone from the list");
+			context.runOnClient(mc -> ProfileManager.flushSaves());
 			Path fileA = context.computeOnClient(mc -> ProfileManager.store().fileFor(A));
 			check(!Files.exists(fileA) && Files.exists(fileA.resolveSibling(fileA.getFileName() + ".bak")), "A's file is deleted and kept as .bak");
 
@@ -187,7 +200,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 				mc.gui.setScreen(null);
 				ProfileManager.delete(boostKey);
 				ProfileManager.delete(key);
-				ProfileManager.update(p -> Profile.empty(p.name()));
+				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().remove(FARM.id())));
 				ProfileManager.flushSaves();
 			});
 		}

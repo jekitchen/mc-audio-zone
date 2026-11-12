@@ -90,6 +90,11 @@ public final class ProfileCodec {
 	 * @param worldKey the key to record, or null for none (exports and older callers)
 	 */
 	public static String toJson(Profile profile, String worldKey) {
+		return write(toJsonObject(profile, worldKey));
+	}
+
+	/** The profile file's JSON object; {@link ExportCodec} adds the exported sets to it. */
+	static JsonObject toJsonObject(Profile profile, String worldKey) {
 		JsonObject root = new JsonObject();
 		root.addProperty("schemaVersion", Profile.SCHEMA_VERSION);
 		root.addProperty("name", profile.name());
@@ -109,6 +114,11 @@ public final class ProfileCodec {
 			zones.add(zoneToJson(zone, profile.colorOf(zone.id())));
 		}
 		root.add("zones", zones);
+		return root;
+	}
+
+	/** A profile or export file's text: pretty-printed JSON ending in a line break. */
+	static String write(JsonObject root) {
 		return GSON.toJson(root) + "\n";
 	}
 
@@ -433,11 +443,11 @@ public final class ProfileCodec {
 		return Double.toString(value);
 	}
 
-	private static String quote(String text) {
+	static String quote(String text) {
 		return "\"" + text + "\"";
 	}
 
-	private static String describe(JsonElement value) {
+	static String describe(JsonElement value) {
 		if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()) {
 			return format(value.getAsDouble());
 		}

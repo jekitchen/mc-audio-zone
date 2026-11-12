@@ -90,15 +90,39 @@ public final class SetLibrary {
 	}
 
 	/**
-	 * A name no other set uses, ignoring case: {@code wanted}, else "wanted (2)", "wanted (3)" and so on. The set
-	 * {@code exceptId} (the one being renamed) does not count as a clash.
+	 * A name no other set uses, ignoring case (the same rule the list is sorted by): {@code wanted}, else
+	 * "wanted (2)", "wanted (3)" and so on. The set {@code exceptId} (the one being renamed) does not count as a clash.
+	 * When a suffix is added, {@code wanted} is cut short so the result still fits in {@link SoundSet#MAX_NAME_LENGTH}
+	 * characters.
 	 */
 	public String uniqueName(String wanted, String exceptId) {
-		String candidate = wanted;
+		return uniqueName(wanted, exceptId, "");
+	}
+
+	/**
+	 * Like {@link #uniqueName(String, String)}, but a name that clashes first gets {@code firstSuffix} (for example
+	 * " (copy)"), and only then " (2)", " (3)" and so on after it. The result fits in {@link SoundSet#MAX_NAME_LENGTH}.
+	 */
+	public String uniqueName(String wanted, String exceptId, String firstSuffix) {
+		String candidate = firstSuffix.isEmpty() ? wanted : fit(wanted, firstSuffix) + firstSuffix;
 		for (int n = 2; clashes(candidate, exceptId); n++) {
-			candidate = wanted + " (" + n + ")";
+			String suffix = firstSuffix + " (" + n + ")";
+			candidate = fit(wanted, suffix) + suffix;
 		}
 		return candidate;
+	}
+
+	/** {@code wanted} cut so that it plus {@code suffix} has at most the maximum name length, never inside a surrogate pair. */
+	private static String fit(String wanted, String suffix) {
+		int room = SoundSet.MAX_NAME_LENGTH - suffix.length();
+		if (wanted.length() <= room) {
+			return wanted;
+		}
+		int end = room;
+		if (end > 0 && Character.isHighSurrogate(wanted.charAt(end - 1))) {
+			end--;
+		}
+		return wanted.substring(0, end).stripTrailing();
 	}
 
 	/** "set-" and 12 lowercase hex digits that no set in the library uses. */
@@ -113,10 +137,14 @@ public final class SetLibrary {
 
 	private boolean clashes(String name, String exceptId) {
 		for (SoundSet s : byId.values()) {
-			if (!s.id().equals(exceptId) && s.name().equalsIgnoreCase(name)) {
+			if (!s.id().equals(exceptId) && key(s.name()).equals(key(name))) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	private static String key(String name) {
+		return name.toLowerCase(Locale.ROOT);
 	}
 }

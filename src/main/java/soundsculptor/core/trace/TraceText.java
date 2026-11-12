@@ -8,23 +8,30 @@ import soundsculptor.core.Translator;
 import soundsculptor.core.lists.Numbers;
 import soundsculptor.core.lists.EntrySummary;
 import soundsculptor.core.lists.ZoneSummary;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Zone;
 
 /**
  * The "Copy trace" text (PRD FR-14.5): the trace panel as plain text, for asking for help or filing a bug. Sections
- * follow FR-14.2: notices, global rules (winner and reason per setting, "overridden by" for losers), zones considered
- * (mode, weight, distance to the anchor, their own rules), the deciding zone per setting, then the final result.
- * Every phrase comes from one translation key; only line breaks and indentation are added here.
+ * follow FR-14.2: notices; Everywhere, with each set that has a matching entry ("used in N places" when it is linked
+ * to more than one) and under it its entries, the winner and reason per setting, and for losers "overridden by" the
+ * winning set and entry; zones considered (mode, weight, distance to the anchor, their sets as for Everywhere); the
+ * deciding zone per setting; then the final result. Every phrase comes from one translation key; only line breaks and
+ * indentation are added here.
  *
  * <p>{@link #lines} gives the same text line by line, each with what it is about, so the panel can put inline edit
- * controls on rule, zone and "no rule" lines (FR-14.4).
+ * controls on entry, zone and "no entry" lines (FR-14.4).
  */
 public final class TraceText {
 	public static final String HEADER = "soundsculptor.trace.text.header";
-	public static final String GLOBAL = "soundsculptor.trace.text.global";
-	public static final String NO_RULES = "soundsculptor.trace.text.no_rules";
-	public static final String RULE = "soundsculptor.trace.text.rule";
+	public static final String EVERYWHERE = "soundsculptor.trace.text.everywhere";
+	public static final String NO_ENTRIES = "soundsculptor.trace.text.no_entries";
+	/** A set's line: Quick changes. */
+	public static final String QUICK = "soundsculptor.trace.text.quick";
+	/** A set's line when the set is linked: "Farm animals · used in 3 places". */
+	public static final String USED_IN = "soundsculptor.trace.text.used_in";
+	public static final String ENTRY = "soundsculptor.trace.text.entry";
 	public static final String WINS = "soundsculptor.trace.text.wins";
 	public static final String OVERRIDDEN = "soundsculptor.trace.text.overridden";
 	public static final String ZONES = "soundsculptor.trace.text.zones";
@@ -58,19 +65,16 @@ public final class TraceText {
 	public sealed interface Target {
 	}
 
-	/** A matched rule: in the global list ({@link RuleLocation#isGlobal()}) or in a zone's own list. */
-	public record RuleTarget(RuleLocation where, SetEntry rule) implements Target {
+	/** A matched entry, in the set and at the place it is listed under. */
+	public record EntryTarget(EntryLocation where, SetEntry entry) implements Target {
 	}
 
 	/** A zone that contains the sound. */
 	public record ZoneTarget(Zone zone) implements Target {
 	}
 
-	/**
-	 * "No rule matches this sound" in the global list ({@code zoneId} null) or in a zone: where "Add rule for this
-	 * sound" goes.
-	 */
-	public record NoRuleTarget(String zoneId) implements Target {
+	/** "No entry matches this sound" at Everywhere or a zone: where Add to Quick changes goes. */
+	public record NoEntryTarget(PlaceRef place) implements Target {
 	}
 
 	private TraceText() {
@@ -92,8 +96,8 @@ public final class TraceText {
 			line(out, 1, tr.translate(notice.translationKey()));
 		}
 
-		line(out, 0, tr.translate(GLOBAL));
-		rules(out, 1, trace.global(), null, tr);
+		line(out, 0, tr.translate(EVERYWHERE));
+		place(out, 1, trace.everywhere(), PlaceRef.EVERYWHERE, tr);
 
 		line(out, 0, tr.translate(ZONES));
 		if (trace.zones().isEmpty()) {
@@ -102,7 +106,7 @@ public final class TraceText {
 		for (ZoneLine zone : trace.zones()) {
 			line(out, 1, tr.translate(ZONE, name(zone.zone()), ZoneSummary.modePart(zone.zone().mode()).text(tr),
 					Numbers.plain(zone.weight() * 100), Numbers.plain(zone.distance())), new ZoneTarget(zone.zone()));
-			rules(out, 2, zone.rules(), zone.zone().id(), tr);
+			place(out, 2, zone.sets(), PlaceRef.zone(zone.zone().id()), tr);
 		}
 
 		if (!trace.zoneWinners().isEmpty()) {
@@ -129,27 +133,37 @@ public final class TraceText {
 		return out;
 	}
 
-	/** Each matched rule with its settings, then which settings it decided and which it lost, and to whom. */
-	private static void rules(List<Line> out, int level, ListTrace list, String zoneId, Translator tr) {
-		if (list.matched().isEmpty()) {
-			line(out, level, tr.translate(NO_RULES), new NoRuleTarget(zoneId));
+	/** Each set with a matching entry; under it each entry, which settings it decided and which it lost, and to whom. */
+	private static void place(List<Line> out, int level, PlaceTrace trace, PlaceRef place, Translator tr) {
+		if (trace.sets().isEmpty()) {
+			line(out, level, tr.translate(NO_ENTRIES), new NoEntryTarget(place));
 			return;
 		}
-		for (SetEntry rule : list.matched()) {
-			RuleLocation where = zoneId == null ? RuleLocation.global(rule.id()) : RuleLocation.inZone(zoneId, rule.id());
-			line(out, level, tr.translate(RULE, rule.pattern().text(), EntrySummary.text(rule, tr)), new RuleTarget(where, rule));
-			for (TraceProperty property : TraceProperty.values()) {
-				EntryWinner winner = list.winners().get(property);
-				if (winner != null && winner.rule() == rule) {
-					line(out, level + 1, tr.translate(WINS, property(property, tr), tr.translate(winner.reason().translationKey())));
-					continue;
-				}
-				SetEntry by = list.overriddenBy(rule, property);
-				if (by != null) {
-					line(out, level + 1, tr.translate(OVERRIDDEN, property(property, tr), by.pattern().text()));
+		for (SetLine set : trace.sets()) {
+			String name = setName(set, tr);
+			line(out, level, set.placesUsing() > 1 ? tr.translate(USED_IN, name, set.placesUsing()) : name);
+			for (SetEntry entry : set.matched()) {
+				EntryLocation where = new EntryLocation(place, set.setId(), entry.id());
+				line(out, level + 1, tr.translate(ENTRY, entry.pattern().text(), EntrySummary.text(entry, tr)), new EntryTarget(where, entry));
+				for (TraceProperty property : TraceProperty.values()) {
+					EntryWinner winner = trace.winners().get(property);
+					if (trace.wins(set.setId(), entry, property)) {
+						line(out, level + 2, tr.translate(WINS, property(property, tr), tr.translate(winner.reason().translationKey())));
+						continue;
+					}
+					EntryWinner by = trace.overriddenBy(set.setId(), entry, property);
+					if (by != null) {
+						line(out, level + 2, tr.translate(OVERRIDDEN, property(property, tr), setName(trace.set(by.setId()), tr),
+								by.entry().pattern().text()));
+					}
 				}
 			}
 		}
+	}
+
+	/** The set's name, or "Quick changes". */
+	private static String setName(SetLine set, Translator tr) {
+		return set.quick() ? tr.translate(QUICK) : set.setName();
 	}
 
 	private static String property(TraceProperty property, Translator tr) {

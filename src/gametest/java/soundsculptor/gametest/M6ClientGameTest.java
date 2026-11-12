@@ -1,7 +1,9 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.quick.QuickActions;
-import soundsculptor.core.quick.ApplyTarget;
+import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
@@ -111,7 +113,12 @@ public final class M6ClientGameTest implements FabricClientGameTest {
 			String firstId = context.computeOnClient(mc -> String.valueOf(main(mc).searchList.getFocused().key()));
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitTicks(1);
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, firstId)), "Mute on a result should mute it");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, firstId)), "Mute on a result should mute it");
+			check(context.computeOnClient(mc -> {
+				SetEntry entry = QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, firstId);
+				return entry != null && Boolean.TRUE.equals(entry.mute())
+						&& ProfileManager.profile().everywhere().attached().get(0).setId().equals(SoundSet.QUICK_ID);
+			}), "the mute is a single-sound entry in Everywhere's Quick changes, pinned first (FR-4.10)");
 			context.runOnClient(mc -> main(mc).toggleSearchHelp());
 
 			// Clean up for later tests.

@@ -12,6 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import soundsculptor.core.sets.PlaceSets;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.Shape;
 
 import soundsculptor.core.TestEnglish;
@@ -43,7 +47,7 @@ class ProfileImportTest {
 	@Test
 	void aValidFileIsAccepted() throws ProfileFormatException {
 		Profile p = Profile.empty("A").withZones(List.of(ProfileZonesTest.fixed("z1", new Shape.Sphere(9))));
-		ProfileImport.Checked checked = ProfileImport.check(ProfileCodec.toJson(p));
+		ExportCodec.Read checked = ProfileImport.check(ProfileCodec.toJson(p));
 		assertEquals(p, checked.profile());
 		assertTrue(checked.warnings().isEmpty(), checked.warnings().toString());
 	}
@@ -143,7 +147,7 @@ class ProfileImportTest {
 	@Test
 	void unknownFieldsAreWarningsNotErrors() throws ProfileFormatException {
 		String zone = fixedZone("z1", "{\"type\": \"sphere\", \"radius\": 5, \"spin\": 1}");
-		ProfileImport.Checked checked = ProfileImport.check("{\"schemaVersion\": 3, \"extra\": true,"
+		ExportCodec.Read checked = ProfileImport.check("{\"schemaVersion\": 3, \"extra\": true,"
 				+ " \"everywhere\": {\"sets\": [{\"set\": \"quick\"}], \"quickChanges\": {\"id\": \"quick\", \"entries\": ["
 				+ "{\"id\": \"a\", \"target\": \"x:a\", \"loud\": 1}]}}, \"zones\": [" + zone + "]}");
 		assertEquals(List.of("Unknown field \"extra\" was ignored.",
@@ -169,5 +173,16 @@ class ProfileImportTest {
 		Path file = dir.resolve("p.json");
 		Files.writeString(file, ProfileCodec.toJson(Profile.empty("Café")), StandardCharsets.UTF_8);
 		assertEquals("Café", ProfileImport.check(file).profile().name());
+	}
+
+	@Test
+	void anExportOnDiskBringsItsSets() throws IOException, ProfileFormatException {
+		SoundSet farm = new SoundSet("set-farm", "Farm animals", List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
+		Profile p = Profile.empty("A").withEverywhere(PlaceSets.EMPTY.attach("set-farm"));
+		Path file = dir.resolve("export.json");
+		Files.writeString(file, ExportCodec.toJson(p, "a.net", new SetLibrary(List.of(farm))), StandardCharsets.UTF_8);
+		ExportCodec.Read read = ProfileImport.check(file);
+		assertEquals(p, read.profile());
+		assertEquals(List.of(farm), read.sets());
 	}
 }

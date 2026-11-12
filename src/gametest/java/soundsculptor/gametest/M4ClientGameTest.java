@@ -3,7 +3,7 @@ package soundsculptor.gametest;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
-import soundsculptor.core.quick.ApplyTarget;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.Notices;
@@ -66,7 +66,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			check(label.equals("Mute"), "the focused row's button should be Mute, was " + label);
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitTicks(2);
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "Enter on Mute should create a mute rule");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Enter on Mute should create a mute rule");
 
 			// The next play is silent and the row says Muted (FR-1 AC row 3); muted plays are still listed.
 			check(!play(context, VILLAGER, SoundSource.NEUTRAL, 3.0), "a muted sound must not start");
@@ -81,7 +81,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> screen(mc).bypassToggle.onPress(null));
 			check(context.computeOnClient(mc -> ProfileManager.isBypassed()), "the header toggle should turn on Bypass");
 			check(play(context, VILLAGER, SoundSource.NEUTRAL, 3.0), "with Bypass on, the muted sound should play");
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "Bypass must not change rules");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Bypass must not change rules");
 			context.takeScreenshot("m4-bypass-header");
 
 			// The hotkey works in the screen too.
@@ -118,7 +118,9 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			});
 			write(file, json);
 			context.runOnClient(mc -> ProfileManager.reload());
-			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, VILLAGER)), "after re-reading the file the sound is still muted");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "after re-reading the file the sound is still muted");
+			// reload() starts a save on the saver thread that briefly removes the .bak before copying it again.
+			context.runOnClient(mc -> ProfileManager.flushSaves());
 			check(Files.exists(file.resolveSibling(file.getFileName() + ".bak")), "the previous file should be kept as .bak");
 
 			// Fail open (FR-13.2): errors never stop a sound; more than 10 in a minute turn on Bypass with a notice.
