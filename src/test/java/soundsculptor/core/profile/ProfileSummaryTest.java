@@ -1,5 +1,7 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,7 +25,7 @@ class ProfileSummaryTest {
 	@Test
 	void rowHasNameKeyCountsAndLastJoined() {
 		// fixed() carries one zone rule.
-		Profile p = new Profile("My server", ProfileSettings.DEFAULTS, List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b")))
+		Profile p = new Profile("My server", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b"))))
 				.withZones(List.of(fixed("z1", new Shape.Sphere(4)), bubble("b1")));
 		ProfileSummary row = ProfileSummary.of("play.example.net", p, MONDAY, "play.example.net");
 		assertEquals("My server", row.displayName());

@@ -32,6 +32,7 @@ public final class SetCodec {
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "entries");
+	private static final Set<String> QUICK_FIELDS = Set.of("id", "entries");
 	private static final Set<String> ENTRY_FIELDS = Set.of("id", "enabled", "target", "mute", "volume", "limit", "cue");
 	private static final Set<String> LIMIT_FIELDS = Set.of("count", "windowMs", "perSource");
 	private static final Pattern LOCATION = Pattern.compile("line ([0-9]+) column ([0-9]+)");
@@ -56,12 +57,27 @@ public final class SetCodec {
 		root.addProperty("schemaVersion", SCHEMA_VERSION);
 		root.addProperty("id", set.id());
 		root.addProperty("name", set.name());
+		root.add("entries", entriesToJson(set.entries()));
+		return root;
+	}
+
+	/**
+	 * A place's Quick changes as a profile file holds it inline (PRD 7.5): {@code {"id": "quick", "entries": [...]}},
+	 * each entry as in a set file.
+	 */
+	public static JsonObject quickToJson(SoundSet quick) {
+		JsonObject root = new JsonObject();
+		root.addProperty("id", SoundSet.QUICK_ID);
+		root.add("entries", entriesToJson(quick.entries()));
+		return root;
+	}
+
+	private static JsonArray entriesToJson(List<SetEntry> list) {
 		JsonArray entries = new JsonArray();
-		for (SetEntry entry : set.entries()) {
+		for (SetEntry entry : list) {
 			entries.add(entryToJson(entry));
 		}
-		root.add("entries", entries);
-		return root;
+		return entries;
 	}
 
 	private static JsonObject entryToJson(SetEntry entry) {
@@ -141,6 +157,32 @@ public final class SetCodec {
 		if (name.length() > SoundSet.MAX_NAME_LENGTH) {
 			throw new SetFormatException(Message.of(SetText.NAME_TOO_LONG, top.where(), SoundSet.MAX_NAME_LENGTH));
 		}
+		return new Read(new SoundSet(id, name, readEntries(top)), warnings);
+	}
+
+	/**
+	 * Reads a place's Quick changes from a profile file ({@link #quickToJson}), checked like a set file's entries.
+	 *
+	 * @param where    how messages name it, e.g. "Everywhere, Quick changes"
+	 * @param warnings receives a warning for each unknown field
+	 * @throws SetFormatException if the ID is not {@code "quick"} or an entry is not valid
+	 */
+	public static SoundSet readQuick(JsonObject o, Object where, List<Message> warnings) throws SetFormatException {
+		try {
+			Fields top = new Fields(o, where, warnings, QUICK_FIELDS);
+			String id = top.string("id", SetText.F_ID);
+			if (!SoundSet.QUICK_ID.equals(id)) {
+				throw top.problem(SetText.F_ID, Message.of(SetText.NOT_QUICK, quote(id)));
+			}
+			return SoundSet.quick(readEntries(top));
+		} catch (IllegalArgumentException | IllegalStateException | ClassCastException e) {
+			// Every value is checked; this is a last guard so a bad file can never crash the game.
+			throw new SetFormatException(Message.of(SetText.NOT_ALLOWED), e);
+		}
+	}
+
+	/** The {@code entries} list: at most {@link SoundSet#MAX_ENTRIES}, entry IDs unique. */
+	private static List<SetEntry> readEntries(Fields top) throws SetFormatException {
 		JsonArray array = top.array("entries", SetText.F_ENTRIES);
 		if (array.size() > SoundSet.MAX_ENTRIES) {
 			throw new SetFormatException(Message.of(SetText.TOO_MANY_ENTRIES, top.where(), array.size(), SoundSet.MAX_ENTRIES));
@@ -156,7 +198,7 @@ public final class SetCodec {
 			}
 			entries.add(entry);
 		}
-		return new Read(new SoundSet(id, name, entries), warnings);
+		return entries;
 	}
 
 	/** How messages name the set: the caller's text, else "Sound Set 'name'" from the file. */

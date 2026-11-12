@@ -21,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The Zones tab (PRD 6.1): "New zone" and the list of zones. Each row shows the zone's color, name, shape and mode,
- * where it is ("Here", "120 blocks away", "Other world") and its rule count, with On/Off, Edit, Rules, Move up/down
+ * where it is ("Here", "120 blocks away", "Other world") and its Sound Set count, with On/Off, Edit, Rules, Move up/down
  * and Delete. List order is the last tie-break between zones (FR-9 step 5). On/Off, Move and Delete save at once and
  * show a 5-second toast with Undo (FR-12.5).
  */
@@ -73,16 +73,16 @@ public final class ZoneListPanel {
 			List<SummaryPart> parts = ZoneSummary.parts(zone, key, dimension, player, profile.settings().defaultEdge());
 			String shape = joinParts(parts.subList(0, parts.size() - 1));
 			String where = parts.get(parts.size() - 1).text(TRANSLATOR);
-			int ruleCount = zone.rules().size();
-			String rules = Component.translatable(ruleCount == 1 ? "soundsculptor.zones.rule_count.one" : "soundsculptor.zones.rule_count", ruleCount).getString();
+			int setCount = zone.sets().librarySetCount() + (zone.sets().quickChanges() != null ? 1 : 0);
+			String sets = Component.translatable(setCount == 1 ? "soundsculptor.zones.set_count.one" : "soundsculptor.zones.set_count", setCount).getString();
 			String state = zone.enabled() ? "" : Component.translatable("soundsculptor.summary.rule.disabled").getString();
-			// Name and where it is (with "Off" for a zone that is off) on the first line; shape and rule count below.
+			// Name and where it is (with "Off" for a zone that is off) on the first line; shape and Sound Set count below.
 			String place = zone.enabled() ? where : state + ", " + where;
 			List<SculptList.Row.Column> columns = List.of(
 					new SculptList.Row.Column(() -> name, 0, 0),
 					new SculptList.Row.Column(() -> place, WHERE_WIDTH, 0),
 					new SculptList.Row.Column(() -> shape, 0, 1),
-					new SculptList.Row.Column(() -> rules, RULE_COUNT_WIDTH, 1));
+					new SculptList.Row.Column(() -> sets, RULE_COUNT_WIDTH, 1));
 			List<SculptButton> buttons = new ArrayList<>();
 			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), ON_OFF_WIDTH, () -> setEnabled(zone.id(), !zone.enabled()))
 					.narrationContext(() -> Component.translatable("soundsculptor.zones.enabled")),

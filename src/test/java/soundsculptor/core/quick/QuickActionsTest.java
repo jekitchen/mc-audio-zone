@@ -1,5 +1,7 @@
 package soundsculptor.core.quick;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -31,11 +33,11 @@ class QuickActionsTest {
 	private static final Point HOME = new Point(0, 64, 0);
 
 	private static Zone pen(SetEntry... rules) {
-		return new Zone("pen", "Villager pen", true, WORLD, OVERWORLD, HOME, new Shape.Sphere(10), List.of(rules));
+		return new Zone("pen", "Villager pen", true, WORLD, OVERWORLD, HOME, new Shape.Sphere(10), quick(List.of(rules)));
 	}
 
 	private static Profile profile(List<SetEntry> global, Zone... zones) {
-		Profile profile = new Profile("p", ProfileSettings.DEFAULTS, global).withZones(List.of(zones));
+		Profile profile = new Profile("p", ProfileSettings.DEFAULTS, quick(global)).withZones(List.of(zones));
 		return zones.length == 0 ? profile : profile.withZoneColor("pen", 0xE69F00);
 	}
 
@@ -52,8 +54,8 @@ class QuickActionsTest {
 	void muteEverywhereCreatesTheSameGlobalRuleAsTheOldQuickAction() {
 		Profile start = profile(List.of(), pen());
 		QuickActionResult result = ok(QuickActions.apply(start, ApplyTarget.EVERYWHERE, AMBIENT, new EntryEdit.Mute(true)));
-		assertEquals(start.muteExact(AMBIENT).globalRules(), result.after().globalRules());
-		assertEquals("exact:" + AMBIENT, result.after().globalRules().get(0).id());
+		assertEquals(List.of(SetEntry.of("exact:" + AMBIENT, AMBIENT).withMute(true)), result.after().everywhere().quickEntries());
+		assertEquals("exact:" + AMBIENT, result.after().everywhere().quickEntries().get(0).id());
 		assertTrue(QuickActions.isMuted(result.after(), ApplyTarget.EVERYWHERE, AMBIENT));
 		assertEquals(TraceEditor.TOAST_ADDED, result.toastKey());
 		assertEquals(List.of(AMBIENT), result.toastArgs());
@@ -63,8 +65,8 @@ class QuickActionsTest {
 	void muteInAZoneAddsAnExactRuleToThatZoneOnly() {
 		Profile start = profile(List.of(), pen());
 		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(true)));
-		assertEquals(List.of(), result.after().globalRules());
-		SetEntry added = result.after().zones().get(0).rules().get(0);
+		assertEquals(List.of(), result.after().everywhere().quickEntries());
+		SetEntry added = result.after().zones().get(0).sets().quickEntries().get(0);
 		assertEquals("pen/exact:" + AMBIENT, added.id());
 		assertEquals(AMBIENT, added.pattern().text());
 		assertEquals(Boolean.TRUE, added.mute());
@@ -78,7 +80,7 @@ class QuickActionsTest {
 		SetEntry old = SetEntry.of("mine", AMBIENT).withVolume(50).withEnabled(false);
 		Profile start = profile(List.of(), pen(old));
 		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(true)));
-		assertEquals(List.of(old.withEnabled(true).withMute(true)), result.after().zones().get(0).rules());
+		assertEquals(List.of(old.withEnabled(true).withMute(true)), result.after().zones().get(0).sets().quickEntries());
 		assertEquals(TraceEditor.TOAST_CHANGED, result.toastKey());
 	}
 
@@ -93,7 +95,7 @@ class QuickActionsTest {
 		assertEquals(30, rule.volume());
 		assertEquals(new Limit(2, 1000, false), rule.limit());
 		assertEquals(Boolean.TRUE, rule.cue());
-		assertEquals(1, p.zones().get(0).rules().size());
+		assertEquals(1, p.zones().get(0).sets().quickEntries().size());
 	}
 
 	@Test
@@ -114,7 +116,7 @@ class QuickActionsTest {
 		SetEntry old = SetEntry.of("mine", AMBIENT).withMute(true).withVolume(50).withEnabled(false);
 		Profile start = profile(List.of(), pen(old));
 		QuickActionResult result = ok(QuickActions.apply(start, penTarget(start), AMBIENT, new EntryEdit.Mute(null)));
-		assertEquals(List.of(SetEntry.of("mine", AMBIENT).withVolume(50).withEnabled(false)), result.after().zones().get(0).rules());
+		assertEquals(List.of(SetEntry.of("mine", AMBIENT).withVolume(50).withEnabled(false)), result.after().zones().get(0).sets().quickEntries());
 		assertEquals(TraceEditor.TOAST_CHANGED, result.toastKey());
 	}
 
@@ -221,9 +223,9 @@ class QuickActionsTest {
 	}
 
 	@Test
-	void aFullProfileRefusesNewRulesButStillEditsExistingOnes() {
+	void aFullQuickChangesRefusesNewEntriesButOtherPlacesStillWork() {
 		List<SetEntry> rules = new ArrayList<>();
-		for (int i = 0; i < TraceEditor.MAX_RULES - 1; i++) {
+		for (int i = 0; i < TraceEditor.MAX_RULES; i++) {
 			rules.add(SetEntry.of("g" + i, "minecraft:sound." + i));
 		}
 		Profile full = profile(rules, pen(SetEntry.of("mine", AMBIENT)));

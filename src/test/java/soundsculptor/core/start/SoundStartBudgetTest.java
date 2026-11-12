@@ -33,7 +33,8 @@ class SoundStartBudgetTest {
 	private final SoundStartResult out = new SoundStartResult();
 
 	SoundStartBudgetTest() {
-		decider.setProfile(new Precedence(StressProfile.globalRules(), StressProfile.zones(WORLD, OVERWORLD)));
+		decider.setProfile(new Precedence(StressProfile.everywhere(), StressProfile.zones(WORLD, OVERWORLD),
+				StressProfile.library()));
 		for (int i = 0; i < ids.length; i++) {
 			xs[i] = (i * 37 % 90) / 10.0 - 4.5;
 			zs[i] = (i * 53 % 90) / 10.0 - 4.5;

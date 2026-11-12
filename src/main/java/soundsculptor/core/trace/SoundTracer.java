@@ -48,7 +48,8 @@ public final class SoundTracer {
 			notices.add(TraceNotice.NON_POSITIONAL);
 		}
 
-		ListTrace global = explain(p.globalRules(), soundId);
+		// M8c shim: removed in Task 10 (every set's entries are listed as one list)
+		ListTrace global = explain(p.everywhere(), soundId);
 		List<ZoneLine> lines = new ArrayList<>();
 		List<Integer> indices = new ArrayList<>();
 		if (play != null && play.positional()) {
@@ -77,7 +78,7 @@ public final class SoundTracer {
 				if (w <= 0) {
 					continue;
 				}
-				lines.add(new ZoneLine(zone, w, Math.sqrt(dx * dx + dy * dy + dz * dz), explain(p.zoneRules(i), soundId)));
+				lines.add(new ZoneLine(zone, w, Math.sqrt(dx * dx + dy * dy + dz * dz), explain(p.zoneResolver(i), soundId)));
 				indices.add(i);
 			}
 		}

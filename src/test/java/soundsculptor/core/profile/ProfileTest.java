@@ -1,69 +1,85 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
+import java.util.Map;
+
+import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SoundSet;
+import soundsculptor.core.zones.Point;
+import soundsculptor.core.zones.Shape;
+import soundsculptor.core.zones.Zone;
+
 import org.junit.jupiter.api.Test;
 
-/** PRD FR-1.5 quick actions on exact-ID rules (M4: Mute). */
+/** A profile's places (PRD FR-8.6, FR-8.10): Everywhere and its zones, each with attached Sound Sets. */
 class ProfileTest {
-	private static final String VILLAGER = "minecraft:entity.villager.ambient";
+	private static final SoundSet FARM = new SoundSet("set-farm", "Farm animals",
+			List.of(SetEntry.of("e1", "minecraft:entity.cow.ambient").withVolume(30)));
+	private static final SoundSet LOUD = new SoundSet("set-loud", "Loud", List.of(SetEntry.of("e1", "x:a").withVolume(150)));
+	private static final SetLibrary LIBRARY = new SetLibrary(List.of(FARM, LOUD));
 
-	@Test
-	void muteCreatesOneExactIdRule() {
-		Profile p = Profile.empty("Default").muteExact(VILLAGER);
-		assertEquals(1, p.globalRules().size());
-		SetEntry rule = p.globalRules().get(0);
-		assertEquals(VILLAGER, rule.pattern().text());
-		assertEquals(Boolean.TRUE, rule.mute());
-		assertTrue(p.isExactMuted(VILLAGER));
+	private static Zone zone(String id, PlaceSets sets) {
+		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10),
+				sets);
+	}
+
+	private static Profile profile(PlaceSets everywhere, Zone... zones) {
+		return new Profile("Default", ProfileSettings.DEFAULTS, everywhere, List.of(zones), Map.of());
 	}
 
 	@Test
-	void mutingTwiceDoesNotDuplicate() {
-		Profile p = Profile.empty("Default").muteExact(VILLAGER).muteExact(VILLAGER);
-		assertEquals(1, p.globalRules().size());
+	void placeIsEverywhereOrTheZonesSets() {
+		PlaceSets a = PlaceSets.EMPTY.attach(FARM.id());
+		Profile p = profile(quick(SetEntry.of("q1", "x:q").withMute(true)), zone("a", a));
+		assertSame(p.everywhere(), p.place(PlaceRef.EVERYWHERE));
+		assertSame(a, p.place(PlaceRef.zone("a")));
+		assertNull(p.place(PlaceRef.zone("gone")));
 	}
 
 	@Test
-	void unmuteRemovesARuleThatSetsNothingElse() {
-		Profile p = Profile.empty("Default").muteExact(VILLAGER).unmuteExact(VILLAGER);
-		assertTrue(p.globalRules().isEmpty());
-		assertFalse(p.isExactMuted(VILLAGER));
+	void withPlaceReplacesOnlyThatPlace() {
+		Profile p = profile(PlaceSets.EMPTY, zone("a", PlaceSets.EMPTY), zone("b", PlaceSets.EMPTY));
+		PlaceSets farm = PlaceSets.EMPTY.attach(FARM.id());
+		Profile changed = p.withPlace(PlaceRef.zone("b"), farm);
+		assertEquals(farm, changed.zone("b").sets());
+		assertEquals(PlaceSets.EMPTY, changed.zone("a").sets());
+		assertEquals(PlaceSets.EMPTY, changed.everywhere());
+		assertEquals(farm, p.withPlace(PlaceRef.EVERYWHERE, farm).everywhere());
+		assertSame(p, p.withPlace(PlaceRef.zone("gone"), farm), "a zone that is gone is not added");
 	}
 
 	@Test
-	void unmuteKeepsOtherPropertiesOfTheRule() {
-		SetEntry withVolume = SetEntry.of("r1", VILLAGER).withMute(true).withVolume(50);
-		Profile p = new Profile("Default", ProfileSettings.DEFAULTS, java.util.List.of(withVolume)).unmuteExact(VILLAGER);
-		assertEquals(1, p.globalRules().size());
-		assertNull(p.globalRules().get(0).mute());
-		assertEquals(50, p.globalRules().get(0).volume());
+	void placesUsingListsEverywhereFirstThenZonesInOrder() {
+		PlaceSets farm = PlaceSets.EMPTY.attach(FARM.id());
+		Profile p = profile(farm, zone("b", farm), zone("c", PlaceSets.EMPTY), zone("a", farm));
+		assertEquals(List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("b"), PlaceRef.zone("a")), p.placesUsing(FARM.id()));
+		assertEquals(List.of(), p.placesUsing(LOUD.id()));
 	}
 
 	@Test
-	void muteReenablesADisabledExactRule() {
-		SetEntry disabled = SetEntry.of("r1", VILLAGER).withMute(true).withEnabled(false);
-		Profile p = new Profile("Default", ProfileSettings.DEFAULTS, java.util.List.of(disabled));
-		assertFalse(p.isExactMuted(VILLAGER));
-		assertTrue(p.muteExact(VILLAGER).isExactMuted(VILLAGER));
+	void hasBoostLooksAtAttachedLibrarySetsAndQuickChanges() {
+		assertFalse(profile(PlaceSets.EMPTY.attach(FARM.id())).hasBoost(LIBRARY));
+		assertTrue(profile(PlaceSets.EMPTY.attach(LOUD.id())).hasBoost(LIBRARY), "an attached library set");
+		assertTrue(profile(PlaceSets.EMPTY, zone("a", PlaceSets.EMPTY.attach(LOUD.id()))).hasBoost(LIBRARY), "in a zone");
+		assertTrue(profile(quick(SetEntry.of("q", "x:q").withVolume(101))).hasBoost(LIBRARY), "Quick changes");
+		assertFalse(profile(PlaceSets.EMPTY.attach(LOUD.id())).hasBoost(SetLibrary.EMPTY), "a set the library lacks");
+		assertFalse(profile(PlaceSets.EMPTY).hasBoost(LIBRARY), "a set in the library but not attached");
 	}
 
 	@Test
-	void wildcardRulesAreNotExactRules() {
-		SetEntry wildcard = SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true);
-		Profile p = new Profile("Default", ProfileSettings.DEFAULTS, java.util.List.of(wildcard));
-		assertNull(p.exactRule(VILLAGER));
-		assertEquals(2, p.muteExact(VILLAGER).globalRules().size());
-	}
-
-	@Test
-	void unmuteWithoutRuleChangesNothing() {
+	void anEmptyProfileHasNoSets() {
 		Profile p = Profile.empty("Default");
-		assertSame(p, p.unmuteExact(VILLAGER));
+		assertEquals(PlaceSets.EMPTY, p.everywhere());
+		assertTrue(p.zones().isEmpty());
 	}
 }

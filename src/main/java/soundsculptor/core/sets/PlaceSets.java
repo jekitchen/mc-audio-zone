@@ -114,6 +114,20 @@ public record PlaceSets(List<Attachment> attached, SoundSet quickChanges) {
 		return new PlaceSets(list, quick);
 	}
 
+	/** The entries of the place's Quick changes, or an empty list when it has none. */
+	public List<SetEntry> quickEntries() {
+		return quickChanges == null ? List.of() : quickChanges.entries();
+	}
+
+	/**
+	 * Replaces the Quick changes entries: creates the set on the first entry and removes it when the list is empty.
+	 *
+	 * @throws IllegalArgumentException past {@link SoundSet#MAX_ENTRIES}; check {@link SoundSet#canAdd} first
+	 */
+	public PlaceSets withQuickEntries(List<SetEntry> entries) {
+		return withQuickChanges(entries.isEmpty() ? null : SoundSet.quick(entries));
+	}
+
 	/**
 	 * {@code null} if Quick changes can be saved as library set {@code newSetId}, else the problem to show: there is no
 	 * Quick changes, the set is already attached, or the place already has {@link #MAX_SETS} library sets.

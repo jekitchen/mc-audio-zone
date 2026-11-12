@@ -1,5 +1,8 @@
 package soundsculptor.core.trace;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -26,7 +29,7 @@ class SoundTracerFullZonesTest {
 	private static final String COW = "minecraft:entity.cow.ambient";
 
 	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), List.of(rules));
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), quick(List.of(rules)));
 	}
 
 	private static LastPlay play(double x, double px) {
@@ -40,7 +43,7 @@ class SoundTracerFullZonesTest {
 	@Test
 	void fadeZoneShowsItsWeight() {
 		Zone a = sphere("a", 0, 10, SetEntry.of("r", "*cow*").withMute(true)).withEdge(ZoneEdge.fade(4));
-		SoundTrace t = trace(new Precedence(List.of(), List.of(a)), play(8, Double.NaN));
+		SoundTrace t = trace(precedence(List.of(), List.of(a)), play(8, Double.NaN));
 		assertEquals(0.5, t.zones().get(0).weight(), 1e-9);
 		assertEquals(50, t.volumePercent(), 1e-4);
 	}
@@ -48,13 +51,13 @@ class SoundTracerFullZonesTest {
 	@Test
 	void zoneAtZeroWeightIsNotListed() {
 		Zone a = sphere("a", 0, 10, SetEntry.of("r", "*cow*").withMute(true)).withEdge(ZoneEdge.fade(4));
-		assertTrue(trace(new Precedence(List.of(), List.of(a)), play(10, Double.NaN)).zones().isEmpty(), "w = 0 at the boundary");
+		assertTrue(trace(precedence(List.of(), List.of(a)), play(10, Double.NaN)).zones().isEmpty(), "w = 0 at the boundary");
 	}
 
 	@Test
 	void outsideZoneIsListedForSoundsOutsideIt() {
 		Zone o = sphere("o", 0, 10, SetEntry.of("all", "*").withMute(true)).withMode(ZoneMode.OUTSIDE);
-		Precedence p = new Precedence(List.of(), List.of(o));
+		Precedence p = precedence(List.of(), List.of(o));
 		assertEquals(1, trace(p, play(30, Double.NaN)).zones().size());
 		assertTrue(trace(p, play(5, Double.NaN)).zones().isEmpty());
 	}
@@ -62,7 +65,7 @@ class SoundTracerFullZonesTest {
 	@Test
 	void bubbleIsMeasuredFromThePlayer() {
 		Zone bubble = sphere("bubble", 0, 8, SetEntry.of("all", "*").withVolume(30)).asBubble();
-		SoundTrace t = trace(new Precedence(List.of(), List.of(bubble)), play(105, 100));
+		SoundTrace t = trace(precedence(List.of(), List.of(bubble)), play(105, 100));
 		assertEquals(1, t.zones().size());
 		assertEquals(5, t.zones().get(0).distance(), 1e-9);
 		assertEquals(30, t.volumePercent(), 1e-4);
@@ -73,7 +76,7 @@ class SoundTracerFullZonesTest {
 		// Below w = 0.5 a fade zone's limit and cue do not apply (FR-9 step 6), so the trace must not name it.
 		Zone a = sphere("a", 0, 10, SetEntry.of("r", "*cow*").withLimit(new Limit(2, 1000, false)).withCue(true))
 				.withEdge(ZoneEdge.fade(4));
-		Precedence p = new Precedence(List.of(), List.of(a));
+		Precedence p = precedence(List.of(), List.of(a));
 		SoundTrace quarter = trace(p, play(9, Double.NaN));
 		assertFalse(quarter.zoneWinners().containsKey(TraceProperty.LIMIT));
 		assertFalse(quarter.zoneWinners().containsKey(TraceProperty.CUE));
@@ -86,7 +89,7 @@ class SoundTracerFullZonesTest {
 		Zone fade = sphere("fade", 1, 12, SetEntry.of("r1", "*cow*").withVolume(40).withCue(true)).withEdge(ZoneEdge.fade(6));
 		Zone outside = sphere("out", 30, 10, SetEntry.of("r2", "*").withLimit(new Limit(3, 1000, false))).withMode(ZoneMode.OUTSIDE);
 		Zone bubble = sphere("bubble", 0, 20, SetEntry.of("r3", "*").withVolume(70)).asBubble();
-		Precedence p = new Precedence(List.of(SetEntry.of("g", "*").withVolume(90)), List.of(fade, outside, bubble));
+		Precedence p = precedence(List.of(SetEntry.of("g", "*").withVolume(90)), List.of(fade, outside, bubble));
 		for (double x = -8; x <= 8; x += 0.5) {
 			LastPlay play = play(x, 4);
 			SoundDecision d = new SoundDecision();

@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.zones.Point;
@@ -28,7 +29,7 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(
-					new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(0.5, -59.5, 0.5), new Shape.Box(9, 3, 9), List.of())))));
+					new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(0.5, -59.5, 0.5), new Shape.Box(9, 3, 9), PlaceSets.EMPTY)))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 
@@ -71,7 +72,7 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 				editorScreen(mc).save();
 			});
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().stream()
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).stream()
 					.anyMatch(r -> r.pattern().text().equals("minecraft:entity.cow.*"))), "the family rule is saved");
 
 			// In a zone's rules too, and readable names count: "basalt deltas" finds a sound without a subtitle.
@@ -86,7 +87,7 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 				editorScreen(mc).save();
 			});
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().zone("z1").rules().stream()
+			check(context.computeOnClient(mc -> ProfileManager.profile().zone("z1").sets().quickEntries().stream()
 					.anyMatch(r -> r.pattern().text().equals(BASALT) && Boolean.TRUE.equals(r.mute()))), "the zone gets the rule");
 
 			// Patterns still work as before: a typo with a colon is an error, not a search.

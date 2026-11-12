@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.editor.ZoneDraft;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.profile.Profile;
@@ -37,9 +38,9 @@ public final class M7cClientGameTest implements FabricClientGameTest {
 			// A sphere 8 blocks in front of the player, so the screenshot shows it.
 			Vec3 center = context.computeOnClient(mc -> mc.player.getEyePosition().add(mc.player.getLookAngle().scale(8)));
 			Zone pen = new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(center.x, center.y, center.z),
-					new Shape.Sphere(4), List.of(SetEntry.of("r1", "*villager*").withMute(true)));
+					new Shape.Sphere(4), PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "*villager*").withMute(true))));
 			Zone nether = new Zone("z2", "Nether pen", true, key, "minecraft:the_nether", new Point(center.x, center.y, center.z),
-					new Shape.Sphere(4), List.of());
+					new Shape.Sphere(4), PlaceSets.EMPTY);
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(pen, nether)).withZoneColor("z1", 0x56B4E9)));
 
 			// The default is "Only while editing": nothing is drawn while no zone editor is open.

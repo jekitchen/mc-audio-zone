@@ -1,6 +1,7 @@
 package soundsculptor.mc;
 
 import soundsculptor.SoundSculptorClient;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.zones.BoxEdit;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -123,7 +124,7 @@ public final class ZoneMarking {
 		Zone zone = editor.draftZone();
 		String name = zone == null || zone.name() == null ? "" : zone.name();
 		return new Zone(editor.zoneId(), name, true, ProfileManager.key(), WorldSession.dimension(minecraft), placed.center(),
-				placed.box(), List.of());
+				placed.box(), PlaceSets.EMPTY);
 	}
 
 	/** The color of the zone being marked. */

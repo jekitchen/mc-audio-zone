@@ -1,5 +1,6 @@
 package soundsculptor.mc;
 
+import soundsculptor.core.Message;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.sets.SetEntry;
@@ -81,7 +82,13 @@ public final class RuleCopyScreen extends SculptScreen {
 
 	/** Copies the rule into this zone and returns to its rules, with a toast saying what happened. */
 	public void copy(SetEntry rule) {
-		ProfileManager.update(profile -> target.copyIn(profile, rule));
+		Profile profile = ProfileManager.profile();
+		Message full = target.canPut(profile, rule.withId(target.newRuleId(profile)));
+		if (full != null) {
+			showToast(ProfileManager.component(full), null);
+			return;
+		}
+		ProfileManager.update(p -> target.copyIn(p, rule));
 		closeNow();
 		if (parent instanceof SculptScreen screen) {
 			screen.showToast(Component.translatable("soundsculptor.rule_copy.copied", rule.pattern().text()), null);

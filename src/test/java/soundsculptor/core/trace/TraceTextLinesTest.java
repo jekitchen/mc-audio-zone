@@ -1,5 +1,8 @@
 package soundsculptor.core.trace;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -9,7 +12,6 @@ import java.util.List;
 import soundsculptor.core.TestEnglish;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Point;
-import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 
@@ -24,11 +26,11 @@ class TraceTextLinesTest {
 	private static final LastPlay PLAY = new LastPlay(true, WORLD, OVERWORLD, 0, 0, 0, 60, false, false);
 
 	private static Zone sphere(String id, SetEntry... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), List.of(rules));
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), quick(List.of(rules)));
 	}
 
 	private static SoundTrace trace(List<SetEntry> global, List<Zone> zones) {
-		return SoundTracer.trace(new Precedence(global, zones, soundsculptor.core.zones.ZoneEdge.hard()), AMBIENT, PLAY, false, false);
+		return SoundTracer.trace(precedence(global, zones, soundsculptor.core.zones.ZoneEdge.hard()), AMBIENT, PLAY, false, false);
 	}
 
 	@Test

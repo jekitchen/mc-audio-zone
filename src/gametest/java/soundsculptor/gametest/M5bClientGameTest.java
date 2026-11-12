@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.diag.DiagnosticsReport;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetEntry;
@@ -38,8 +39,8 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				ProfileManager.setBypass(false);
 				ProfileManager.update(p -> Profile.empty(p.name())
-						.putRule(SetEntry.of("w", "*villager*").withMute(true))
-						.putRule(SetEntry.of("e", AMBIENT).withVolume(60)));
+						.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("w", "*villager*").withMute(true),
+								SetEntry.of("e", AMBIENT).withVolume(60)))));
 				RecentLog.get().sounds().clear();
 			});
 			context.setScreen(SoundSculptorScreen::new);
@@ -118,11 +119,12 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 				data = context.computeOnClient(mc -> main(mc).diagnostics());
 			}
 			check(data.sounds().count() > 0 && data.sounds().averageMicros() > 0, "Diagnostics should show sounds per second and time per sound, was " + data);
-			check(data.globalRules() == 2 && !Double.isNaN(data.cacheHitRate()), "Diagnostics should count the rules and the cache, was " + data);
+			check(data.activeSets() == 1 && data.activeEntries() == 2 && !Double.isNaN(data.cacheHitRate()),
+					"Diagnostics should count the sets, the entries and the cache, was " + data);
 			context.takeScreenshot("m5b-diagnostics");
 			context.runOnClient(mc -> main(mc).copyReport());
 			String report = context.computeOnClient(mc -> mc.keyboardHandler.getClipboard()).replace("\r\n", "\n");
-			check(report.startsWith("Sound Sculptor ") && report.contains(", Minecraft ") && report.contains("Global rules: 2\n")
+			check(report.startsWith("Sound Sculptor ") && report.contains(", Minecraft ") && report.contains("Entries active: 2\n")
 					&& report.contains("Per sound: avg "), "the report should hold versions, counts and timings:\n" + report);
 			check(context.computeOnClient(mc -> Diagnostics.report()).contains("Errors this session: "), "the report should count errors");
 

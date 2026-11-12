@@ -4,8 +4,8 @@ import soundsculptor.core.sets.Limit;
 import soundsculptor.core.sets.SetEntry;
 
 /**
- * The result of {@link Precedence#decide} for one sound: the final value of each property and which rule and zone
- * decided it. A {@code null} zone means the global list decided; a {@code null} rule means no rule set the property.
+ * The result of {@link Precedence#decide} for one sound: the final value of each property and which entry and zone
+ * decided it. A {@code null} zone means Everywhere decided; a {@code null} entry means no entry set the property.
  *
  * <p>Mutable so the sound hook can reuse one instance on the game thread and allocate nothing per sound (PRD 7.4).
  * The rule and zone references are what the recently played status ("Zone: name") and the sound trace (FR-14) show.
@@ -17,6 +17,7 @@ public final class SoundDecision {
 	float loudnessWeight;
 	Limit limit;
 	SetEntry limitRule;
+	String limitSet;
 	Zone limitZone;
 	boolean cueOn;
 	SetEntry cueRule;
@@ -29,6 +30,7 @@ public final class SoundDecision {
 		loudnessWeight = 0;
 		limit = null;
 		limitRule = null;
+		limitSet = null;
 		limitZone = null;
 		cueOn = false;
 		cueRule = null;
@@ -64,6 +66,14 @@ public final class SoundDecision {
 
 	public SetEntry limitRule() {
 		return limitRule;
+	}
+
+	/**
+	 * The ID of the set {@link #limitRule} won in, or {@code null} when no entry sets a limit. Taken from the place's
+	 * resolver, because a set and its duplicate share entry instances (repeat-limit counters, FR-6.7).
+	 */
+	public String limitSet() {
+		return limitSet;
 	}
 
 	public Zone limitZone() {

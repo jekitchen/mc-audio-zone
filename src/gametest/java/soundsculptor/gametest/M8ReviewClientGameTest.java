@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
@@ -25,9 +26,9 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.putRule(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))
-					.putRule(SetEntry.of("r2", AMBIENT).withVolume(30))
-					.putRule(SetEntry.of("r3", "*villagr*").withMute(true))));
+					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
+							SetEntry.of("r2", AMBIENT).withVolume(30),
+							SetEntry.of("r3", "*villagr*").withMute(true))))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 

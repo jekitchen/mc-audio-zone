@@ -4,11 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.Zone;
 
+// M8c shim: removed in Task 10
 /**
- * Creating and editing the exact-ID rule for one sound, in the global list or in one zone: the rule both "Add rule for
- * this sound" in the trace (PRD FR-14.4) and the Recently Played quick actions (FR-1.5) edit. Not on the hot path.
+ * Creating and editing the exact-ID rule for one sound, in Everywhere's or one zone's Quick changes: the entry both
+ * "Add rule for this sound" in the trace (PRD FR-14.4) and the Recently Played quick actions (FR-1.5) edit. Not on the
+ * hot path.
  */
 public final class ExactRules {
 	/** What an edit did to the exact-ID rule. */
@@ -67,7 +70,7 @@ public final class ExactRules {
 			if (z < 0) {
 				return refused(rules, TraceEditError.ZONE_NOT_FOUND);
 			}
-			list = rules.zones().get(z).rules();
+			list = rules.zones().get(z).sets().quickEntries();
 		}
 		boolean setsSomething = setsAnything(edit.apply(SetEntry.of("probe", soundId)));
 		int existing = indexOfExact(list, soundId);
@@ -90,7 +93,7 @@ public final class ExactRules {
 			if (tidy && !setsSomething) {
 				return new Change(null, rules, Outcome.UNCHANGED);
 			}
-			if (ruleCount(rules) >= TraceEditor.MAX_RULES) {
+			if (list.size() >= SoundSet.MAX_ENTRIES) {
 				return refused(rules, TraceEditError.TOO_MANY_RULES);
 			}
 			newList = new ArrayList<>(list);
@@ -117,7 +120,7 @@ public final class ExactRules {
 			return rules.globalRules();
 		}
 		int z = indexOfZone(rules.zones(), zoneId);
-		return z < 0 ? null : rules.zones().get(z).rules();
+		return z < 0 ? null : rules.zones().get(z).sets().quickEntries();
 	}
 
 	static int indexOfZone(List<Zone> zones, String id) {
@@ -148,14 +151,6 @@ public final class ExactRules {
 		return -1;
 	}
 
-	private static int ruleCount(EditableRules rules) {
-		int count = rules.globalRules().size();
-		for (Zone zone : rules.zones()) {
-			count += zone.rules().size();
-		}
-		return count;
-	}
-
 	/** {@code id}, or {@code id#2}, {@code id#3}... if another rule already uses it. */
 	private static String freeId(EditableRules rules, String id) {
 		String candidate = id;
@@ -170,7 +165,7 @@ public final class ExactRules {
 			return true;
 		}
 		for (Zone zone : rules.zones()) {
-			if (indexOfRule(zone.rules(), id) >= 0) {
+			if (indexOfRule(zone.sets().quickEntries(), id) >= 0) {
 				return true;
 			}
 		}

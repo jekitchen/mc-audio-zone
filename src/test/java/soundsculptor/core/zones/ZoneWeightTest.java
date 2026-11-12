@@ -3,8 +3,7 @@ package soundsculptor.core.zones;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.util.List;
-
+import soundsculptor.core.sets.PlaceSets;
 import org.junit.jupiter.api.Test;
 
 /** PRD FR-8.4 and FR-8.5: how strongly a zone applies at a point (its weight w, 0 to 1). */
@@ -13,7 +12,7 @@ class ZoneWeightTest {
 	private static final ZoneEdge FADE_4 = ZoneEdge.fade(4);
 
 	private static Zone sphere(ZoneMode mode, ZoneEdge edge) {
-		return new Zone("z", "Z", true, "w", "minecraft:overworld", new Point(0, 0, 0), new Shape.Sphere(20), List.of())
+		return new Zone("z", "Z", true, "w", "minecraft:overworld", new Point(0, 0, 0), new Shape.Sphere(20), PlaceSets.EMPTY)
 				.withMode(mode).withEdge(edge);
 	}
 
@@ -68,7 +67,7 @@ class ZoneWeightTest {
 
 	@Test
 	void zonesAreFixedInsideAndDefaultEdgeUnlessSetOtherwise() {
-		Zone z = new Zone("z", "Z", true, "w", "d", new Point(0, 0, 0), new Shape.Sphere(5), List.of());
+		Zone z = new Zone("z", "Z", true, "w", "d", new Point(0, 0, 0), new Shape.Sphere(5), PlaceSets.EMPTY);
 		assertEquals(ZoneMode.INSIDE, z.mode());
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
 		assertEquals(AnchorType.FIXED, z.anchorType());

@@ -1,5 +1,8 @@
 package soundsculptor.core.start;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -12,7 +15,10 @@ import java.util.List;
 import soundsculptor.core.cue.CueSettings;
 import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.trace.LastPlay;
 import soundsculptor.core.trace.LastPlays;
 import soundsculptor.core.zones.Point;
@@ -44,12 +50,17 @@ class SoundStartDeciderTest {
 		return SetEntry.of(id, "minecraft:entity.villager.*");
 	}
 
+	/** The limiter key of an entry in Everywhere's Quick changes, where {@link #profile} puts the entries. */
+	private static String everywhereKey(String entryId) {
+		return SoundStartDecider.limiterKey(null, SoundSet.QUICK_ID, entryId);
+	}
+
 	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
-		return new Zone(id, "Zone " + id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), List.of(rules));
+		return new Zone(id, "Zone " + id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), quick(List.of(rules)));
 	}
 
 	private void profile(List<SetEntry> global, Zone... zones) {
-		decider.setProfile(new Precedence(global, List.of(zones)));
+		decider.setProfile(precedence(global, List.of(zones)));
 	}
 
 	/** A villager sound at {@code (x, 0, 0)}, heard from 5 blocks away with vanilla's 16-block range. */
@@ -177,7 +188,7 @@ class SoundStartDeciderTest {
 	@Test
 	void p6FadeEdgeBlendsTheVolume() {
 		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
-				List.of(SetEntry.of("ra", "*").withMute(true))).withEdge(ZoneEdge.fade(4));
+				quick(List.of(SetEntry.of("ra", "*").withMute(true)))).withEdge(ZoneEdge.fade(4));
 		profile(List.of(), a);
 		// 2 blocks inside a 4-block fade: half way.
 		assertEquals(0.5F, start(villagerAt(8)).factor(), 1e-3);
@@ -240,7 +251,7 @@ class SoundStartDeciderTest {
 	@Test
 	void disabledZonesNeverOverride() {
 		Zone a = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
-				List.of(villagers("z1").withVolume(50)));
+				quick(List.of(villagers("z1").withVolume(50))));
 		profile(List.of(villagers("g1").withMute(true)), a);
 		assertTrue(start(villagerAt(0)).cancel());
 	}
@@ -311,7 +322,7 @@ class SoundStartDeciderTest {
 		assertTrue(dropped.cancel());
 		assertTrue(lastPlays.get(VILLAGER).dropped());
 		assertEquals(PlayStatus.PLAYING, start(villagerAt(0), 2_000).status(), "the window slides");
-		assertEquals(1, decider.limiter().droppedCount("g1"));
+		assertEquals(1, decider.limiter().droppedCount(everywhereKey("g1")));
 	}
 
 	@Test
@@ -354,8 +365,33 @@ class SoundStartDeciderTest {
 		assertEquals(PlayStatus.PLAYING, start(cow, 1_000).status());
 		assertEquals(PlayStatus.PLAYING, start(villagerAt(0), 1_001).status(), "zone a's r1 has not played yet");
 		assertEquals(PlayStatus.LIMITED, start(villagerAt(0), 1_002).status());
-		assertEquals(1, decider.limiter().droppedCount(SoundStartDecider.limiterKey(a, "r1")));
-		assertEquals(0, decider.limiter().droppedCount("r1"));
+		assertEquals(1, decider.limiter().droppedCount(SoundStartDecider.limiterKey("a", SoundSet.QUICK_ID, "r1")));
+		assertEquals(0, decider.limiter().droppedCount(everywhereKey("r1")));
+	}
+
+	@Test
+	void duplicateSetsHaveSeparateLimiterKeys() {
+		// A Duplicate shares the original's entry instances, yet each set counts on its own (FR-6.7).
+		SetEntry limited = villagers("e1").withLimit(new Limit(1, 1000, false));
+		SoundSet farm = new SoundSet("set-farm", "Farm", List.of(limited));
+		SoundSet copy = new SoundSet("set-copy", "Farm (2)", farm.entries());
+		SetLibrary library = new SetLibrary(List.of(farm, copy));
+		PlaceSets both = PlaceSets.EMPTY.attach(copy.id()).attach(farm.id());
+		String copyKey = SoundStartDecider.limiterKey(null, copy.id(), "e1");
+		String farmKey = SoundStartDecider.limiterKey(null, farm.id(), "e1");
+
+		decider.setProfile(new Precedence(both, List.of(), library));
+		assertEquals(PlayStatus.PLAYING, start(villagerAt(0), 1_000).status());
+		assertEquals(PlayStatus.LIMITED, start(villagerAt(0), 1_001).status());
+		assertEquals(1, decider.limiter().droppedCount(copyKey), "the top set won, so its counter counted");
+		assertEquals(0, decider.limiter().droppedCount(farmKey));
+
+		// The original moved to the top: it wins now, with a counter of its own that has not played yet.
+		decider.setProfile(new Precedence(both.move(farm.id(), -1), List.of(), library));
+		assertEquals(PlayStatus.PLAYING, start(villagerAt(0), 1_002).status());
+		assertEquals(PlayStatus.LIMITED, start(villagerAt(0), 1_003).status());
+		assertEquals(1, decider.limiter().droppedCount(farmKey));
+		assertEquals(1, decider.limiter().droppedCount(copyKey));
 	}
 
 	@Test
@@ -385,7 +421,7 @@ class SoundStartDeciderTest {
 		start(cow, 1_000);
 		assertEquals(2, decider.limiter().ruleIds().size());
 		profile(List.of(villagers("g1").withLimit(TWO_PER_SECOND)));
-		assertEquals(java.util.Set.of("g1"), decider.limiter().ruleIds());
+		assertEquals(java.util.Set.of(everywhereKey("g1")), decider.limiter().ruleIds());
 	}
 
 	@Test
@@ -450,7 +486,7 @@ class SoundStartDeciderTest {
 	@Test
 	void fullyFadedZoneMuteShowsACueButAPartlyFadedOneDoesNot() {
 		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
-				List.of(villagers("z1").withMute(true).withCue(true))).withEdge(ZoneEdge.fade(4));
+				quick(List.of(villagers("z1").withMute(true).withCue(true)))).withEdge(ZoneEdge.fade(4));
 		profile(List.of(), a);
 		assertTrue(start(villagerAt(0)).cue(), "full weight at the centre: volume 0");
 		assertFalse(start(villagerAt(8)).cue(), "half way through the fade the sound is still audible");

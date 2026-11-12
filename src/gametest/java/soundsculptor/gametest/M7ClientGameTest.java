@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.WorldIds;
 import soundsculptor.core.recent.PlayStatus;
@@ -167,11 +168,11 @@ public final class M7ClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zone(String id, String name, String key, String dimension, Point anchor, Shape shape, SetEntry rule) {
-		return new Zone(id, name, true, key, dimension, anchor, shape, List.of(rule));
+		return new Zone(id, name, true, key, dimension, anchor, shape, PlaceSets.EMPTY.withQuickEntries(List.of(rule)));
 	}
 
 	private static void setZones(ClientGameTestContext context, List<SetEntry> globalRules, Zone... zones) {
-		context.runOnClient(mc -> ProfileManager.update(p -> p.withGlobalRules(globalRules).withZones(List.of(zones))));
+		context.runOnClient(mc -> ProfileManager.update(p -> p.withEverywhere(PlaceSets.EMPTY.withQuickEntries(globalRules)).withZones(List.of(zones))));
 	}
 
 	/** Plays a villager-style sound at a position; returns the start factor (0 when it did not start). */

@@ -1,5 +1,7 @@
 package soundsculptor.core.start;
 
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -10,7 +12,6 @@ import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.sets.Limit;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.trace.LastPlays;
-import soundsculptor.core.zones.Precedence;
 
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +29,7 @@ class VillagerPenLimitTest {
 	private static List<Long> run(boolean perSource) {
 		SoundStartDecider decider = new SoundStartDecider(new LastPlays());
 		SetEntry rule = SetEntry.of("g1", VILLAGER).withLimit(new Limit(3, 1000, perSource));
-		decider.setProfile(new Precedence(List.of(rule), List.of()));
+		decider.setProfile(precedence(List.of(rule), List.of()));
 		SoundStart in = new SoundStart();
 		SoundStartResult out = new SoundStartResult();
 		Random random = new Random(20);

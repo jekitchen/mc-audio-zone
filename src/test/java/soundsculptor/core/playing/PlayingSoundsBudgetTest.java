@@ -21,7 +21,8 @@ class PlayingSoundsBudgetTest {
 	private static final int SOUNDS = 255;
 	private static final double BUDGET_NANOS = 200_000;
 
-	private final Precedence precedence = new Precedence(StressProfile.globalRules(), StressProfile.zones(WORLD, OVERWORLD));
+	private final Precedence precedence = new Precedence(StressProfile.everywhere(), StressProfile.zones(WORLD, OVERWORLD),
+			StressProfile.library());
 	private final String[] ids = StressProfile.soundIds().toArray(new String[0]);
 	private final PlayingSounds playing = new PlayingSounds();
 	private final PlayingSounds.GainListener listener = (handle, gain) -> { };

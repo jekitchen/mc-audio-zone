@@ -1,5 +1,7 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Shape;
 
 import soundsculptor.core.TestEnglish;
@@ -30,7 +31,7 @@ class ProfileImportTest {
 	}
 
 	private static String zoneFile(String shape) {
-		return "{\"schemaVersion\": 1, \"zones\": [" + fixedZone("z1", "{\"type\": \"sphere\", \"radius\": 5}") + ", "
+		return "{\"schemaVersion\": 3, \"zones\": [" + fixedZone("z1", "{\"type\": \"sphere\", \"radius\": 5}") + ", "
 				+ fixedZone("z2", "{\"type\": \"sphere\", \"radius\": 5}") + ", " + fixedZone("z3", shape) + "]}";
 	}
 
@@ -77,17 +78,18 @@ class ProfileImportTest {
 	}
 
 	@Test
-	void volumeAboveTwoHundredNamesTheRule() {
-		assertEquals("Rule 2, field volume: 250 is above the maximum 200.", problem(
-				"{\"schemaVersion\": 1, \"globalRules\": [{\"id\": \"a\", \"pattern\": \"x:a\"}, {\"id\": \"b\", \"pattern\": \"x:b\", \"volume\": 250}]}"));
+	void levelAboveTwoHundredNamesThePlaceAndTheEntry() {
+		assertEquals("Everywhere, Quick changes, entry 2, level: 250 is above the maximum 200.", problem("{\"schemaVersion\": 3,"
+				+ " \"everywhere\": {\"sets\": [{\"set\": \"quick\"}], \"quickChanges\": {\"id\": \"quick\", \"entries\": ["
+				+ "{\"id\": \"a\", \"target\": \"x:a\"}, {\"id\": \"b\", \"target\": \"x:b\", \"volume\": 250}]}}}"));
 	}
 
 	@Test
-	void zoneRuleProblemsNameTheZoneAndTheRule() {
+	void zoneEntryProblemsNameTheZoneAndTheEntry() {
 		String zone = "{\"id\": \"z1\", \"anchor\": {\"type\": \"bubble\"}, \"shape\": {\"type\": \"sphere\", \"radius\": 4},"
-				+ " \"rules\": [{\"id\": \"r\", \"pattern\": \"a:b:c\"}]}";
-		String message = problem("{\"schemaVersion\": 1, \"zones\": [" + zone + "]}");
-		assertEquals("Zone 1, rule 1, field pattern: Use at most one :.", message);
+				+ " \"sets\": [{\"set\": \"quick\"}], \"quickChanges\": {\"id\": \"quick\", \"entries\": [{\"id\": \"r\", \"target\": \"a:b:c\"}]}}";
+		String message = problem("{\"schemaVersion\": 3, \"zones\": [" + zone + "]}");
+		assertEquals("Zone 1, Quick changes, entry 1, target: Use at most one :.", message);
 	}
 
 	@Test
@@ -104,30 +106,7 @@ class ProfileImportTest {
 	@Test
 	void newerSchemaUsesTheImportWording() {
 		assertEquals("This file was made with a newer Sound Sculptor. Update the mod to import it.",
-				problem("{\"schemaVersion\": 3}"));
-	}
-
-	@Test
-	void moreThanAThousandRulesIsRefused() {
-		StringBuilder rules = new StringBuilder();
-		for (int i = 0; i < 1001; i++) {
-			rules.append(i == 0 ? "" : ",").append("{\"id\": \"r").append(i).append("\", \"pattern\": \"a:b").append(i).append("\"}");
-		}
-		assertEquals("The file has 1001 rules; the maximum is 1000.",
-				problem("{\"schemaVersion\": 1, \"globalRules\": [" + rules + "]}"));
-	}
-
-	@Test
-	void zoneRulesCountTowardsTheRuleLimit() throws ProfileFormatException {
-		List<SetEntry> many = new java.util.ArrayList<>();
-		for (int i = 0; i < 1000; i++) {
-			many.add(SetEntry.of("g" + i, "a:b" + i));
-		}
-		Profile p = new Profile("A", ProfileSettings.DEFAULTS, many);
-		ProfileImport.check(ProfileCodec.toJson(p));
-		Profile over = p.withZones(List.of(ProfileZonesTest.fixed("z1", new Shape.Sphere(3))));
-		assertEquals("The file has 1001 rules; the maximum is 1000.",
-				assertThrows(ProfileFormatException.class, () -> ProfileImport.check(ProfileCodec.toJson(over))).problem().text(EN));
+				problem("{\"schemaVersion\": 4}"));
 	}
 
 	@Test
@@ -136,21 +115,21 @@ class ProfileImportTest {
 		for (int i = 0; i < 65; i++) {
 			zones.append(i == 0 ? "" : ",").append(fixedZone("z" + i, "{\"type\": \"sphere\", \"radius\": 5}"));
 		}
-		assertEquals("The file has 65 zones; the maximum is 64.", problem("{\"schemaVersion\": 1, \"zones\": [" + zones + "]}"));
+		assertEquals("The file has 65 zones; the maximum is 64.", problem("{\"schemaVersion\": 3, \"zones\": [" + zones + "]}"));
 	}
 
 	@Test
 	void duplicateZoneIdsAreRefused() {
 		String z = fixedZone("same", "{\"type\": \"sphere\", \"radius\": 5}");
 		assertEquals("Zone 2, field id: \"same\" is already used by zone 1.",
-				problem("{\"schemaVersion\": 1, \"zones\": [" + z + ", " + z + "]}"));
+				problem("{\"schemaVersion\": 3, \"zones\": [" + z + ", " + z + "]}"));
 	}
 
 	@Test
 	void badColorIsNamed() {
 		String zone = fixedZone("z1", "{\"type\": \"sphere\", \"radius\": 5}").replace("\"name\"", "\"color\": \"#12\", \"name\"");
 		assertEquals("Zone 1, field color: \"#12\" is not a color like #E69F00.",
-				problem("{\"schemaVersion\": 1, \"zones\": [" + zone + "]}"));
+				problem("{\"schemaVersion\": 3, \"zones\": [" + zone + "]}"));
 	}
 
 	@Test
@@ -158,22 +137,24 @@ class ProfileImportTest {
 		String zone = fixedZone("z1", "{\"type\": \"sphere\", \"radius\": 5}").replace("\"name\"",
 				"\"edge\": {\"mode\": \"fade\", \"fade\": 40}, \"name\"");
 		assertEquals("Zone 1, field fade: 40 is above the maximum 32.",
-				problem("{\"schemaVersion\": 1, \"zones\": [" + zone + "]}"));
+				problem("{\"schemaVersion\": 3, \"zones\": [" + zone + "]}"));
 	}
 
 	@Test
 	void unknownFieldsAreWarningsNotErrors() throws ProfileFormatException {
 		String zone = fixedZone("z1", "{\"type\": \"sphere\", \"radius\": 5, \"spin\": 1}");
-		ProfileImport.Checked checked = ProfileImport.check("{\"schemaVersion\": 1, \"extra\": true,"
-				+ " \"globalRules\": [{\"id\": \"a\", \"pattern\": \"x:a\", \"loud\": 1}], \"zones\": [" + zone + "]}");
-		assertEquals(List.of("Unknown field \"extra\" was ignored.", "Rule 1: unknown field \"loud\" was ignored.",
+		ProfileImport.Checked checked = ProfileImport.check("{\"schemaVersion\": 3, \"extra\": true,"
+				+ " \"everywhere\": {\"sets\": [{\"set\": \"quick\"}], \"quickChanges\": {\"id\": \"quick\", \"entries\": ["
+				+ "{\"id\": \"a\", \"target\": \"x:a\", \"loud\": 1}]}}, \"zones\": [" + zone + "]}");
+		assertEquals(List.of("Unknown field \"extra\" was ignored.",
+				"Everywhere, Quick changes, entry 1: unknown field \"loud\" was ignored.",
 				"Zone 1: unknown field \"spin\" was ignored."), checked.warnings().stream().map(w -> w.text(EN)).toList());
 	}
 
 	@Test
 	void fileLargerThanOneMegabyteIsRefusedBeforeReading() throws IOException {
 		Path big = dir.resolve("big.json");
-		Files.writeString(big, "{\"schemaVersion\": 1, \"name\": \"" + "x".repeat(1024 * 1024) + "\"}", StandardCharsets.UTF_8);
+		Files.writeString(big, "{\"schemaVersion\": 3, \"name\": \"" + "x".repeat(1024 * 1024) + "\"}", StandardCharsets.UTF_8);
 		assertEquals("The file is larger than 1 MB.",
 				assertThrows(ProfileFormatException.class, () -> ProfileImport.check(big)).problem().text(EN));
 	}

@@ -1,5 +1,7 @@
 package soundsculptor.core.trace;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -27,7 +29,7 @@ class TraceEditorTest {
 	private static final LastPlay PLAY = new LastPlay(true, WORLD, OVERWORLD, 2, 0, 0, 50, false, false);
 
 	private static Zone sphere(String id, double radius, SetEntry... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(radius), List.of(rules));
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(radius), quick(List.of(rules)));
 	}
 
 	private static TraceEditContext context(LastPlay play) {
@@ -53,7 +55,7 @@ class TraceEditorTest {
 
 		assertEquals(20, result.predicted().volumePercent(), 1e-6);
 		assertTrue(result.predictedForNextPlay(), "labelled 'Predicted for next play' until the sound plays again");
-		assertEquals(20, result.after().zones().get(0).rules().get(0).volume());
+		assertEquals(20, result.after().zones().get(0).sets().quickEntries().get(0).volume());
 
 		UndoSlot<EditableRules> undo = new UndoSlot<>();
 		undo.offer(result.before(), result.after(), result.toastKey(), result.toastArgs(), 1000);
@@ -174,7 +176,7 @@ class TraceEditorTest {
 
 		assertEquals(List.of(a, b), after.globalRules());
 		assertEquals(yard, after.zones().get(1));
-		assertEquals(hall.rules().get(1), after.zones().get(0).rules().get(1));
+		assertEquals(hall.sets().quickEntries().get(1), after.zones().get(0).sets().quickEntries().get(1));
 		Zone edited = after.zones().get(0);
 		assertEquals(hall.shape(), edited.shape());
 		assertEquals(hall.anchor(), edited.anchor());
@@ -193,7 +195,7 @@ class TraceEditorTest {
 		assertFalse(result.after().zones().get(0).enabled());
 		assertTrue(result.predicted().zones().isEmpty());
 		assertEquals(100, result.predicted().volumePercent(), 1e-6);
-		assertEquals(hall.rules(), result.after().zones().get(0).rules());
+		assertEquals(hall.sets().quickEntries(), result.after().zones().get(0).sets().quickEntries());
 	}
 
 	@Test
@@ -236,7 +238,7 @@ class TraceEditorTest {
 
 		TraceEditResult result = ok(TraceEditor.addRuleForSound(context(PLAY), start, "hall", new EntryEdit.Volume(25)));
 
-		List<SetEntry> rules = result.after().zones().get(0).rules();
+		List<SetEntry> rules = result.after().zones().get(0).sets().quickEntries();
 		assertEquals(2, rules.size());
 		SetEntry added = rules.get(1);
 		assertEquals(AMBIENT, added.pattern().text());
@@ -282,8 +284,8 @@ class TraceEditorTest {
 
 		List<String> ids = new ArrayList<>();
 		ids.add(r.globalRules().get(0).id());
-		ids.add(r.zones().get(0).rules().get(0).id());
-		ids.add(r.zones().get(1).rules().get(0).id());
+		ids.add(r.zones().get(0).sets().quickEntries().get(0).id());
+		ids.add(r.zones().get(1).sets().quickEntries().get(0).id());
 		assertEquals(3, ids.stream().distinct().count(), "rule IDs stay unique across the profile: " + ids);
 		assertEquals(ids, List.of(
 				TraceEditor.exactRuleId(null, AMBIENT),
@@ -311,7 +313,7 @@ class TraceEditorTest {
 	}
 
 	@Test
-	void addRuleRefusesPastTheProfileRuleLimit() {
+	void addRuleRefusesPastTheQuickChangesLimit() {
 		List<SetEntry> many = new ArrayList<>();
 		for (int i = 0; i < TraceEditor.MAX_RULES; i++) {
 			many.add(SetEntry.of("r" + i, "minecraft:block.b" + i));

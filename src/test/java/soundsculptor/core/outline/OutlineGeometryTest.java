@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test;
 /** PRD FR-10.2: box edges; a sphere as three great circles. Coordinates are world coordinates. */
 class OutlineGeometryTest {
 	private static Zone zone(Point anchor, Shape shape) {
-		return new Zone("z", "Z", true, "w", "minecraft:overworld", anchor, shape, List.of());
+		return new Zone("z", "Z", true, "w", "minecraft:overworld", anchor, shape, PlaceSets.EMPTY);
 	}
 
 	@Test

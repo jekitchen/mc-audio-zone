@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
@@ -78,9 +79,9 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("m5-editor-villager-mute");
 			context.runOnClient(mc -> editor(mc).save());
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().size() == 1), "Save should add the rule");
-			String wildcardId = context.computeOnClient(mc -> ProfileManager.profile().globalRules().get(0).id());
-			int listed = context.computeOnClient(mc -> soundsculptor.core.lists.EntrySummary.matchCount(ProfileManager.profile().rule(wildcardId),
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).size() == 1), "Save should add the rule");
+			String wildcardId = context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).get(0).id());
+			int listed = context.computeOnClient(mc -> soundsculptor.core.lists.EntrySummary.matchCount(RuleTarget.GLOBAL.rule(ProfileManager.profile(), wildcardId),
 					soundsculptor.mc.KnownSounds.ids()));
 			int previewed = context.computeOnClient(mc -> soundsculptor.core.editor.PatternPreview.of("minecraft:entity.villager.*",
 					soundsculptor.mc.KnownSounds.ids(), soundsculptor.mc.KnownSounds.seenExcluded()).count());
@@ -103,7 +104,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(play(context, VILLAGER_AMBIENT, SoundSource.NEUTRAL), "the exact rule should let villager ambient play");
 			check(lastStartFactor == 1.0F, "at 100% the volume is unchanged");
 			check(!play(context, VILLAGER_HURT, SoundSource.NEUTRAL), "other villager sounds stay muted");
-			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(main(mc), ProfileManager.profile().rule(wildcardId))));
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(main(mc), RuleTarget.GLOBAL.rule(ProfileManager.profile(), wildcardId))));
 			context.waitForScreen(EntryEditorScreen.class);
 			String overridden = editor(context, e -> e.overriddenText().getString());
 			check(overridden.equals("Partly overridden by: " + VILLAGER_AMBIENT), "the wildcard rule should say it is overridden, was " + overridden);
@@ -112,7 +113,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(SoundSculptorScreen.class);
 
 			// FR-4 AC 2 and FR-5 AC: *:block.*.step at 50% makes every footstep quieter, by the rule's factor.
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(SetEntry.of(p.newRuleId(), "*:block.*.step").withVolume(50))));
+			context.runOnClient(mc -> ProfileManager.update(p -> RuleTarget.GLOBAL.put(p, SetEntry.of(RuleTarget.GLOBAL.newRuleId(p), "*:block.*.step").withVolume(50))));
 			check(play(context, STONE_STEP, SoundSource.BLOCKS), "a 50% sound still plays");
 			check(lastStartFactor == 0.5F, "stone steps should play at 50%");
 			check(play(context, WOOD_STEP, SoundSource.BLOCKS), "a 50% sound still plays");
@@ -122,8 +123,8 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 					"recalculated volumes get the rule factor too");
 
 			// A-2: edit a rule's volume with the keyboard only: the slider moves in 5% steps.
-			String stepId = context.computeOnClient(mc -> ProfileManager.profile().globalRules().get(2).id());
-			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(main(mc), ProfileManager.profile().rule(stepId))));
+			String stepId = context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).get(2).id());
+			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.edit(main(mc), RuleTarget.GLOBAL.rule(ProfileManager.profile(), stepId))));
 			context.waitForScreen(EntryEditorScreen.class);
 			context.runOnClient(mc -> editor(mc).setFocused(editor(mc).volumeSlider));
 			context.getInput().pressKey(InputConstants.KEY_LEFT);
@@ -143,9 +144,9 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(lastStartFactor == 0.4F, "stone steps should now play at 40%");
 
 			// FR-5.1: 0% (not muted) plays nothing, like a zero vanilla slider.
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(p.rule(stepId).withVolume(0))));
+			context.runOnClient(mc -> ProfileManager.update(p -> RuleTarget.GLOBAL.put(p, RuleTarget.GLOBAL.rule(p, stepId).withVolume(0))));
 			check(!play(context, STONE_STEP, SoundSource.BLOCKS), "a 0% sound should not start");
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(p.rule(stepId).withVolume(50))));
+			context.runOnClient(mc -> ProfileManager.update(p -> RuleTarget.GLOBAL.put(p, RuleTarget.GLOBAL.rule(p, stepId).withVolume(50))));
 
 			// FR-4 AC 5: turning a rule off stops its effect at once; on again brings it back.
 			context.runOnClient(mc -> main(mc).refreshRules());
@@ -156,7 +157,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(!play(context, VILLAGER_HURT, SoundSource.NEUTRAL), "with the rule on again, villager hurt is muted");
 
 			// Vanilla-covered sounds are never changed, not even by *.
-			context.runOnClient(mc -> ProfileManager.update(p -> p.putRule(SetEntry.of(p.newRuleId(), "*").withMute(true))));
+			context.runOnClient(mc -> ProfileManager.update(p -> RuleTarget.GLOBAL.put(p, SetEntry.of(RuleTarget.GLOBAL.newRuleId(p), "*").withMute(true))));
 			check(context.computeOnClient(mc -> {
 				SoundInstance click = SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvent.createVariableRangeEvent(Identifier.parse(UI_CLICK)), 1.0F);
 				mc.getSoundManager().play(click);
@@ -165,19 +166,19 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			check(!play(context, TRADER_AMBIENT, SoundSource.NEUTRAL), "* mutes ordinary sounds");
 
 			// Move and delete from the list.
-			String starId = context.computeOnClient(mc -> ProfileManager.profile().globalRules().get(3).id());
+			String starId = context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).get(3).id());
 			context.runOnClient(mc -> main(mc).moveRule(starId, -1));
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().get(2).id()).equals(starId), "Move up should move the rule");
-			context.runOnClient(mc -> main(mc).confirmDelete(ProfileManager.profile().rule(starId)));
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).get(2).id()).equals(starId), "Move up should move the rule");
+			context.runOnClient(mc -> main(mc).confirmDelete(RuleTarget.GLOBAL.rule(ProfileManager.profile(), starId)));
 			context.waitForScreen(SculptDialog.class);
 			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().rule(starId) != null), "Esc in the delete dialog must keep the rule");
-			context.runOnClient(mc -> main(mc).confirmDelete(ProfileManager.profile().rule(starId)));
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rule(ProfileManager.profile(), starId) != null), "Esc in the delete dialog must keep the rule");
+			context.runOnClient(mc -> main(mc).confirmDelete(RuleTarget.GLOBAL.rule(ProfileManager.profile(), starId)));
 			context.waitForScreen(SculptDialog.class);
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().rule(starId) == null), "Delete should remove the rule");
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rule(ProfileManager.profile(), starId) == null), "Delete should remove the rule");
 			check(context.computeOnClient(mc -> main(mc).rulesList.findRow(starId) == null), "the deleted rule's row should be gone at once");
 			check(play(context, TRADER_AMBIENT, SoundSource.NEUTRAL), "after deleting *, the trader plays again");
 

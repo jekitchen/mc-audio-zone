@@ -1,5 +1,7 @@
 package soundsculptor.core.editor;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -8,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.editor.ZoneDraft.Field;
 import soundsculptor.core.editor.ZoneDraft.ShapeKind;
 import soundsculptor.core.outline.ColorError;
@@ -45,7 +48,7 @@ class ZoneDraftTest {
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
 		assertEquals(AnchorType.FIXED, z.anchorType());
 		assertEquals(WORLD, z.worldKey());
-		assertTrue(z.rules().isEmpty());
+		assertEquals(PlaceSets.EMPTY, z.sets());
 		assertEquals(ORANGE, d.color());
 	}
 
@@ -55,7 +58,7 @@ class ZoneDraftTest {
 		ZoneDraft box = ZoneDraft.blank("z1", "Pen", WORLD, OVERWORLD, new Point(0, 64, 0), ORANGE);
 		assertEquals(List.of(ShapeKind.BOX, ShapeKind.CYLINDER), box.shapeChoices());
 		ZoneDraft sphere = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(12),
-				RULES), ORANGE, ORANGE);
+				quick(RULES)), ORANGE, ORANGE);
 		assertEquals(List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER), sphere.shapeChoices());
 		sphere.setShape(ShapeKind.BOX);
 		assertEquals(List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER), sphere.shapeChoices(),
@@ -79,7 +82,7 @@ class ZoneDraftTest {
 	@Test
 	void aFixedZonesShapeResetsToABox() {
 		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(12),
-				RULES), ORANGE, ORANGE);
+				quick(RULES)), ORANGE, ORANGE);
 		assertFalse(d.isDefault(Field.SHAPE));
 		d.resetToDefault(Field.SHAPE);
 		assertEquals(ShapeKind.BOX, d.shape());
@@ -88,11 +91,11 @@ class ZoneDraftTest {
 
 	@Test
 	void existingZonesRoundTrip() {
-		Zone sphere = new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(1.25, 64, -3), new Shape.Sphere(12.5), RULES);
-		Zone bubble = new Zone("z2", "Bubble", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Box(20, 8, 30), RULES)
+		Zone sphere = new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(1.25, 64, -3), new Shape.Sphere(12.5), quick(RULES));
+		Zone bubble = new Zone("z2", "Bubble", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Box(20, 8, 30), quick(RULES))
 				.withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(8)).asBubble();
 		Zone cylinder = new Zone("z3", "Tower", true, WORLD, "minecraft:the_nether", new Point(5, 70, 5),
-				new Shape.Cylinder(6, 40), List.of()).withEdge(ZoneEdge.hard());
+				new Shape.Cylinder(6, 40), PlaceSets.EMPTY).withEdge(ZoneEdge.hard());
 		for (Zone z : List.of(sphere, bubble, cylinder)) {
 			ZoneDraft d = ZoneDraft.of(z, SKY, ORANGE);
 			assertTrue(d.canSave(), z.id());
@@ -193,7 +196,7 @@ class ZoneDraftTest {
 	@Test
 	void dirtyIgnoresHowANumberOrColorIsWritten() {
 		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(120.5, 64, 0),
-				new Shape.Sphere(10), RULES), ORANGE, ORANGE);
+				new Shape.Sphere(10), quick(RULES)), ORANGE, ORANGE);
 		d.set(Field.X, "120.50");
 		d.set(Field.RADIUS, "10.0");
 		d.set(Field.COLOR, "e69f00");
@@ -217,7 +220,7 @@ class ZoneDraftTest {
 	@Test
 	void resetToDefaultPerValue() {
 		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", false, WORLD, OVERWORLD, new Point(1, 2, 3),
-				new Shape.Cylinder(30, 60), RULES).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(2)).asBubble(), SKY, ORANGE);
+				new Shape.Cylinder(30, 60), quick(RULES)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(2)).asBubble(), SKY, ORANGE);
 		for (Field f : List.of(Field.ENABLED, Field.COLOR, Field.ANCHOR_TYPE, Field.SHAPE, Field.RADIUS, Field.HEIGHT,
 				Field.MODE, Field.EDGE, Field.FADE)) {
 			assertFalse(d.isDefault(f), f.name());
@@ -230,7 +233,7 @@ class ZoneDraftTest {
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
 		assertFalse(z.isBubble());
 		assertTrue(z.enabled());
-		assertEquals(RULES, z.rules(), "the zone's own rule list is kept");
+		assertEquals(quick(RULES), z.sets(), "the zone's own sets are kept");
 	}
 
 	@Test
@@ -257,6 +260,6 @@ class ZoneDraftTest {
 	/** An unsaved-looking sphere zone, so the field tests are not affected by box snapping. */
 	private static ZoneDraft draft() {
 		return ZoneDraft.of(new Zone("z1", "Trading hall", true, WORLD, OVERWORLD, new Point(120.5, 64, -33.5),
-				new Shape.Sphere(10), List.of()), ORANGE, ORANGE);
+				new Shape.Sphere(10), PlaceSets.EMPTY), ORANGE, ORANGE);
 	}
 }

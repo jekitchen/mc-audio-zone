@@ -4,8 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import soundsculptor.core.sets.Attachment;
 import soundsculptor.core.sets.Limit;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -14,17 +18,22 @@ import soundsculptor.core.zones.ZoneEdge;
 import soundsculptor.core.zones.ZoneMode;
 
 /**
- * The "stress" profile for the noisy-farm test (PRD 11.2 step 2): 50 global rules mixing exact IDs and wildcards,
- * and 64 zones (the maximum, every kind) that all affect a 9 x 9 pen centred on (0, {@value #PEN_Y}, 0). It also lists the sound IDs
- * such a farm plays. Generated from a fixed seed, so every run measures the same thing.
+ * The "stress" profile for the noisy-farm test (PRD 11.2 step 2): Everywhere attaches 2 library Sound Sets of 25
+ * entries each, mixing single sounds and groups, and 64 zones (the maximum, every kind) that all affect a 9 x 9 pen
+ * centred on (0, {@value #PEN_Y}, 0) each attach 1 to 3 sets from a pool of 8, so most pool sets are shared by several
+ * zones. It also lists the sound IDs such a farm plays. Generated from fixed seeds, so every run measures the same
+ * thing.
  *
- * <p>Used by the budget tests now. Once the profile file can hold zones, a dev command can load it for the in-game
- * test.
+ * <p>Used by the budget tests and the in-game stress test, with {@link #library()} as the library.
  */
 public final class StressProfile {
 	public static final double PEN_Y = 64;
 	/** The player's eye position, standing in the middle of the pen: the anchor of the profile's personal bubbles. */
 	public static final Point PLAYER = new Point(0, PEN_Y + 1.62, 0);
+	/** The two sets attached to Everywhere. */
+	public static final List<String> EVERYWHERE_SET_IDS = List.of("stress-everywhere-1", "stress-everywhere-2");
+	/** Zones attach sets from this many. */
+	public static final int POOL_SIZE = 8;
 	private static final long SEED = 11_2L;
 
 	private static final String[] PROFESSIONS = {"armorer", "butcher", "cartographer", "cleric", "farmer", "fisherman",
@@ -71,13 +80,16 @@ public final class StressProfile {
 		return List.copyOf(ids);
 	}
 
-	/** 50 global rules: every fourth farm sound as an exact rule, plus wildcard families. */
-	public static List<SetEntry> globalRules() {
+	/**
+	 * The 50 entries of Everywhere's two sets, first set first: every fourth farm sound as a single-sound entry, plus
+	 * group families, so each set mixes both.
+	 */
+	public static List<SetEntry> everywhereEntries() {
 		Random random = new Random(SEED);
 		List<String> ids = soundIds();
-		List<SetEntry> rules = new ArrayList<>();
-		for (int i = 0; i < ids.size() && rules.size() < 25; i += 4) {
-			rules.add(withSettings(SetEntry.of("g" + rules.size(), ids.get(i)), random));
+		List<SetEntry> singles = new ArrayList<>();
+		for (int i = 0; i < ids.size() && singles.size() < 25; i += 4) {
+			singles.add(withSettings(SetEntry.of("g" + singles.size(), ids.get(i)), random));
 		}
 		String[] wildcards = {"minecraft:entity.villager.*", "*villager*", "minecraft:entity.chicken.*",
 				"minecraft:entity.cow.*", "minecraft:entity.*.ambient", "minecraft:entity.*.hurt", "minecraft:entity.*.death",
@@ -85,15 +97,56 @@ public final class StressProfile {
 				"minecraft:entity.iron_golem.*", "minecraft:entity.villager.work_*", "othermod:*", "othermod:machine.*",
 				"*:*.step", "minecraft:block.*", "minecraft:entity.*", "*golem*", "*.click*", "minecraft:block.chest.*",
 				"minecraft:entity.zombie.*", "*sheep*", "minecraft:entity.pig.*", "*"};
+		List<SetEntry> groups = new ArrayList<>();
 		for (String w : wildcards) {
-			rules.add(withSettings(SetEntry.of("g" + rules.size(), w), random));
+			groups.add(withSettings(SetEntry.of("g" + (singles.size() + groups.size()), w), random));
 		}
-		return List.copyOf(rules);
+		List<SetEntry> entries = new ArrayList<>(singles.subList(0, 13));
+		entries.addAll(groups.subList(0, 12));
+		entries.addAll(singles.subList(13, singles.size()));
+		entries.addAll(groups.subList(12, groups.size()));
+		return List.copyOf(entries);
+	}
+
+	/** Everywhere's sets: the two {@link #EVERYWHERE_SET_IDS}, both on. */
+	public static PlaceSets everywhere() {
+		return new PlaceSets(EVERYWHERE_SET_IDS.stream().map(id -> new Attachment(id, true)).toList(), null);
+	}
+
+	/** Everywhere's two sets of 25 entries and the zones' pool of {@value #POOL_SIZE}. */
+	public static SetLibrary library() {
+		List<SoundSet> sets = new ArrayList<>();
+		List<SetEntry> everywhere = everywhereEntries();
+		sets.add(new SoundSet(EVERYWHERE_SET_IDS.get(0), "Stress everywhere 1", everywhere.subList(0, 25)));
+		sets.add(new SoundSet(EVERYWHERE_SET_IDS.get(1), "Stress everywhere 2", everywhere.subList(25, 50)));
+		sets.addAll(pool());
+		return new SetLibrary(sets);
+	}
+
+	/** {@value #POOL_SIZE} sets of 1 to 3 group entries each, which zones attach. */
+	private static List<SoundSet> pool() {
+		Random random = new Random(SEED + 2);
+		List<SoundSet> pool = new ArrayList<>(POOL_SIZE);
+		for (int s = 0; s < POOL_SIZE; s++) {
+			List<SetEntry> entries = new ArrayList<>();
+			int count = 1 + random.nextInt(3);
+			for (int e = 0; e < count; e++) {
+				String pattern = ZONE_PATTERNS[random.nextInt(ZONE_PATTERNS.length)];
+				entries.add(withSettings(SetEntry.of("p" + s + "e" + e, pattern), random));
+			}
+			pool.add(new SoundSet(poolId(s), "Stress pool " + (s + 1), entries));
+		}
+		return pool;
+	}
+
+	private static String poolId(int s) {
+		return "stress-pool-" + (s + 1);
 	}
 
 	/**
 	 * 64 zones that all affect the pen: Inside spheres, boxes and cylinders scattered up to 20 blocks away, Outside
-	 * spheres 40 to 60 blocks away, and personal bubbles around the player. Every third zone fades.
+	 * spheres 40 to 60 blocks away, and personal bubbles around the player. Every third zone fades. Each attaches 1 to 3
+	 * different sets from the pool in {@link #library()}.
 	 */
 	public static List<Zone> zones(String worldKey, String dimension) {
 		Random random = new Random(SEED + 1);
@@ -128,13 +181,12 @@ public final class StressProfile {
 					bubble = true;
 				}
 			}
-			List<SetEntry> rules = new ArrayList<>();
+			PlaceSets sets = PlaceSets.EMPTY;
 			int count = 1 + random.nextInt(3);
-			for (int r = 0; r < count; r++) {
-				String pattern = ZONE_PATTERNS[random.nextInt(ZONE_PATTERNS.length)];
-				rules.add(withSettings(SetEntry.of("z" + i + "r" + r, pattern), random));
+			while (sets.librarySetCount() < count) {
+				sets = sets.attach(poolId(random.nextInt(POOL_SIZE)));
 			}
-			Zone zone = new Zone("z" + i, "Stress " + i, true, worldKey, dimension, new Point(ax, ay, az), shape, rules)
+			Zone zone = new Zone("z" + i, "Stress " + i, true, worldKey, dimension, new Point(ax, ay, az), shape, sets)
 					.withMode(mode);
 			if (i % 3 == 0) {
 				zone = zone.withEdge(ZoneEdge.fade(1 + random.nextInt(8)));
@@ -150,12 +202,12 @@ public final class StressProfile {
 	}
 
 	/** A mix of mute, volume, limit and cue settings, like a real profile. */
-	private static SetEntry withSettings(SetEntry rule, Random random) {
+	private static SetEntry withSettings(SetEntry entry, Random random) {
 		SetEntry r = switch (random.nextInt(4)) {
-			case 0 -> rule.withMute(true);
-			case 1 -> rule.withVolume(random.nextInt(101));
-			case 2 -> rule.withVolume(random.nextInt(101)).withLimit(new Limit(1 + random.nextInt(10), 1000, random.nextBoolean()));
-			default -> rule.withCue(true);
+			case 0 -> entry.withMute(true);
+			case 1 -> entry.withVolume(random.nextInt(101));
+			case 2 -> entry.withVolume(random.nextInt(101)).withLimit(new Limit(1 + random.nextInt(10), 1000, random.nextBoolean()));
+			default -> entry.withCue(true);
 		};
 		return random.nextInt(3) == 0 ? r.withCue(random.nextBoolean()) : r;
 	}

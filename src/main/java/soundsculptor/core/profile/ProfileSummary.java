@@ -6,7 +6,7 @@ import java.util.Comparator;
 /**
  * One row of the Profiles tab (PRD FR-11.3): display name, world key, rule and zone counts, and last joined date.
  *
- * @param ruleCount  global rules plus every zone's rules
+ * @param ruleCount  entries in the Quick changes of Everywhere and of every zone
  * @param lastJoined when the player last joined this server or world, or null if never
  * @param connected  whether this is the profile of the server the player is on
  */
@@ -31,9 +31,9 @@ public record ProfileSummary(String displayName, String worldKey, int ruleCount,
 	 * @param connectedWorldKey the current server's world key, or null when not in a world
 	 */
 	public static ProfileSummary of(String worldKey, Profile profile, Instant lastJoined, String connectedWorldKey) {
-		int rules = profile.globalRules().size();
+		int rules = profile.everywhere().quickEntries().size();
 		for (var zone : profile.zones()) {
-			rules += zone.rules().size();
+			rules += zone.sets().quickEntries().size();
 		}
 		return new ProfileSummary(profile.name(), worldKey, rules, profile.zones().size(), lastJoined,
 				!ProfileOps.canDelete(worldKey, connectedWorldKey));

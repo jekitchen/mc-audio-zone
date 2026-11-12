@@ -1,6 +1,11 @@
 package soundsculptor.core.profile;
 
+import soundsculptor.core.sets.Attachment;
+import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.Zone;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -12,27 +17,28 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * A profile (PRD FR-11, section 7.5): its global rules, zones and profile settings. Immutable; every change returns a
- * new profile, which the sound path then reads as a snapshot (PRD 7.4).
+ * A profile (PRD FR-11, section 7.5): the Sound Sets attached to Everywhere, its zones and profile settings. Library
+ * sets are referred to by ID; each place's Quick changes are held inline. Immutable; every change returns a new
+ * profile, which the sound path then reads as a snapshot (PRD 7.4).
  *
  * @param name     display name
  * @param settings profile settings
- * @param globalRules rules that apply everywhere, in the order the player sees them
+ * @param everywhere the Sound Sets attached to Everywhere (FR-8.10), and its Quick changes
  * @param zones    fixed zones and personal bubbles, in the order the player sees them
  * @param zoneColors outline color of each zone that has one, as {@code 0xRRGGBB}, keyed by zone ID
  * @param lastJoined when the player last joined this server or world (FR-11.3), or null if never
  * @param boostConfirmed whether the player has confirmed the boost dialog for this profile (FR-5.4: asked once per
- *                   profile, the first time a volume goes above 100%)
+ *                   profile, the first time a level goes above 100%)
  */
-public record Profile(String name, ProfileSettings settings, List<SetEntry> globalRules, List<Zone> zones,
+public record Profile(String name, ProfileSettings settings, PlaceSets everywhere, List<Zone> zones,
 		Map<String, Integer> zoneColors, Instant lastJoined, boolean boostConfirmed) {
-	/** Bumped on every change to the file format, with a migration step (PRD 7.6). */
-	public static final int SCHEMA_VERSION = 2;
+	/** Bumped on every change to the file format (PRD 7.6). Schema 3 is the first with Sound Sets. */
+	public static final int SCHEMA_VERSION = 3;
 
 	public Profile {
 		Objects.requireNonNull(name, "name");
 		Objects.requireNonNull(settings, "settings");
-		globalRules = List.copyOf(globalRules);
+		Objects.requireNonNull(everywhere, "everywhere");
 		zones = List.copyOf(zones);
 		Set<String> ids = new HashSet<>();
 		for (Zone zone : zones) {
@@ -49,65 +55,113 @@ public record Profile(String name, ProfileSettings settings, List<SetEntry> glob
 	}
 
 	/** A profile never joined, with boost not yet confirmed. */
-	public Profile(String name, ProfileSettings settings, List<SetEntry> globalRules, List<Zone> zones,
+	public Profile(String name, ProfileSettings settings, PlaceSets everywhere, List<Zone> zones,
 			Map<String, Integer> zoneColors) {
-		this(name, settings, globalRules, zones, zoneColors, null, false);
+		this(name, settings, everywhere, zones, zoneColors, null, false);
 	}
 
 	/** A profile with no zones. */
-	public Profile(String name, ProfileSettings settings, List<SetEntry> globalRules) {
-		this(name, settings, globalRules, List.of(), Map.of());
+	public Profile(String name, ProfileSettings settings, PlaceSets everywhere) {
+		this(name, settings, everywhere, List.of(), Map.of());
 	}
 
 	public static Profile empty(String name) {
-		return new Profile(name, ProfileSettings.DEFAULTS, List.of());
+		return new Profile(name, ProfileSettings.DEFAULTS, PlaceSets.EMPTY);
 	}
 
 	public Profile withSettings(ProfileSettings value) {
-		return new Profile(name, value, globalRules, zones, zoneColors, lastJoined, boostConfirmed);
+		return new Profile(name, value, everywhere, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
 	public Profile withName(String value) {
-		return new Profile(value, settings, globalRules, zones, zoneColors, lastJoined, boostConfirmed);
+		return new Profile(value, settings, everywhere, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
-	public Profile withGlobalRules(List<SetEntry> value) {
+	public Profile withEverywhere(PlaceSets value) {
 		return new Profile(name, settings, value, zones, zoneColors, lastJoined, boostConfirmed);
 	}
 
 	/** Records a join (FR-11.3); called with the time the player joined this server or world. */
 	public Profile withLastJoined(Instant value) {
-		return new Profile(name, settings, globalRules, zones, zoneColors, value, boostConfirmed);
+		return new Profile(name, settings, everywhere, zones, zoneColors, value, boostConfirmed);
 	}
 
 	/** Set after the player confirms the boost dialog, so it is not shown again for this profile (FR-5.4). */
 	public Profile withBoostConfirmed(boolean value) {
-		return new Profile(name, settings, globalRules, zones, zoneColors, lastJoined, value);
+		return new Profile(name, settings, everywhere, zones, zoneColors, lastJoined, value);
 	}
 
+	// ---- Places (Everywhere and zones, FR-8.6, FR-8.10) ----
+
+	/** The sets of Everywhere or of the zone; {@code null} for a zone this profile does not have. */
+	public PlaceSets place(PlaceRef where) {
+		if (where.isEverywhere()) {
+			return everywhere;
+		}
+		Zone zone = zone(where.zoneId());
+		return zone == null ? null : zone.sets();
+	}
+
+	/** Replaces the sets of Everywhere or of the zone; unchanged for a zone this profile does not have. */
+	public Profile withPlace(PlaceRef where, PlaceSets value) {
+		if (where.isEverywhere()) {
+			return withEverywhere(value);
+		}
+		Zone zone = zone(where.zoneId());
+		return zone == null ? this : putZone(zone.withSets(value));
+	}
+
+	/** Every place that attaches the set: Everywhere first, then zones in list order. */
+	public List<PlaceRef> placesUsing(String setId) {
+		List<PlaceRef> out = new ArrayList<>();
+		if (everywhere.uses(setId)) {
+			out.add(PlaceRef.EVERYWHERE);
+		}
+		for (Zone zone : zones) {
+			if (zone.sets().uses(setId)) {
+				out.add(PlaceRef.zone(zone.id()));
+			}
+		}
+		return out;
+	}
+
+	// ---- Boost (FR-5.4) ----
+
 	/**
-	 * Whether setting a rule to this volume must first show the boost dialog (FR-5.4): only above 100%, and only until
+	 * Whether setting an entry to this level must first show the boost dialog (FR-5.4): only above 100%, and only until
 	 * the player has confirmed it once for this profile.
 	 *
-	 * @param volume the new volume in percent, or null if the rule does not set one
+	 * @param volume the new level in percent, or null if the entry does not set one
 	 */
 	public boolean needsBoostConfirm(Integer volume) {
 		return !boostConfirmed && volume != null && volume > 100;
 	}
 
 	/**
-	 * Whether any rule, global or in a zone, sets a volume above 100%: a profile that came in by import or copy with
-	 * such a rule must first show the boost dialog (FR-5.4) unless it was already confirmed.
+	 * Whether any entry attached anywhere in this profile, in a library set or in a place's Quick changes, sets a level
+	 * above 100%: a profile that came in by import or copy with one must first show the boost dialog (FR-5.4) unless it
+	 * was already confirmed. Sets the library does not have are skipped.
 	 */
-	public boolean hasBoost() {
-		for (SetEntry rule : globalRules) {
-			if (needsConfirm(rule)) {
+	public boolean hasBoost(SetLibrary library) {
+		if (hasBoost(everywhere, library)) {
+			return true;
+		}
+		for (Zone zone : zones) {
+			if (hasBoost(zone.sets(), library)) {
 				return true;
 			}
 		}
-		for (Zone zone : zones) {
-			for (SetEntry rule : zone.rules()) {
-				if (needsConfirm(rule)) {
+		return false;
+	}
+
+	private static boolean hasBoost(PlaceSets place, SetLibrary library) {
+		for (Attachment attachment : place.attached()) {
+			SoundSet set = attachment.setId().equals(SoundSet.QUICK_ID) ? place.quickChanges() : library.get(attachment.setId());
+			if (set == null) {
+				continue;
+			}
+			for (SetEntry entry : set.entries()) {
+				if (entry.volume() != null && entry.volume() > 100) {
 					return true;
 				}
 			}
@@ -115,9 +169,7 @@ public record Profile(String name, ProfileSettings settings, List<SetEntry> glob
 		return false;
 	}
 
-	private static boolean needsConfirm(SetEntry rule) {
-		return rule.volume() != null && rule.volume() > 100;
-	}
+	// ---- Zones (Zones tab, PRD 6.1) ----
 
 	/** Replaces the zones; colors of zones no longer present are dropped. */
 	public Profile withZones(List<Zone> value) {
@@ -128,125 +180,20 @@ public record Profile(String name, ProfileSettings settings, List<SetEntry> glob
 				colors.put(zone.id(), rgb);
 			}
 		}
-		return new Profile(name, settings, globalRules, value, colors, lastJoined, boostConfirmed);
+		return new Profile(name, settings, everywhere, value, colors, lastJoined, boostConfirmed);
 	}
 
 	/** Sets the outline color of a zone in this profile. */
 	public Profile withZoneColor(String zoneId, int rgb) {
 		Map<String, Integer> colors = new LinkedHashMap<>(zoneColors);
 		colors.put(zoneId, rgb);
-		return new Profile(name, settings, globalRules, zones, colors, lastJoined, boostConfirmed);
+		return new Profile(name, settings, everywhere, zones, colors, lastJoined, boostConfirmed);
 	}
 
 	/** The zone's color as {@code 0xRRGGBB}, or null if it has none. */
 	public Integer colorOf(String zoneId) {
 		return zoneColors.get(zoneId);
 	}
-
-	/**
-	 * The exact-ID rule for this sound ID (the rule quick actions create and edit, FR-1.5), or null. An exact-ID rule
-	 * is one whose pattern is the ID itself, with no wildcard.
-	 */
-	public SetEntry exactRule(String soundId) {
-		for (SetEntry rule : globalRules) {
-			if (rule.pattern().text().equals(soundId)) {
-				return rule;
-			}
-		}
-		return null;
-	}
-
-	/** Whether this sound ID has an exact-ID rule that mutes it. */
-	public boolean isExactMuted(String soundId) {
-		SetEntry rule = exactRule(soundId);
-		return rule != null && rule.enabled() && Boolean.TRUE.equals(rule.mute());
-	}
-
-	/** Quick action Mute: sets mute on the sound's exact-ID rule, creating the rule if needed (FR-1.5). */
-	public Profile muteExact(String soundId) {
-		SetEntry existing = exactRule(soundId);
-		if (existing == null) {
-			return withRules(append(SetEntry.of(exactRuleId(soundId), soundId).withMute(true)));
-		}
-		return replace(existing, existing.withEnabled(true).withMute(true));
-	}
-
-	/**
-	 * Quick action Unmute: clears mute on the sound's exact-ID rule. A rule left setting nothing is removed, so muting
-	 * and unmuting leaves the profile as it was.
-	 */
-	public Profile unmuteExact(String soundId) {
-		SetEntry existing = exactRule(soundId);
-		if (existing == null) {
-			return this;
-		}
-		SetEntry cleared = existing.withMute(null);
-		if (!cleared.setsLoudness() && !cleared.setsLimit() && !cleared.setsCue()) {
-			List<SetEntry> rules = new ArrayList<>(globalRules);
-			rules.remove(existing);
-			return withRules(rules);
-		}
-		return replace(existing, cleared);
-	}
-
-	/** The global rule with this ID, or null. */
-	public SetEntry rule(String id) {
-		for (SetEntry rule : globalRules) {
-			if (rule.id().equals(id)) {
-				return rule;
-			}
-		}
-		return null;
-	}
-
-	/** Saves a rule from the editor: replaces the rule with the same ID in place, or adds it at the end. */
-	public Profile putRule(SetEntry rule) {
-		SetEntry existing = rule(rule.id());
-		return existing == null ? withRules(append(rule)) : replace(existing, rule);
-	}
-
-	/** Deletes the rule with this ID; returns this profile if there is none. */
-	public Profile removeRule(String id) {
-		SetEntry existing = rule(id);
-		if (existing == null) {
-			return this;
-		}
-		List<SetEntry> rules = new ArrayList<>(globalRules);
-		rules.remove(existing);
-		return withRules(rules);
-	}
-
-	/**
-	 * Moves a rule up ({@code delta < 0}) or down the list. List order is the last tie-break between rules (FR-4.5
-	 * step 4). Returns this profile if the rule is missing or already at that end.
-	 */
-	public Profile moveRule(String id, int delta) {
-		SetEntry existing = rule(id);
-		if (existing == null) {
-			return this;
-		}
-		int from = globalRules.indexOf(existing);
-		int to = Math.max(0, Math.min(globalRules.size() - 1, from + delta));
-		if (to == from) {
-			return this;
-		}
-		List<SetEntry> rules = new ArrayList<>(globalRules);
-		rules.remove(from);
-		rules.add(to, existing);
-		return withRules(rules);
-	}
-
-	/** An ID for a new rule from the editor: {@code r1}, {@code r2}, … the first one not in use. */
-	public String newRuleId() {
-		for (int n = 1; ; n++) {
-			String id = "r" + n;
-			if (rule(id) == null) {
-				return id;
-			}
-		}
-	}
-
-	// ---- Zones (Zones tab, PRD 6.1) ----
 
 	/** The zone with this ID, or null. */
 	public Zone zone(String id) {
@@ -309,26 +256,5 @@ public record Profile(String name, ProfileSettings settings, List<SetEntry> glob
 				return id;
 			}
 		}
-	}
-
-	/** Stable ID for a quick-action rule, so muting the same sound twice cannot create two rules. */
-	static String exactRuleId(String soundId) {
-		return "exact:" + soundId;
-	}
-
-	private Profile withRules(List<SetEntry> rules) {
-		return withGlobalRules(rules);
-	}
-
-	private List<SetEntry> append(SetEntry rule) {
-		List<SetEntry> rules = new ArrayList<>(globalRules);
-		rules.add(rule);
-		return rules;
-	}
-
-	private Profile replace(SetEntry old, SetEntry replacement) {
-		List<SetEntry> rules = new ArrayList<>(globalRules);
-		rules.set(rules.indexOf(old), replacement);
-		return withRules(rules);
 	}
 }

@@ -2,6 +2,8 @@ package soundsculptor.core.trace;
 
 import java.util.Objects;
 
+import soundsculptor.core.sets.PlaceSets;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.ZoneEdge;
 
@@ -19,9 +21,14 @@ public record TraceEditContext(String soundId, LastPlay play, ZoneEdge profileEd
 		Objects.requireNonNull(profileEdge, "profileEdge");
 	}
 
-	/** The trace for these rules and zones, exactly as {@link SoundTracer} builds it. */
+	/**
+	 * The trace for these rules and zones, exactly as {@link SoundTracer} builds it. Only Quick changes count: library
+	 * sets are left out until the trace is in set terms.
+	 */
 	public SoundTrace trace(EditableRules rules) {
-		return SoundTracer.trace(new Precedence(rules.globalRules(), rules.zones(), profileEdge), soundId, play, bypass,
-				vanillaCovered);
+		// M8c shim: removed in Task 10
+		PlaceSets everywhere = PlaceSets.EMPTY.withQuickEntries(rules.globalRules());
+		return SoundTracer.trace(new Precedence(everywhere, rules.zones(), SetLibrary.EMPTY, profileEdge), soundId, play,
+				bypass, vanillaCovered);
 	}
 }

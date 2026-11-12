@@ -656,7 +656,8 @@ public final class SoundSculptorScreen extends SculptScreen {
 				micros(diagnostics.sounds().maxMicros()), micros(diagnostics.peakSoundMicros())));
 		body.label(() -> timing("soundsculptor.diag.tick", diagnostics.tick()));
 		body.label(() -> timing("soundsculptor.diag.outlines", diagnostics.outlines()));
-		body.label(() -> Component.translatable("soundsculptor.diag.active", diagnostics.globalRules(), diagnostics.zones()));
+		body.label(() -> Component.translatable("soundsculptor.diag.active", diagnostics.activeSets(),
+				diagnostics.librarySets(), diagnostics.activeEntries(), diagnostics.zones()));
 		body.label(() -> Double.isNaN(diagnostics.cacheHitRate())
 				? Component.translatable("soundsculptor.diag.cache.none")
 				: Component.translatable("soundsculptor.diag.cache", String.format(Locale.ROOT, "%.1f", diagnostics.cacheHitRate() * 100)));

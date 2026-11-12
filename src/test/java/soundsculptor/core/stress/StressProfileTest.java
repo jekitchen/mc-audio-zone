@@ -3,9 +3,14 @@ package soundsculptor.core.stress;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import soundsculptor.core.sets.Attachment;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -15,17 +20,27 @@ import soundsculptor.core.zones.ZoneMode;
 
 import org.junit.jupiter.api.Test;
 
-/** PRD 11.2 step 2: the "stress" profile, 50 global rules and 64 zones overlapping the pen. */
+/**
+ * PRD 11.2 step 2: the "stress" profile, Everywhere with 2 sets of 25 entries and 64 zones overlapping the pen, each
+ * with sets from a shared pool.
+ */
 class StressProfileTest {
 	private static final String WORLD = "world:stress";
 	private static final String OVERWORLD = "minecraft:overworld";
 
 	@Test
-	void hasFiftyGlobalRulesMixingExactAndWildcard() {
-		List<SetEntry> rules = StressProfile.globalRules();
-		assertEquals(50, rules.size());
-		long exact = rules.stream().filter(r -> r.pattern().isExact()).count();
-		assertTrue(exact >= 15 && exact <= 35, "exact: " + exact);
+	void everywhereHasTwoSetsOfTwentyFiveMixingSinglesAndGroups() {
+		SetLibrary library = StressProfile.library();
+		List<Attachment> attached = StressProfile.everywhere().attached();
+		assertEquals(2, attached.size());
+		for (Attachment a : attached) {
+			assertTrue(a.enabled());
+			List<SetEntry> entries = library.get(a.setId()).entries();
+			assertEquals(25, entries.size(), a.setId());
+			long singles = entries.stream().filter(e -> e.pattern().isExact()).count();
+			assertTrue(singles >= 5 && singles <= 20, a.setId() + " singles: " + singles);
+		}
+		assertEquals(50, StressProfile.everywhereEntries().size());
 	}
 
 	@Test
@@ -39,7 +54,24 @@ class StressProfileTest {
 		assertTrue(zones.stream().anyMatch(z -> z.mode() == ZoneMode.OUTSIDE));
 		assertTrue(zones.stream().anyMatch(z -> z.edge().mode() == ZoneEdge.Mode.FADE));
 		assertTrue(zones.stream().anyMatch(Zone::isBubble));
-		assertTrue(zones.stream().allMatch(z -> !z.rules().isEmpty()));
+	}
+
+	@Test
+	void zonesAttachOneToThreeSetsFromASharedPool() {
+		SetLibrary library = StressProfile.library();
+		Map<String, Integer> uses = new HashMap<>();
+		for (Zone z : StressProfile.zones(WORLD, OVERWORLD)) {
+			int count = z.sets().librarySetCount();
+			assertTrue(count >= 1 && count <= 3, z.id() + " attaches " + count);
+			for (Attachment a : z.sets().attached()) {
+				assertTrue(library.contains(a.setId()), a.setId());
+				assertTrue(!StressProfile.EVERYWHERE_SET_IDS.contains(a.setId()), "zones use the pool");
+				uses.merge(a.setId(), 1, Integer::sum);
+			}
+		}
+		assertTrue(uses.size() <= StressProfile.POOL_SIZE);
+		assertTrue(uses.values().stream().filter(n -> n > 1).count() >= 2, "sets are shared by several zones: " + uses);
+		assertEquals(2 + StressProfile.POOL_SIZE, library.size());
 	}
 
 	@Test
@@ -54,8 +86,11 @@ class StressProfileTest {
 
 	@Test
 	void profileIsTheSameEveryTime() {
-		assertEquals(StressProfile.globalRules(), StressProfile.globalRules());
+		assertEquals(StressProfile.everywhereEntries(), StressProfile.everywhereEntries());
 		assertEquals(StressProfile.zones(WORLD, OVERWORLD), StressProfile.zones(WORLD, OVERWORLD));
+		List<SoundSet> a = StressProfile.library().sets();
+		List<SoundSet> b = StressProfile.library().sets();
+		assertEquals(a, b);
 	}
 
 	@Test

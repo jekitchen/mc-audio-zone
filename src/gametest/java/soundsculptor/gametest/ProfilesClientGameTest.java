@@ -1,5 +1,7 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.profile.RuleTarget;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileSettings;
@@ -49,8 +51,8 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			Profile serverA = Profile.empty("Server A")
-					.putRule(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))
-					.putRule(SetEntry.of("r2", "*cow*").withVolume(40))
+					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
+							SetEntry.of("r2", "*cow*").withVolume(40))))
 					.withZones(List.of(zone("fa", A), zone("ba", A).asBubble()))
 					.withSettings(new ProfileSettings(false))
 					.withLastJoined(Instant.parse("2026-11-01T12:00:00Z"));
@@ -86,7 +88,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
 			Profile copied = context.computeOnClient(mc -> ProfileManager.profile());
-			check(copied.globalRules().size() == 2, "A's global rules are copied, was " + copied.globalRules());
+			check(RuleTarget.GLOBAL.rules(copied).size() == 2, "A's global rules are copied, was " + RuleTarget.GLOBAL.rules(copied));
 			check(copied.zones().stream().map(Zone::id).toList().equals(List.of("home", "ba")),
 					"this world's fixed zone stays and A's bubble arrives; A's fixed zone does not, was " + copied.zones());
 			check(!copied.settings().showDistance(), "A's settings are copied");
@@ -94,8 +96,8 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 					&& main(mc).toast().message().getString().equals("Copied from Server A")), "a toast confirms the copy");
 
 			// A one-time copy: changing A later does not change this world.
-			context.runOnClient(mc -> ProfileManager.saveOther(A, serverA.removeRule("r1")));
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().size()) == 2, "this world keeps its copy");
+			context.runOnClient(mc -> ProfileManager.saveOther(A, RuleTarget.GLOBAL.remove(serverA, "r1")));
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).size()) == 2, "this world keeps its copy");
 
 			// Rename A (FR-11.3): an empty name is refused; a new name changes only the display name.
 			context.runOnClient(mc -> row(mc, A).buttons().stream()
@@ -111,7 +113,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			});
 			context.waitForScreen(SoundSculptorScreen.class);
 			Profile renamed = context.computeOnClient(mc -> stored(A));
-			check(renamed.name().equals("Farm server") && renamed.globalRules().size() == 1, "A is renamed and keeps its rules, was " + renamed);
+			check(renamed.name().equals("Farm server") && RuleTarget.GLOBAL.rules(renamed).size() == 1, "A is renamed and keeps its rules, was " + renamed);
 			check(context.computeOnClient(mc -> row(mc, A).columnTexts().get(0)).equals("Farm server"), "the list shows the new name");
 
 			// Reset A: back to empty defaults; this world is unaffected.
@@ -120,9 +122,9 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
 			Profile reset = context.computeOnClient(mc -> stored(A));
-			check(reset.globalRules().isEmpty() && reset.zones().isEmpty() && reset.settings().equals(ProfileSettings.DEFAULTS)
+			check(RuleTarget.GLOBAL.rules(reset).isEmpty() && reset.zones().isEmpty() && reset.settings().equals(ProfileSettings.DEFAULTS)
 					&& reset.name().equals("Farm server"), "A is reset to empty defaults, keeping its name, was " + reset);
-			check(context.computeOnClient(mc -> ProfileManager.profile().globalRules().size()) == 2, "this world is unaffected by the reset");
+			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).size()) == 2, "this world is unaffected by the reset");
 
 			// Delete: never this world's profile; A's goes (kept as .bak).
 			context.runOnClient(mc -> panel(mc).delete(key));
@@ -157,13 +159,13 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			String idText = context.computeOnClient(mc -> read(mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).resolve(WorldIds.FILE_NAME)));
 			check(newKey.equals("world:" + WorldIds.readId(idText).orElse("")), "the ID file holds the new ID, was " + idText);
 			check(context.computeOnClient(mc -> ProfileManager.profile().zone("home").worldKey()).equals(newKey), "the fixed zone moves to the new key");
-			check(context.computeOnClient(mc -> stored(key)).globalRules().size() == 2, "the original profile is kept");
+			check(RuleTarget.GLOBAL.rules(context.computeOnClient(mc -> stored(key))).size() == 2, "the original profile is kept");
 
 			// Copying boosted rules into a profile that never confirmed boost asks first (FR-5.4), then saves it as confirmed.
 			String boostKey = "boost.example.net";
 			context.runOnClient(mc -> {
 				try {
-					ProfileManager.store().save(boostKey, Profile.empty("Boost server").putRule(SetEntry.of("b1", "*bell*").withVolume(150)));
+					ProfileManager.store().save(boostKey, RuleTarget.GLOBAL.put(Profile.empty("Boost server"), SetEntry.of("b1", "*bell*").withVolume(150)));
 				} catch (java.io.IOException e) {
 					throw new AssertionError(e);
 				}
@@ -179,7 +181,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().boostConfirmed()
-					&& ProfileManager.profile().rule("b1") != null), "the boosted rule is copied and boost is confirmed");
+					&& RuleTarget.GLOBAL.rule(ProfileManager.profile(), "b1") != null), "the boosted rule is copied and boost is confirmed");
 
 			context.runOnClient(mc -> {
 				mc.gui.setScreen(null);
@@ -232,7 +234,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zone(String id, String key) {
-		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), List.of());
+		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), PlaceSets.EMPTY);
 	}
 
 	private static void check(boolean condition, String message) {

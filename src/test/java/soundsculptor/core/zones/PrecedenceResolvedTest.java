@@ -17,7 +17,8 @@ class PrecedenceResolvedTest {
 
 	@Test
 	void decideResolvedMatchesDecideEverywhereWithEveryZoneKind() {
-		Precedence p = new Precedence(StressProfile.globalRules(), StressProfile.zones(WORLD, OVERWORLD), ZoneEdge.fade(4));
+		Precedence p = new Precedence(StressProfile.everywhere(), StressProfile.zones(WORLD, OVERWORLD),
+				StressProfile.library(), ZoneEdge.fade(4));
 		EntryResolution[] resolved = new EntryResolution[Precedence.MAX_ZONES + 1];
 		SoundDecision a = new SoundDecision();
 		SoundDecision b = new SoundDecision();

@@ -158,7 +158,7 @@ public final class TraceScreen extends SculptScreen {
 
 	private static EditableRules currentRules() {
 		Profile profile = ProfileManager.profile();
-		return new EditableRules(profile.globalRules(), profile.zones());
+		return new EditableRules(profile.everywhere().quickEntries(), profile.zones()); // M8c shim: removed in Task 10
 	}
 
 	private void recompute() {
@@ -305,7 +305,8 @@ public final class TraceScreen extends SculptScreen {
 	}
 
 	private static Profile withRules(Profile profile, EditableRules rules) {
-		return profile.withGlobalRules(rules.globalRules()).withZones(rules.zones());
+		// M8c shim: removed in Task 10
+		return profile.withEverywhere(profile.everywhere().withQuickEntries(rules.globalRules())).withZones(rules.zones());
 	}
 
 	private static Component errorText(TraceEditError error) {

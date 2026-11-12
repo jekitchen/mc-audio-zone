@@ -10,9 +10,10 @@ import soundsculptor.core.Message;
 final class ProfileText {
 	// Places in a file.
 	static final String PLACE_SETTINGS = "soundsculptor.profile.place.settings";
-	static final String PLACE_RULE = "soundsculptor.profile.place.rule";
+	static final String PLACE_EVERYWHERE = "soundsculptor.profile.place.everywhere";
 	static final String PLACE_ZONE = "soundsculptor.profile.place.zone";
-	static final String PLACE_ZONE_RULE = "soundsculptor.profile.place.zone_rule";
+	static final String PLACE_ATTACHMENT = "soundsculptor.profile.place.attachment";
+	static final String PLACE_QUICK = "soundsculptor.profile.place.quick";
 
 	// A field's problem: "%1$s, field %2$s: %3$s." with a place, "Field %1$s: %2$s." at the top of the file.
 	static final String FIELD = "soundsculptor.profile.problem.field";
@@ -27,12 +28,15 @@ final class ProfileText {
 	static final String NOT_NUMBER = "soundsculptor.profile.problem.value.not_number";
 	static final String ABOVE_MAX = "soundsculptor.profile.problem.value.above_max";
 	static final String BELOW_MIN = "soundsculptor.profile.problem.value.below_min";
-	static final String NOT_WHOLE = "soundsculptor.profile.problem.value.not_whole";
 	static final String NOT_CHOICE = "soundsculptor.profile.problem.value.not_choice";
 	static final String NOT_COLOR = "soundsculptor.profile.problem.value.not_color";
 	static final String NOT_OBJECT = "soundsculptor.profile.problem.value.not_object";
 	static final String NOT_LIST = "soundsculptor.profile.problem.value.not_list";
 	static final String ID_USED = "soundsculptor.profile.problem.value.id_used";
+	static final String QUICK_NOT_FIRST = "soundsculptor.profile.problem.value.quick_not_first";
+	static final String QUICK_UNLISTED = "soundsculptor.profile.problem.value.quick_unlisted";
+	static final String SET_TWICE = "soundsculptor.profile.problem.value.set_twice";
+	static final String TOO_MANY_SETS = "soundsculptor.profile.problem.value.too_many_sets";
 
 	// The file as a whole.
 	static final String NOT_JSON = "soundsculptor.profile.problem.not_json";
@@ -40,7 +44,6 @@ final class ProfileText {
 	static final String NOT_PROFILE = "soundsculptor.profile.problem.not_profile";
 	static final String NOT_ALLOWED = "soundsculptor.profile.problem.not_allowed";
 	static final String TOO_MANY_ZONES = "soundsculptor.profile.problem.too_many_zones";
-	static final String TOO_MANY_RULES = "soundsculptor.profile.problem.too_many_rules";
 	static final String TOO_LARGE = "soundsculptor.profile.problem.too_large";
 	static final String UNREADABLE = "soundsculptor.profile.problem.unreadable";
 	static final String NOT_UTF8 = "soundsculptor.profile.problem.not_utf8";

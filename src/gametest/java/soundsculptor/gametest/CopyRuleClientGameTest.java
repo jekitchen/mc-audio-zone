@@ -1,5 +1,6 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.sets.SetEntry;
@@ -30,7 +31,7 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name())
-					.putRule(SetEntry.of("r1", VILLAGERS).withMute(true))
+					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", VILLAGERS).withMute(true))))
 					.withZones(List.of(zone("a", key, SetEntry.of("r1", "*cow*").withVolume(40)), zone("b", key)))));
 
 			// The global Rules tab has no "Add existing rule"; a zone's rules do.
@@ -87,7 +88,7 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(ZoneRulesScreen.class);
 			check(context.computeOnClient(mc -> Boolean.FALSE.equals(RuleTarget.zone("b").rules(ProfileManager.profile()).get(0).mute())),
 					"the copy should change");
-			check(context.computeOnClient(mc -> Boolean.TRUE.equals(ProfileManager.profile().rule("r1").mute())),
+			check(context.computeOnClient(mc -> Boolean.TRUE.equals(RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r1").mute())),
 					"the original global rule must not change");
 
 			context.runOnClient(mc -> {
@@ -99,7 +100,7 @@ public final class CopyRuleClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zone(String id, String key, SetEntry... rules) {
-		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), List.of(rules));
+		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), PlaceSets.EMPTY.withQuickEntries(List.of(rules)));
 	}
 
 	private static void check(boolean condition, String message) {

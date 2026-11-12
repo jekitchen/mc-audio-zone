@@ -1,5 +1,8 @@
 package soundsculptor.core.start;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.List;
@@ -23,12 +26,12 @@ class SoundStartDeciderMemoryTest {
 
 		SetEntry limited = SetEntry.of("r", "minecraft:*").withLimit(new Limit(3, 1000, true));
 		Zone zone = new Zone("z", "Z", true, "world", "minecraft:overworld", new Point(0, 0, 0), new Shape.Sphere(10),
-				List.of(SetEntry.of("zr", "minecraft:entity.*").withMute(true)));
-		Precedence precedence = new Precedence(List.of(limited), List.of(zone));
+				quick(List.of(SetEntry.of("zr", "minecraft:entity.*").withMute(true))));
+		Precedence precedence = precedence(List.of(limited), List.of(zone));
 		decider.setProfile(precedence);
 		decider.limiter().tryStart("r", limited.limit(), 0, 64, 0, 0);
-		precedence.globalRules().resolve("minecraft:entity.cow.ambient");
-		precedence.zoneRules(0).resolve("minecraft:entity.cow.ambient");
+		precedence.everywhere().resolve("minecraft:entity.cow.ambient");
+		precedence.zoneResolver(0).resolve("minecraft:entity.cow.ambient");
 
 		assertEquals(decider.limiter().estimatedBytes() + precedence.estimatedBytes(), decider.estimatedBytes());
 	}

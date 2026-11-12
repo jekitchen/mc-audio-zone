@@ -1,5 +1,7 @@
 package soundsculptor.core.profile;
 
+import static soundsculptor.core.Fixtures.quick;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -84,7 +86,7 @@ class WorldIdsTest {
 
 	private static Zone fixed(String id, String worldKey) {
 		return new Zone(id, "Hall " + id, true, worldKey, "minecraft:overworld", new Point(1, 64, 2), new Shape.Sphere(8),
-				List.of(SetEntry.of("r1", "*villager*").withVolume(50)));
+				quick(List.of(SetEntry.of("r1", "*villager*").withVolume(50))));
 	}
 
 	@Test
@@ -92,7 +94,7 @@ class WorldIdsTest {
 		String oldKey = WorldKey.world(ID).key();
 		Zone bubble = fixed("z2", "").asBubble();
 		Profile current = Profile.empty("My World")
-				.withGlobalRules(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true)))
+				.withEverywhere(quick(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))))
 				.withZones(List.of(fixed("z1", oldKey), bubble, fixed("z3", "play.example.net")))
 				.withZoneColor("z1", 0xE69F00);
 
@@ -103,7 +105,7 @@ class WorldIdsTest {
 		assertEquals(newKey, own.worldKey().key());
 		assertEquals(OTHER_ID + "\n", own.fileText());
 		assertEquals("My World", own.profile().name());
-		assertEquals(current.globalRules(), own.profile().globalRules());
+		assertEquals(current.everywhere().quickEntries(), own.profile().everywhere().quickEntries());
 		assertEquals(current.settings(), own.profile().settings());
 		List<Zone> zones = own.profile().zones();
 		assertEquals(newKey, zones.get(0).worldKey());

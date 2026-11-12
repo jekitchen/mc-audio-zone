@@ -9,6 +9,7 @@ import soundsculptor.core.trace.ExactRules;
 import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.trace.TraceEditor;
 
+// M8c shim: removed in Task 7 (edits Quick changes through the trace's EditableRules)
 /**
  * Recently Played quick actions (PRD FR-1.5): Mute/Unmute, Volume, Limit and Cue create or edit the sound's exact-ID
  * rule in the list the "Apply to" selector chose. Values are checked like the full editors (FR-12.7), and the result
@@ -62,11 +63,12 @@ public final class QuickActions {
 		if (toastKey == null) {
 			return new QuickActionResult(null, profile, profile, null, List.of());
 		}
-		Profile after = profile.withGlobalRules(change.after().globalRules()).withZones(change.after().zones());
+		Profile after = profile.withEverywhere(profile.everywhere().withQuickEntries(change.after().globalRules()))
+				.withZones(change.after().zones());
 		return new QuickActionResult(null, profile, after, toastKey, List.of(soundId));
 	}
 
 	private static EditableRules rules(Profile profile) {
-		return new EditableRules(profile.globalRules(), profile.zones());
+		return new EditableRules(profile.everywhere().quickEntries(), profile.zones());
 	}
 }

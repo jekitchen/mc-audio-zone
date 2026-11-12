@@ -3,10 +3,11 @@ package soundsculptor.core.profile;
 import soundsculptor.core.Message;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.outline.ZoneColors;
-import soundsculptor.core.sets.InvalidPatternException;
-import soundsculptor.core.sets.Limit;
-import soundsculptor.core.sets.SetEntry;
-import soundsculptor.core.sets.SoundPattern;
+import soundsculptor.core.sets.Attachment;
+import soundsculptor.core.sets.PlaceSets;
+import soundsculptor.core.sets.SetCodec;
+import soundsculptor.core.sets.SetFormatException;
+import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
@@ -26,6 +27,7 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -36,28 +38,30 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Reads and writes the profile file (PRD section 7.5). Human-readable JSON; unset rule properties are omitted
- * ("this rule does not set it"); unknown fields are ignored, with a warning, so newer optional fields do not break
- * older readers.
+ * Reads and writes the profile file (PRD section 7.5). Human-readable JSON; unknown fields are ignored, with a
+ * warning, so newer optional fields do not break older readers.
+ *
+ * <p>Each place (Everywhere and every zone) lists its attached Sound Sets in {@code sets}, top first, by library set
+ * ID; {@code "quick"}, when present, is first and refers to the place's own {@code quickChanges} set, held inline with
+ * its entries written as in a Sound Set file ({@link SetCodec}).
  *
  * <p>Reading checks every value (PRD FR-11.6) and names the problem and its place in plain words, for example
- * "Zone 3, field radius: 900 is above the maximum 256." Older schema versions are migrated first (PRD 7.6).
+ * "Zone 3, field radius: 900 is above the maximum 256." Schema 1 and 2 files come from earlier test builds and are
+ * refused ({@link ProfileMigrations#OLD_BUILD}); later schemas will be migrated first (PRD 7.6).
  */
 public final class ProfileCodec {
-	/** At most this many rules in a profile, counting global and zone rules (PRD FR-11.6). */
-	public static final int MAX_RULES = 1000;
 	/** Coordinates beyond the world border are refused. */
 	static final double MAX_COORDINATE = 30_000_000;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
-	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "worldKey", "settings", "globalRules",
+	private static final Set<String> ROOT_FIELDS = Set.of("schemaVersion", "id", "name", "worldKey", "settings", "everywhere",
 			"zones", "lastJoined", "boostConfirmed");
 	private static final Set<String> SETTINGS_FIELDS = Set.of("showDistance", "cueDefault", "outlines", "edge");
-	private static final Set<String> RULE_FIELDS = Set.of("id", "enabled", "pattern", "mute", "volume", "cue", "limit");
-	private static final Set<String> LIMIT_FIELDS = Set.of("count", "windowMs", "perSource");
+	private static final Set<String> PLACE_FIELDS = Set.of("sets", "quickChanges");
+	private static final Set<String> ATTACHMENT_FIELDS = Set.of("set", "enabled");
 	private static final Set<String> ZONE_FIELDS = Set.of("id", "name", "enabled", "color", "anchor", "shape", "mode", "edge",
-			"rules");
+			"sets", "quickChanges");
 	private static final Set<String> ANCHOR_FIELDS = Set.of("type", "x", "y", "z", "dimension", "worldKey");
 	private static final Set<String> EDGE_FIELDS = Set.of("mode", "fade");
 	private static final Map<String, Set<String>> SHAPE_FIELDS = Map.of(
@@ -97,7 +101,9 @@ public final class ProfileCodec {
 		}
 		root.addProperty("boostConfirmed", profile.boostConfirmed());
 		root.add("settings", settingsToJson(profile.settings()));
-		root.add("globalRules", rulesToJson(profile.globalRules()));
+		JsonObject everywhere = new JsonObject();
+		placeToJson(everywhere, profile.everywhere());
+		root.add("everywhere", everywhere);
 		JsonArray zones = new JsonArray();
 		for (Zone zone : profile.zones()) {
 			zones.add(zoneToJson(zone, profile.colorOf(zone.id())));
@@ -121,36 +127,19 @@ public final class ProfileCodec {
 		return json;
 	}
 
-	private static JsonArray rulesToJson(List<SetEntry> rules) {
-		JsonArray array = new JsonArray();
-		for (SetEntry rule : rules) {
-			array.add(ruleToJson(rule));
+	/** Adds a place's {@code sets} and, if it has one, its {@code quickChanges} to {@code json}. */
+	private static void placeToJson(JsonObject json, PlaceSets place) {
+		JsonArray sets = new JsonArray();
+		for (Attachment attachment : place.attached()) {
+			JsonObject a = new JsonObject();
+			a.addProperty("set", attachment.setId());
+			a.addProperty("enabled", attachment.enabled());
+			sets.add(a);
 		}
-		return array;
-	}
-
-	private static JsonObject ruleToJson(SetEntry rule) {
-		JsonObject json = new JsonObject();
-		json.addProperty("id", rule.id());
-		json.addProperty("enabled", rule.enabled());
-		json.addProperty("pattern", rule.pattern().text());
-		if (rule.mute() != null) {
-			json.addProperty("mute", rule.mute());
+		json.add("sets", sets);
+		if (place.quickChanges() != null) {
+			json.add("quickChanges", SetCodec.quickToJson(place.quickChanges()));
 		}
-		if (rule.volume() != null) {
-			json.addProperty("volume", rule.volume());
-		}
-		if (rule.cue() != null) {
-			json.addProperty("cue", rule.cue());
-		}
-		if (rule.limit() != null) {
-			JsonObject limit = new JsonObject();
-			limit.addProperty("count", rule.limit().count());
-			limit.addProperty("windowMs", rule.limit().windowMs());
-			limit.addProperty("perSource", rule.limit().perSource());
-			json.add("limit", limit);
-		}
-		return json;
 	}
 
 	private static JsonObject zoneToJson(Zone zone, Integer color) {
@@ -206,7 +195,7 @@ public final class ProfileCodec {
 			edge.addProperty("fade", zone.edge().fadeDistance());
 		}
 		json.add("edge", edge);
-		json.add("rules", rulesToJson(zone.rules()));
+		placeToJson(json, zone.sets());
 		return json;
 	}
 
@@ -272,22 +261,19 @@ public final class ProfileCodec {
 		ProfileSettings settings = top.has("settings")
 				? readSettings(top.object("settings", Message.of(ProfileText.PLACE_SETTINGS), SETTINGS_FIELDS))
 				: ProfileSettings.DEFAULTS;
-		JsonArray ruleArray = top.has("globalRules") ? top.array("globalRules") : new JsonArray();
+		PlaceSets everywhere = top.has("everywhere")
+				? readPlace(top.object("everywhere", Message.of(ProfileText.PLACE_EVERYWHERE), PLACE_FIELDS), warnings)
+				: PlaceSets.EMPTY;
 		JsonArray zoneArray = top.has("zones") ? top.array("zones") : new JsonArray();
 		if (zoneArray.size() > Precedence.MAX_ZONES) {
 			throw ProfileText.problem(ProfileText.TOO_MANY_ZONES, zoneArray.size(), Precedence.MAX_ZONES);
 		}
-		List<SetEntry> rules = new ArrayList<>();
-		for (int i = 0; i < ruleArray.size(); i++) {
-			rules.add(readRule(top.element(ruleArray, i, Message.of(ProfileText.PLACE_RULE, i + 1), RULE_FIELDS)));
-		}
-		int ruleCount = rules.size();
 		List<Zone> zones = new ArrayList<>();
 		Map<String, Integer> colors = new LinkedHashMap<>();
 		Map<String, Integer> firstUse = new HashMap<>();
 		for (int i = 0; i < zoneArray.size(); i++) {
 			Fields z = top.element(zoneArray, i, Message.of(ProfileText.PLACE_ZONE, i + 1), ZONE_FIELDS);
-			Zone zone = readZone(z);
+			Zone zone = readZone(z, warnings);
 			Integer earlier = firstUse.putIfAbsent(zone.id(), i + 1);
 			if (earlier != null) {
 				throw z.problem("id", Message.of(ProfileText.ID_USED, quote(zone.id()), earlier));
@@ -295,13 +281,60 @@ public final class ProfileCodec {
 			if (z.has("color")) {
 				colors.put(zone.id(), z.color("color"));
 			}
-			ruleCount += zone.rules().size();
 			zones.add(zone);
 		}
-		if (ruleCount > MAX_RULES) {
-			throw ProfileText.problem(ProfileText.TOO_MANY_RULES, ruleCount, MAX_RULES);
+		return new Read(new Profile(name, settings, everywhere, zones, colors, lastJoined, boostConfirmed), warnings);
+	}
+
+	/**
+	 * A place's attached sets and Quick changes. Checked as the editor keeps them: {@code "quick"} only first and only
+	 * with a {@code quickChanges} set, no set twice, at most {@value PlaceSets#MAX_SETS} library sets, and the Quick
+	 * changes entries checked like a Sound Set file's (at most {@value SoundSet#MAX_ENTRIES}).
+	 */
+	private static PlaceSets readPlace(Fields p, List<Message> warnings) throws ProfileFormatException {
+		List<Attachment> attached = new ArrayList<>();
+		if (p.has("sets")) {
+			JsonArray array = p.array("sets");
+			Set<String> seen = new HashSet<>();
+			int librarySets = 0;
+			for (int i = 0; i < array.size(); i++) {
+				Fields a = p.element(array, i, Message.of(ProfileText.PLACE_ATTACHMENT, p.where(), i + 1), ATTACHMENT_FIELDS);
+				String id = a.string("set");
+				boolean quick = id.equals(SoundSet.QUICK_ID);
+				if (quick && i > 0) {
+					throw p.problem("sets", ProfileText.QUICK_NOT_FIRST);
+				}
+				if (!seen.add(id)) {
+					throw p.problem("sets", ProfileText.SET_TWICE, quote(id));
+				}
+				if (!quick) {
+					librarySets++;
+				}
+				attached.add(new Attachment(id, !a.has("enabled") || a.bool("enabled")));
+			}
+			if (librarySets > PlaceSets.MAX_SETS) {
+				throw p.problem("sets", ProfileText.TOO_MANY_SETS, librarySets, PlaceSets.MAX_SETS);
+			}
 		}
-		return new Read(new Profile(name, settings, rules, zones, colors, lastJoined, boostConfirmed), warnings);
+		boolean quickListed = !attached.isEmpty() && attached.get(0).setId().equals(SoundSet.QUICK_ID);
+		SoundSet quick = null;
+		if (p.has("quickChanges")) {
+			if (!quickListed) {
+				throw p.problem("quickChanges", ProfileText.QUICK_UNLISTED);
+			}
+			JsonElement raw = p.require("quickChanges");
+			if (!raw.isJsonObject()) {
+				throw p.problem("quickChanges", ProfileText.NOT_OBJECT, describe(raw));
+			}
+			try {
+				quick = SetCodec.readQuick(raw.getAsJsonObject(), Message.of(ProfileText.PLACE_QUICK, p.where()), warnings);
+			} catch (SetFormatException e) {
+				throw new ProfileFormatException(e.problem(), e);
+			}
+		} else if (quickListed) {
+			throw p.problem("quickChanges", ProfileText.MISSING);
+		}
+		return new PlaceSets(attached, quick);
 	}
 
 	/** Profile settings; a missing value takes its default. */
@@ -326,30 +359,7 @@ public final class ProfileCodec {
 		return settings;
 	}
 
-	private static SetEntry readRule(Fields r) throws ProfileFormatException {
-		String id = r.string("id");
-		String patternText = r.string("pattern");
-		SoundPattern pattern;
-		try {
-			pattern = SoundPattern.of(patternText);
-		} catch (InvalidPatternException e) {
-			throw new ProfileFormatException(r.problem("pattern", Message.of(e.error().translationKey())).problem(), e);
-		}
-		boolean enabled = !r.has("enabled") || r.bool("enabled");
-		Boolean mute = r.has("mute") ? r.bool("mute") : null;
-		Integer volume = r.has("volume") ? r.integer("volume", SetEntry.MIN_VOLUME, SetEntry.MAX_VOLUME) : null;
-		Boolean cue = r.has("cue") ? r.bool("cue") : null;
-		Limit limit = null;
-		if (r.has("limit")) {
-			Fields l = r.object("limit", r.where(), LIMIT_FIELDS);
-			limit = new Limit(l.integer("count", Limit.MIN_COUNT, Limit.MAX_COUNT),
-					l.integer("windowMs", Limit.MIN_WINDOW_MS, Limit.MAX_WINDOW_MS),
-					l.has("perSource") && l.bool("perSource"));
-		}
-		return new SetEntry(id, enabled, pattern, mute, volume, limit, cue);
-	}
-
-	private static Zone readZone(Fields z) throws ProfileFormatException {
+	private static Zone readZone(Fields z, List<Message> warnings) throws ProfileFormatException {
 		String id = z.string("id");
 		String name = z.has("name") ? z.string("name") : null;
 		boolean enabled = !z.has("enabled") || z.bool("enabled");
@@ -380,15 +390,8 @@ public final class ProfileCodec {
 				default -> ZoneEdge.DEFAULT;
 			};
 		}
-		List<SetEntry> rules = new ArrayList<>();
-		if (z.has("rules")) {
-			JsonArray array = z.array("rules");
-			for (int i = 0; i < array.size(); i++) {
-				rules.add(readRule(z.element(array, i, Message.of(ProfileText.PLACE_ZONE_RULE, z.where(), i + 1),
-						RULE_FIELDS)));
-			}
-		}
-		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, rules, mode, edge,
+		PlaceSets sets = readPlace(z, warnings);
+		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, mode, edge,
 				anchorType.equals("fixed") ? AnchorType.FIXED : AnchorType.BUBBLE);
 	}
 
@@ -534,14 +537,6 @@ public final class ProfileCodec {
 				throw problem(field, ProfileText.BELOW_MIN, format(value), format(min));
 			}
 			return value;
-		}
-
-		int integer(String field, int min, int max) throws ProfileFormatException {
-			double value = number(field, min, max);
-			if (value != Math.rint(value)) {
-				throw problem(field, ProfileText.NOT_WHOLE, format(value));
-			}
-			return (int) value;
 		}
 
 		/** One of the allowed words, e.g. "sphere"; {@code label} names the field in the message ("shape type"). */

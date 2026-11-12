@@ -4,8 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
-
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -18,7 +17,7 @@ class OutlineVisibilityTest {
 	private static final String OVERWORLD = "minecraft:overworld";
 
 	private static Zone sphereAt(String id, double x, double radius) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), List.of());
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), PlaceSets.EMPTY);
 	}
 
 	private static boolean draws(Zone zone, OutlineMode mode, String editingId) {
@@ -64,7 +63,7 @@ class OutlineVisibilityTest {
 
 	@Test
 	void disabledZonesAreDrawnOnlyWhileEdited() {
-		Zone off = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(10, 0, 0), new Shape.Sphere(5), List.of());
+		Zone off = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(10, 0, 0), new Shape.Sphere(5), PlaceSets.EMPTY);
 		assertFalse(draws(off, OutlineMode.ALWAYS, null));
 		assertTrue(draws(off, OutlineMode.ALWAYS, "a"));
 		assertTrue(draws(off, OutlineMode.EDITING, "a"));
@@ -78,7 +77,7 @@ class OutlineVisibilityTest {
 
 	@Test
 	void boxDistanceUsesItsNearestFace() {
-		Zone box = new Zone("b", "B", true, WORLD, OVERWORLD, new Point(200, 0, 0), new Shape.Box(150, 4, 4), List.of());
+		Zone box = new Zone("b", "B", true, WORLD, OVERWORLD, new Point(200, 0, 0), new Shape.Box(150, 4, 4), PlaceSets.EMPTY);
 		// Nearest face is at x = 125, 125 blocks from the camera.
 		assertTrue(draws(box, OutlineMode.ALWAYS, null));
 	}

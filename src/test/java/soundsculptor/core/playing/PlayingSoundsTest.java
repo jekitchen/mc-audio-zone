@@ -1,5 +1,8 @@
 package soundsculptor.core.playing;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,7 +36,7 @@ class PlayingSoundsTest {
 	private final PlayingSounds.GainListener listener = reported::put;
 
 	private static Zone sphere(String id, double radius, Point anchor, SetEntry... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, anchor, new Shape.Sphere(radius), List.of(rules));
+		return new Zone(id, id, true, WORLD, OVERWORLD, anchor, new Shape.Sphere(radius), quick(List.of(rules)));
 	}
 
 	private int update(Precedence p, double px, double py, double pz) {
@@ -42,7 +45,7 @@ class PlayingSoundsTest {
 
 	@Test
 	void reportsNothingWhenTheGainIsWhatTheSoundStartedWith() {
-		Precedence p = new Precedence(List.of(SetEntry.of("r", VILLAGER).withVolume(50)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("r", VILLAGER).withVolume(50)), List.of());
 		playing.start(1, VILLAGER, 0, 64, 0, 0.8F, 0.4F);
 		assertEquals(0, update(p, 0, 65.62, 0));
 		assertTrue(reported.isEmpty());
@@ -51,7 +54,7 @@ class PlayingSoundsTest {
 	@Test
 	void reportsTheNewGainWhenTheProfileChangedWhileTheSoundPlays() {
 		playing.start(1, VILLAGER, 0, 64, 0, 0.8F, 0.8F);
-		Precedence p = new Precedence(List.of(SetEntry.of("r", VILLAGER).withVolume(50)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("r", VILLAGER).withVolume(50)), List.of());
 		assertEquals(1, update(p, 0, 65.62, 0));
 		assertEquals(0.4F, reported.get(1L), 1e-6);
 		assertEquals(0.4F, playing.gain(1), 1e-6);
@@ -60,7 +63,7 @@ class PlayingSoundsTest {
 	@Test
 	void muteReEvaluatesToSilenceWithoutStoppingTheSound() {
 		// A cow walks into a muting zone: its sound goes to gain 0 but stays tracked (still playing).
-		Precedence p = new Precedence(List.of(), List.of(sphere("z", 10, new Point(0, 64, 0), SetEntry.of("m", COW).withMute(true))));
+		Precedence p = precedence(List.of(), List.of(sphere("z", 10, new Point(0, 64, 0), SetEntry.of("m", COW).withMute(true))));
 		playing.start(7, COW, 15, 64, 0, 1F, 1F);
 		update(p, 30, 65.62, 0);
 		assertTrue(reported.isEmpty());
@@ -77,7 +80,7 @@ class PlayingSoundsTest {
 	void bubbleVolumeChangesAsYouWalkAway() {
 		// FR-8 acceptance: bubble radius 8, rule * at 30%; a note block loop changes volume as you walk away.
 		Zone bubble = sphere("bubble", 8, new Point(0, 0, 0), SetEntry.of("all", "*").withVolume(30)).asBubble();
-		Precedence p = new Precedence(List.of(), List.of(bubble));
+		Precedence p = precedence(List.of(), List.of(bubble));
 		playing.start(3, NOTE, 2, 64, 0, 1F, 0.3F);
 		update(p, 0, 65.62, 0);
 		assertTrue(reported.isEmpty(), "inside the bubble from the start");
@@ -94,7 +97,7 @@ class PlayingSoundsTest {
 		// FR-8 acceptance: fade 8 on a 20-block sphere muting cows; a cow walking from the edge to the centre gets
 		// steadily quieter and is silent from 8 blocks inside.
 		Zone zone = sphere("pen", 20, new Point(0, 64, 0), SetEntry.of("m", COW).withMute(true)).withEdge(ZoneEdge.fade(8));
-		Precedence p = new Precedence(List.of(), List.of(zone));
+		Precedence p = precedence(List.of(), List.of(zone));
 		playing.start(5, COW, 20, 64, 0, 1F, 1F);
 		update(p, 40, 65.62, 0);
 		float last = 1F;
@@ -114,7 +117,7 @@ class PlayingSoundsTest {
 	@Test
 	void repeatLimitsAreNotReDecided() {
 		// A zone that only sets a limit changes nothing while the sound plays.
-		Precedence p = new Precedence(List.of(),
+		Precedence p = precedence(List.of(),
 				List.of(sphere("z", 10, new Point(0, 64, 0), SetEntry.of("l", COW).withLimit(new Limit(1, 1000, false)))));
 		playing.start(1, COW, 30, 64, 0, 1F, 1F);
 		update(p, 0, 65.62, 0);
@@ -125,7 +128,7 @@ class PlayingSoundsTest {
 
 	@Test
 	void anotherWorldOrDimensionDropsTheFixedZone() {
-		Precedence p = new Precedence(List.of(), List.of(sphere("z", 10, new Point(0, 64, 0), SetEntry.of("m", COW).withMute(true))));
+		Precedence p = precedence(List.of(), List.of(sphere("z", 10, new Point(0, 64, 0), SetEntry.of("m", COW).withMute(true))));
 		playing.start(1, COW, 0, 64, 0, 1F, 0F);
 		update(p, 0, 65.62, 0);
 		assertTrue(reported.isEmpty());
@@ -135,7 +138,7 @@ class PlayingSoundsTest {
 
 	@Test
 	void boostIsCappedWhenNotSupported() {
-		Precedence p = new Precedence(List.of(SetEntry.of("b", COW).withVolume(150)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("b", COW).withVolume(150)), List.of());
 		playing.start(1, COW, 0, 64, 0, 0.8F, 0.8F);
 		playing.update(p, WORLD, OVERWORLD, 0, 65.62, 0, false, listener);
 		assertTrue(reported.isEmpty(), "capped at 100%, which is where it started");
@@ -145,7 +148,7 @@ class PlayingSoundsTest {
 
 	@Test
 	void vanillaGainChangeIsFollowed() {
-		Precedence p = new Precedence(List.of(SetEntry.of("r", COW).withVolume(50)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("r", COW).withVolume(50)), List.of());
 		playing.start(1, COW, 0, 64, 0, 1F, 0.5F);
 		update(p, 0, 65.62, 0);
 		playing.setVanillaGain(1, 0.4F);
@@ -155,7 +158,7 @@ class PlayingSoundsTest {
 
 	@Test
 	void bypassRestoresVanillaGainsAndTheNextUpdateReappliesRules() {
-		Precedence p = new Precedence(List.of(SetEntry.of("m", COW).withMute(true)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("m", COW).withMute(true)), List.of());
 		playing.start(1, COW, 0, 64, 0, 0.7F, 0F);
 		update(p, 0, 65.62, 0);
 		assertEquals(1, playing.updateBypassed(listener));
@@ -166,7 +169,7 @@ class PlayingSoundsTest {
 
 	@Test
 	void soundsWhoseInputsDidNotChangeAreNotReDecided() {
-		Precedence noBubbles = new Precedence(List.of(SetEntry.of("r", COW).withVolume(50)),
+		Precedence noBubbles = precedence(List.of(SetEntry.of("r", COW).withVolume(50)),
 				List.of(sphere("z", 10, new Point(0, 64, 0), SetEntry.of("q", COW).withVolume(20))));
 		for (int i = 0; i < 10; i++) {
 			playing.start(i, COW, i, 64, 0, 1F, 1F);
@@ -180,7 +183,7 @@ class PlayingSoundsTest {
 		update(noBubbles, 5, 65.62, 0);
 		assertEquals(1, playing.decisionCount() - before, "only the sound that moved");
 
-		Precedence withBubble = new Precedence(List.of(),
+		Precedence withBubble = precedence(List.of(),
 				List.of(sphere("b", 8, new Point(0, 0, 0), SetEntry.of("all", "*").withVolume(30)).asBubble()));
 		update(withBubble, 0, 65.62, 0);
 		long bubbleBefore = playing.decisionCount();
@@ -217,7 +220,7 @@ class PlayingSoundsTest {
 		}
 		assertFalse(playing.start(9_999, COW, 0, 64, 0, 1F, 1F));
 		assertEquals(1, playing.rejectedCount());
-		Precedence p = new Precedence(List.of(SetEntry.of("r", COW).withVolume(50)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("r", COW).withVolume(50)), List.of());
 		assertEquals(PlayingSounds.CAPACITY, update(p, 0, 65.62, 0), "every tracked sound is still re-decided");
 		assertFalse(reported.containsKey(9_999L));
 		playing.stop(0);
@@ -260,16 +263,16 @@ class PlayingSoundsTest {
 	void aNewProfileSnapshotIsResolvedAgain() {
 		// The player saves a change while the sound plays: the new snapshot's rules apply, not the cached old ones.
 		playing.start(1, COW, 0, 64, 0, 1F, 0.5F);
-		update(new Precedence(List.of(SetEntry.of("r", COW).withVolume(50)), List.of()), 0, 65.62, 0);
+		update(precedence(List.of(SetEntry.of("r", COW).withVolume(50)), List.of()), 0, 65.62, 0);
 		assertTrue(reported.isEmpty());
-		update(new Precedence(List.of(SetEntry.of("r", COW).withVolume(25)), List.of()), 0, 65.62, 0);
+		update(precedence(List.of(SetEntry.of("r", COW).withVolume(25)), List.of()), 0, 65.62, 0);
 		assertEquals(0.25F, reported.get(1L), 1e-6);
 	}
 
 	@Test
 	void stoppingASoundKeepsTheOthersRulesStraight() {
 		// Swap-remove moves the last sound into the hole; its cached rules must move with it.
-		Precedence p = new Precedence(List.of(SetEntry.of("c", COW).withVolume(40), SetEntry.of("v", VILLAGER).withVolume(60)), List.of());
+		Precedence p = precedence(List.of(SetEntry.of("c", COW).withVolume(40), SetEntry.of("v", VILLAGER).withVolume(60)), List.of());
 		playing.start(1, COW, 0, 64, 0, 1F, 0.4F);
 		playing.start(2, VILLAGER, 0, 64, 0, 1F, 0.6F);
 		update(p, 0, 65.62, 0);

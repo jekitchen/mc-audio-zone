@@ -1,5 +1,8 @@
 package soundsculptor.core.diag;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -144,9 +147,9 @@ class MemoryBudgetTest {
 		List<Zone> zones = new ArrayList<>();
 		for (int z = 0; z < Precedence.MAX_ZONES; z++) {
 			zones.add(new Zone("zone_" + z, "Zone " + z, true, "world", "minecraft:overworld", new Point(z * 100, 0, 0),
-					new Shape.Sphere(10), List.of(SetEntry.of("r", "minecraft:*").withMute(true))));
+					new Shape.Sphere(10), quick(List.of(SetEntry.of("r", "minecraft:*").withMute(true)))));
 		}
-		Precedence precedence = new Precedence(List.of(SetEntry.of("g", "minecraft:*").withVolume(50)), zones);
+		Precedence precedence = precedence(List.of(SetEntry.of("g", "minecraft:*").withVolume(50)), zones);
 		soundsculptor.core.sets.EntryResolution[] out = new soundsculptor.core.sets.EntryResolution[zones.size() + 1];
 		for (int i = 0; i < 4096; i++) { // the global cache's cap; the zones' shared cap fills on the way
 			precedence.resolve(id(i), out);

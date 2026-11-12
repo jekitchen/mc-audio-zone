@@ -1,5 +1,8 @@
 package soundsculptor.core.zones;
 
+import static soundsculptor.core.Fixtures.quick;
+import static soundsculptor.core.Fixtures.precedence;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -32,7 +35,7 @@ class PrecedenceCacheBudgetTest {
 		for (int z = 0; z < Precedence.MAX_ZONES; z++) {
 			SetEntry rule = SetEntry.of("r", "minecraft:entity.test_sound.number_1*").withMute(true);
 			zones.add(new Zone("z" + z, "Z" + z, true, WORLD, OVERWORLD, new Point(z * 100, 0, 0), new Shape.Sphere(10),
-					List.of(rule)));
+					quick(List.of(rule))));
 		}
 		return zones;
 	}
@@ -40,14 +43,14 @@ class PrecedenceCacheBudgetTest {
 	private static int zoneCachedIds(Precedence p) {
 		int n = 0;
 		for (int z = 0; z < p.zones().size(); z++) {
-			n += p.zoneRules(z).cachedIdCount();
+			n += p.zoneResolver(z).cachedIdCount();
 		}
 		return n;
 	}
 
 	@Test
 	void allZonesTogetherCacheAtMostTheSharedCap() {
-		Precedence p = new Precedence(List.of(), fullZones());
+		Precedence p = precedence(List.of(), fullZones());
 		EntryResolution[] out = new EntryResolution[p.zoneCount() + 1];
 		for (int i = 0; i < 2000; i++) {
 			p.resolve(id(i), out);
@@ -58,7 +61,7 @@ class PrecedenceCacheBudgetTest {
 
 	@Test
 	void pastTheCapZonesStillAnswerCorrectly() {
-		Precedence p = new Precedence(List.of(), fullZones());
+		Precedence p = precedence(List.of(), fullZones());
 		EntryResolution[] out = new EntryResolution[p.zoneCount() + 1];
 		for (int i = 0; i < 2000; i++) {
 			p.resolve(id(i), out);
@@ -73,7 +76,7 @@ class PrecedenceCacheBudgetTest {
 
 	@Test
 	void pastTheCapLookupsAllocateNothing() {
-		Precedence p = new Precedence(List.of(), fullZones());
+		Precedence p = precedence(List.of(), fullZones());
 		EntryResolution[] out = new EntryResolution[p.zoneCount() + 1];
 		for (int i = 0; i < 2000; i++) {
 			p.resolve(id(i), out);
@@ -99,12 +102,12 @@ class PrecedenceCacheBudgetTest {
 
 	@Test
 	void eachPrecedenceHasItsOwnCap() {
-		Precedence first = new Precedence(List.of(), fullZones());
+		Precedence first = precedence(List.of(), fullZones());
 		EntryResolution[] out = new EntryResolution[first.zoneCount() + 1];
 		for (int i = 0; i < 2000; i++) {
 			first.resolve(id(i), out);
 		}
-		Precedence second = new Precedence(List.of(), fullZones());
+		Precedence second = precedence(List.of(), fullZones());
 		second.resolve(id(0), out);
 		assertEquals(second.zoneCount(), zoneCachedIds(second), "a new snapshot starts with the whole cap");
 	}
@@ -120,15 +123,15 @@ class PrecedenceCacheBudgetTest {
 
 	@Test
 	void estimateCountsTheGlobalAndEveryZoneCache() {
-		Precedence p = new Precedence(List.of(SetEntry.of("g", "minecraft:*").withMute(true)), fullZones());
+		Precedence p = precedence(List.of(SetEntry.of("g", "minecraft:*").withMute(true)), fullZones());
 		long before = p.estimatedBytes();
 		EntryResolution[] out = new EntryResolution[p.zoneCount() + 1];
 		for (int i = 0; i < 500; i++) {
 			p.resolve(id(i), out);
 		}
-		long cachesOnly = p.globalRules().estimatedBytes() - EntryResolver.of(List.of()).estimatedBytes();
+		long cachesOnly = p.everywhere().estimatedBytes() - EntryResolver.of(List.of()).estimatedBytes();
 		for (int z = 0; z < p.zoneCount(); z++) {
-			cachesOnly += p.zoneRules(z).estimatedBytes() - EntryResolver.of(List.of()).estimatedBytes();
+			cachesOnly += p.zoneResolver(z).estimatedBytes() - EntryResolver.of(List.of()).estimatedBytes();
 		}
 		assertEquals(before + cachesOnly, p.estimatedBytes());
 	}

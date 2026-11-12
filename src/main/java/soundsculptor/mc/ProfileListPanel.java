@@ -173,7 +173,7 @@ public final class ProfileListPanel {
 				Component.translatable("soundsculptor.profiles.copy.title", source.profile().name()),
 				Component.translatable("soundsculptor.profiles.copy.message", copy.ruleCount(), copy.bubbleCount(), copy.fixedKept()),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.copy.confirm"),
-						() -> confirmBoostThen(host, copy.needsBoostConfirm(), () -> copy(source))),
+						() -> confirmBoostThen(host, copy.needsBoostConfirm(ProfileManager.library()), () -> copy(source))),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
 				1, 1));
 	}
@@ -188,7 +188,7 @@ public final class ProfileListPanel {
 			if (copy.problem() != null) {
 				return target;
 			}
-			return copy.needsBoostConfirm() ? copy.result().withBoostConfirmed(true) : copy.result();
+			return copy.needsBoostConfirm(ProfileManager.library()) ? copy.result().withBoostConfirmed(true) : copy.result();
 		});
 		refresh();
 		host.showToast(Component.translatable("soundsculptor.profiles.copied", source.profile().name()), null);

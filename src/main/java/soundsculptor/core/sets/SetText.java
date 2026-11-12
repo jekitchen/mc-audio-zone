@@ -1,5 +1,6 @@
 package soundsculptor.core.sets;
 
+
 /**
  * The messages about Sound Set files (PRD FR-11.6, FR-11.8), as translation keys (PRD 9.3). Values that are wrong in
  * the same way as in a profile file reuse the {@code soundsculptor.profile.problem.value.*} keys.
@@ -27,6 +28,7 @@ final class SetText {
 	// What is wrong with a value, beyond the profile ones.
 	static final String BAD_ID = "soundsculptor.sets.file.problem.value.bad_id";
 	static final String RESERVED_ID = "soundsculptor.sets.file.problem.value.reserved_id";
+	static final String NOT_QUICK = "soundsculptor.sets.file.problem.value.not_quick";
 	static final String ENTRY_ID_USED = "soundsculptor.sets.file.problem.value.entry_id_used";
 
 	// The file as a whole.

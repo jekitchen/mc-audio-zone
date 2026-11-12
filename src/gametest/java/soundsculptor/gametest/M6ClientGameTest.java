@@ -1,5 +1,7 @@
 package soundsculptor.gametest;
 
+import soundsculptor.core.quick.QuickActions;
+import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
@@ -109,7 +111,7 @@ public final class M6ClientGameTest implements FabricClientGameTest {
 			String firstId = context.computeOnClient(mc -> String.valueOf(main(mc).searchList.getFocused().key()));
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitTicks(1);
-			check(context.computeOnClient(mc -> ProfileManager.profile().isExactMuted(firstId)), "Mute on a result should mute it");
+			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.profile(), ApplyTarget.EVERYWHERE, firstId)), "Mute on a result should mute it");
 			context.runOnClient(mc -> main(mc).toggleSearchHelp());
 
 			// Clean up for later tests.

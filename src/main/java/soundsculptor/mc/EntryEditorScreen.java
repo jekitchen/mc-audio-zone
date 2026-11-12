@@ -9,6 +9,7 @@ import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.editor.EntryDraft;
 import soundsculptor.core.editor.EntryDraft.Field;
+import soundsculptor.core.Message;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
@@ -534,6 +535,12 @@ public final class EntryEditorScreen extends SculptScreen {
 			return false;
 		}
 		SetEntry rule = draft.build();
+		Message full = target.canPut(ProfileManager.profile(), rule);
+		if (full != null) {
+			// Quick changes is full: say so and keep the editor open, so nothing typed is lost.
+			showToast(ProfileManager.component(full), null);
+			return false;
+		}
 		ProfileManager.update(profile -> target.put(profile, rule));
 		return true;
 	}
