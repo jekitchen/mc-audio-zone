@@ -201,10 +201,10 @@ public final class SetEditorScreen extends SculptScreen {
 					() -> setEntryEnabled(id, !entry.enabled())).narrationContext(() -> Component.translatable("soundsculptor.set_editor.entry")),
 					Component.translatable(entry.enabled() ? "soundsculptor.set_editor.turn_off" : "soundsculptor.set_editor.turn_on")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.set_editor.edit"), () -> editEntry(id)));
-			SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.rules.move_up"), () -> moveEntry(id, -1));
+			SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.set_editor.move_up"), () -> moveEntry(id, -1));
 			up.active = i > 0;
 			buttons.add(up);
-			SculptButton down = SculptButton.icon(DOWN_ICON, Component.translatable("soundsculptor.rules.move_down"), () -> moveEntry(id, 1));
+			SculptButton down = SculptButton.icon(DOWN_ICON, Component.translatable("soundsculptor.set_editor.move_down"), () -> moveEntry(id, 1));
 			down.active = i < entries.size() - 1;
 			buttons.add(down);
 			buttons.add(SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.set_editor.remove"), () -> removeEntry(id)));
@@ -226,16 +226,16 @@ public final class SetEditorScreen extends SculptScreen {
 	 */
 	static String status(SetEntry entry) {
 		if (!entry.enabled()) {
-			return Component.translatable("soundsculptor.rules.status.off").getString();
+			return Component.translatable("soundsculptor.set_editor.status.off").getString();
 		}
 		if (Boolean.TRUE.equals(entry.mute())) {
-			return Component.translatable("soundsculptor.rules.status.muted").getString();
+			return Component.translatable("soundsculptor.set_editor.status.muted").getString();
 		}
 		if (entry.volume() != null) {
-			return Component.translatable("soundsculptor.rules.status.volume", entry.volume()).getString();
+			return Component.translatable("soundsculptor.set_editor.status.volume", entry.volume()).getString();
 		}
 		if (Boolean.FALSE.equals(entry.mute())) {
-			return Component.translatable("soundsculptor.rules.status.not_muted").getString();
+			return Component.translatable("soundsculptor.set_editor.status.not_muted").getString();
 		}
 		return "";
 	}
@@ -254,8 +254,8 @@ public final class SetEditorScreen extends SculptScreen {
 		}
 		if (!entry.pattern().isExact()) {
 			int count = EntrySummary.matchCount(entry, known);
-			parts.add(SummaryPart.of(count == 0 ? "soundsculptor.rules.matches.none"
-					: count == 1 ? "soundsculptor.rules.matches.one" : "soundsculptor.rules.matches", Integer.toString(count)));
+			parts.add(SummaryPart.of(count == 0 ? "soundsculptor.set_editor.matches.none"
+					: count == 1 ? "soundsculptor.set_editor.matches.one" : "soundsculptor.set_editor.matches", Integer.toString(count)));
 		}
 		return EntrySummary.join(parts, TRANSLATOR);
 	}
