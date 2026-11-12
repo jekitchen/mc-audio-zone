@@ -79,6 +79,33 @@ class PlaceSetsTest {
 	}
 
 	@Test
+	void quickSavedAsAtFullPlaceReturnsProblem() {
+		PlaceSets p = PlaceSets.EMPTY;
+		for (int i = 0; i < 32; i++) {
+			p = p.attach("s" + i);
+		}
+		p = p.withQuickChanges(Q);
+		Message m = p.canSaveQuickAs("new");
+		assertEquals("soundsculptor.sets.error.place_full", m.key());
+		assertEquals(List.of(32), m.args());
+		assertSame(p, p.quickSavedAs("new"));
+	}
+
+	@Test
+	void quickSavedAsAlreadyAttachedReturnsProblem() {
+		PlaceSets p = PlaceSets.EMPTY.attach("A").withQuickChanges(Q);
+		assertEquals("soundsculptor.sets.error.already_attached", p.canSaveQuickAs("A").key());
+		assertSame(p, p.quickSavedAs("A"));
+	}
+
+	@Test
+	void quickSavedAsWithoutQuickReturnsProblem() {
+		PlaceSets p = PlaceSets.EMPTY.attach("A");
+		assertEquals("soundsculptor.sets.error.no_quick_changes", p.canSaveQuickAs("B").key());
+		assertSame(p, p.quickSavedAs("B"));
+	}
+
+	@Test
 	void dropMissingKeepsQuick() {
 		PlaceSets p = PlaceSets.EMPTY.attach("A").attach("B").withQuickChanges(Q).dropMissing(Set.of("B"));
 		assertEquals(List.of("quick", "B"), ids(p));

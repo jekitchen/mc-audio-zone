@@ -59,6 +59,7 @@ public final class TestEnglish implements Translator {
 			Map.entry("soundsculptor.sets.error.already_attached", "This set is already attached here."),
 			Map.entry("soundsculptor.sets.error.place_full", "A place can have up to %s Sound Sets."),
 			Map.entry("soundsculptor.sets.error.library_full", "The library can hold up to %s Sound Sets."),
+			Map.entry("soundsculptor.sets.error.no_quick_changes", "There are no quick changes to save."),
 			Map.entry("soundsculptor.sets.error.entries_full", "A Sound Set can have up to %s entries."),
 			// SetEntry summaries (Rules tab chips, PRD 6.1)
 			Map.entry("soundsculptor.summary.separator", ", "),

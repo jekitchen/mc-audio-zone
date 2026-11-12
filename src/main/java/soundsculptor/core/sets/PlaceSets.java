@@ -114,9 +114,27 @@ public record PlaceSets(List<Attachment> attached, SoundSet quickChanges) {
 		return new PlaceSets(list, quick);
 	}
 
+	/**
+	 * {@code null} if Quick changes can be saved as library set {@code newSetId}, else the problem to show: there is no
+	 * Quick changes, the set is already attached, or the place already has {@link #MAX_SETS} library sets.
+	 */
+	public Message canSaveQuickAs(String newSetId) {
+		Objects.requireNonNull(newSetId, "newSetId");
+		if (quickChanges == null) {
+			return Message.of("soundsculptor.sets.error.no_quick_changes");
+		}
+		if (uses(newSetId)) {
+			return Message.of("soundsculptor.sets.error.already_attached");
+		}
+		if (librarySetCount() >= MAX_SETS) {
+			return Message.of("soundsculptor.sets.error.place_full", MAX_SETS);
+		}
+		return null;
+	}
+
 	/** Quick changes was saved to the library as {@code newSetId}: that set takes its slot, and Quick changes is gone. */
 	public PlaceSets quickSavedAs(String newSetId) {
-		if (quickChanges == null) {
+		if (canSaveQuickAs(newSetId) != null) {
 			return this;
 		}
 		List<Attachment> list = new ArrayList<>(attached);
