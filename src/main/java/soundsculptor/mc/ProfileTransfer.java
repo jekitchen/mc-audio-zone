@@ -1,12 +1,15 @@
 package soundsculptor.mc;
 
 import soundsculptor.SoundSculptorClient;
+import soundsculptor.core.Message;
+import soundsculptor.core.profile.ExportCodec;
 import soundsculptor.core.profile.ImportPlan;
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileExport;
 import soundsculptor.core.profile.ProfileFormatException;
 import soundsculptor.core.profile.ProfileImport;
+import soundsculptor.core.sets.SetImportPlan;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.mc.compat.FolderCompat;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptScreen;
@@ -18,6 +21,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -27,11 +31,12 @@ import net.minecraft.network.chat.MutableComponent;
  * Export and import of profile files (PRD FR-11.4 to FR-11.7).
  *
  * <ul>
- *   <li>Export writes the whole profile, fixed zones included, to {@code config/soundsculptor/exports/<name>-<date>.json}
- *   and offers "Open folder".</li>
+ *   <li>Export writes the whole profile, fixed zones included, and a copy of every library Sound Set it attaches
+ *   ({@link ExportCodec}) to {@code config/soundsculptor/exports/<name>-<date>.json} and offers "Open folder".</li>
  *   <li>Import takes a file dropped on the Profiles tab or one placed in {@code config/soundsculptor/imports/}. The file is
  *   checked first (core {@link ProfileImport}); a dialog then says what will change ({@link ImportPlan}) before
- *   anything does. Imports always apply to the profile of the world you are in.</li>
+ *   anything does. Imports always apply to the profile of the world you are in, and the profile and the library change
+ *   together.</li>
  * </ul>
  */
 public final class ProfileTransfer {
@@ -61,7 +66,7 @@ public final class ProfileTransfer {
 	// ---- Export (FR-11.4) ----
 
 	/**
-	 * Writes the profile to the exports folder.
+	 * Writes the profile, with every library set it attaches, to the exports folder.
 	 *
 	 * @return the file written
 	 */
@@ -69,7 +74,7 @@ public final class ProfileTransfer {
 		Path dir = exportsDir();
 		Files.createDirectories(dir);
 		Path file = dir.resolve(ProfileExport.fileName(profile.name(), LocalDate.now()));
-		Files.writeString(file, ProfileCodec.toJson(profile, key), StandardCharsets.UTF_8);
+		Files.writeString(file, ExportCodec.toJson(profile, key, ProfileManager.library()), StandardCharsets.UTF_8);
 		return file;
 	}
 
@@ -120,30 +125,41 @@ public final class ProfileTransfer {
 			host.showToast(Component.translatable("soundsculptor.transfer.no_world"), null);
 			return;
 		}
-		ProfileImport.Checked checked;
+		ExportCodec.Read read;
 		try {
-			checked = ProfileImport.check(file);
+			read = ProfileImport.check(file);
 		} catch (ProfileFormatException e) {
 			showProblem(host, name, ProfileManager.text(e.problem()));
 			return;
 		}
-		ImportPlan plan = ImportPlan.of(ProfileManager.profile(), checked.profile(), ProfileManager.key());
+		// M8c shim: removed in Task 14. The clash dialog will ask Keep both, Use mine or Replace for each set whose
+		// contents differ from the library's; until then every such set uses the default, Keep both.
+		Map<String, SetImportPlan.Choice> choices = Map.of();
+		ImportPlan plan = ImportPlan.of(ProfileManager.profile(), read, ProfileManager.library(), ProfileManager.key(), choices);
 		if (plan.problem() != null) {
 			showProblem(host, name, ProfileManager.text(plan.problem()));
 			return;
 		}
 		Minecraft.getInstance().gui.setScreen(new SculptDialog(host,
 				Component.translatable("soundsculptor.transfer.import.title", name),
-				planMessage(plan, checked.warnings().size()),
+				planMessage(plan, read.warnings().size()),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.transfer.import.confirm"),
-						() -> ProfileListPanel.confirmBoostThen(host, plan.needsBoostConfirm(ProfileManager.library()), () -> apply(host, name, checked))),
+						() -> ProfileListPanel.confirmBoostThen(host, plan.needsBoostConfirm(), () -> apply(host, name, read, choices))),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
 				1, 1));
 	}
 
 	/** What the import will do, in the dialog's words. */
 	public static Component planMessage(ImportPlan plan, int warnings) {
-		MutableComponent message = Component.translatable("soundsculptor.transfer.import.replace", plan.ruleCount(), plan.bubbleCount());
+		MutableComponent message = Component.translatable("soundsculptor.transfer.import.replace", plan.setCount(), plan.bubbleCount());
+		if (plan.setsAdded() > 0) {
+			message.append(" ").append(plan.setsAdded() == 1 ? Component.translatable("soundsculptor.transfer.import.sets_added.one")
+					: Component.translatable("soundsculptor.transfer.import.sets_added", plan.setsAdded()));
+		}
+		Message missing = plan.missingNote();
+		if (missing != null) {
+			message.append(" ").append(Component.translatable("soundsculptor.transfer.import.note", ProfileManager.text(missing)));
+		}
 		if (plan.fixedImported() > 0) {
 			message.append(" ").append(Component.translatable("soundsculptor.transfer.import.fixed", plan.fixedImported()));
 		}
@@ -156,23 +172,34 @@ public final class ProfileTransfer {
 		return message;
 	}
 
-	private static void apply(SculptScreen host, String name, ProfileImport.Checked checked) {
+	/**
+	 * Imports: the plan is worked out again against the live profile and library, and both are swapped in together
+	 * ({@link ProfileManager#change}), the sets saved before the profile. If the library has filled up since the dialog
+	 * opened, nothing changes and the problem is shown.
+	 */
+	private static void apply(SculptScreen host, String name, ExportCodec.Read read, Map<String, SetImportPlan.Choice> choices) {
 		String key = ProfileManager.key();
-		int[] skipped = {0};
-		ProfileManager.update(current -> {
-			ImportPlan plan = ImportPlan.of(current, checked.profile(), key);
-			skipped[0] = plan.fixedSkipped();
+		ImportPlan[] done = {null};
+		ProfileManager.change(ws -> {
+			ImportPlan plan = ImportPlan.of(ws.profile(), read, ws.library(), key, choices);
+			done[0] = plan;
 			if (plan.problem() != null) {
-				return current;
+				return ws;
 			}
-			// Boosted rules were confirmed in the boost dialog (FR-5.4) before this runs.
-			return plan.needsBoostConfirm(ProfileManager.library()) ? plan.result().withBoostConfirmed(true) : plan.result();
+			// Boosted levels were confirmed in the boost dialog (FR-5.4) before this runs.
+			Profile result = plan.needsBoostConfirm() ? plan.result().withBoostConfirmed(true) : plan.result();
+			return new Workspace(result, plan.library());
 		});
+		if (done[0].problem() != null) {
+			showProblem(host, name, ProfileManager.text(done[0].problem()));
+			return;
+		}
+		int skipped = done[0].fixedSkipped();
 		if (host instanceof SoundSculptorScreen main && main.profilesPanel() != null) {
 			main.profilesPanel().refresh();
 		}
-		host.showToast(skipped[0] > 0
-				? Component.translatable("soundsculptor.transfer.imported.skipped", name, skipped[0])
+		host.showToast(skipped > 0
+				? Component.translatable("soundsculptor.transfer.imported.skipped", name, skipped)
 				: Component.translatable("soundsculptor.transfer.imported", name), null);
 	}
 

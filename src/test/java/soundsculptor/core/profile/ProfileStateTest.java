@@ -15,6 +15,7 @@ import java.util.Map;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.zones.ZoneEdge;
 
 import org.junit.jupiter.api.Test;
@@ -73,7 +74,7 @@ class ProfileStateTest {
 	void copyBringsAllSettingsButKeepsTheTargetsOwnState() {
 		Profile source = joinedAndConfirmed("Source");
 		Profile target = Profile.empty("Target").withLastJoined(Instant.parse("2026-01-01T00:00:00Z"));
-		Profile result = ProfileOps.copyFrom(source, target).result();
+		Profile result = ProfileOps.copyFrom(source, target, SetLibrary.EMPTY).result();
 		assertEquals(SETTINGS, result.settings());
 		assertEquals(Instant.parse("2026-01-01T00:00:00Z"), result.lastJoined(), "copying is not joining");
 		assertFalse(result.boostConfirmed(), "the confirm belongs to the player's choice on that profile");
@@ -91,7 +92,8 @@ class ProfileStateTest {
 	void importTakesTheFilesSettingsButKeepsThisProfilesState() {
 		Profile current = Profile.empty("Here").withLastJoined(JOINED);
 		Profile file = joinedAndConfirmed("Friend").withLastJoined(Instant.parse("2020-01-01T00:00:00Z"));
-		Profile result = ImportPlan.of(current, file, ProfileZonesTest.SERVER).result();
+		Profile result = ImportPlan.of(current, new ExportCodec.Read(file, List.of(), List.of()), SetLibrary.EMPTY, ProfileZonesTest.SERVER,
+				Map.of()).result();
 		assertEquals(SETTINGS, result.settings());
 		assertEquals(JOINED, result.lastJoined());
 		assertFalse(result.boostConfirmed());
