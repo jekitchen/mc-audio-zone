@@ -1,131 +1,106 @@
 package soundsculptor.core.trace;
 
-import java.util.ArrayList;
 import java.util.List;
 
+import soundsculptor.core.Message;
+import soundsculptor.core.quick.QuickActionResult;
+import soundsculptor.core.quick.QuickActions;
+import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SoundSet;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.zones.Zone;
 
-// M8c shim: removed in Task 10
 /**
- * Edits made straight from the sound trace panel (PRD FR-14.4). Each edit is validated like the full editors, then
- * returns the new rules and zones (saved at once, no Save button), the before-state for the 5-second Undo toast, and
- * the trace recomputed from the sound's last play. Not on the hot path.
+ * Edits made straight from the sound trace panel (PRD FR-14.4). Each edit is validated like the full editors
+ * (FR-12.7), then returns the new workspace (saved at once, no Save button), the before-state for the 5-second Undo
+ * toast, and the trace recomputed from the sound's last play. A refused edit comes back as a {@link Message}; nothing
+ * here throws on a limit. Not on the hot path.
+ *
+ * <p>An entry of a library set is edited in the library: sets are linked (FR-4.9), so every place that uses the set
+ * changes too. An entry of a place's Quick changes changes only that place. New entries are only ever made in Quick
+ * changes, through {@link QuickActions}, so the trace and the Sounds tab edit the same single-sound entry.
  */
 public final class TraceEditor {
-	/** The most entries one place's Quick changes may hold (a Sound Set's maximum). */
-	public static final int MAX_RULES = SoundSet.MAX_ENTRIES;
-
-	/** Toast after changing a rule or zone: "Changed %s", with the rule's pattern or the zone's name. */
+	/** Toast after changing an entry or a zone: "Changed %s", with the entry's pattern or the zone's name. */
 	public static final String TOAST_CHANGED = "soundsculptor.trace.edit.toast.changed";
-	/** Toast after "Add rule for this sound": "Added a rule for %s", with the sound ID. */
+	/** Toast after Add to Quick changes made a new entry: "Added %s to Quick changes", with the sound ID. */
 	public static final String TOAST_ADDED = "soundsculptor.trace.edit.toast.added";
 
 	private TraceEditor() {
 	}
 
-	/** Applies one inline control to a rule line: a global rule, or the zone rule shown on a zone line. */
-	public static TraceEditResult edit(TraceEditContext ctx, EditableRules rules, RuleLocation where, EntryEdit edit) {
+	/**
+	 * Applies one inline control to an entry line: the entry in its library set (every place using the set changes), or
+	 * in the place's Quick changes for {@link SoundSet#QUICK_ID}.
+	 */
+	public static TraceEditResult edit(TraceEditContext ctx, Workspace ws, EntryLocation where, EntryEdit edit) {
 		TraceEditError invalid = edit.validate();
 		if (invalid != null) {
-			return refused(ctx, rules, invalid);
+			return refused(ctx, ws, invalid.message());
 		}
-		if (where.isGlobal()) {
-			int i = ExactRules.indexOfRule(rules.globalRules(), where.ruleId());
-			if (i < 0) {
-				return refused(ctx, rules, TraceEditError.RULE_NOT_FOUND);
+		if (where.isQuick()) {
+			PlaceSets place = ws.profile().place(where.place());
+			if (place == null) {
+				return refused(ctx, ws, TraceEditError.ZONE_NOT_FOUND.message());
 			}
-			SetEntry changed = edit.apply(rules.globalRules().get(i));
-			EditableRules after = new EditableRules(replace(rules.globalRules(), i, changed), rules.zones());
-			return applied(ctx, rules, after, TOAST_CHANGED, changed.pattern().text());
+			SoundSet quick = place.quickChanges();
+			SetEntry old = quick == null ? null : quick.entry(where.entryId());
+			if (old == null) {
+				return refused(ctx, ws, TraceEditError.RULE_NOT_FOUND.message());
+			}
+			SetEntry changed = edit.apply(old);
+			if (changed.equals(old)) {
+				return applied(ctx, ws, ws, TOAST_CHANGED, changed.pattern().text());
+			}
+			PlaceSets edited = place.withQuickChanges(quick.putEntry(changed));
+			return applied(ctx, ws, new Workspace(ws.profile().withPlace(where.place(), edited), ws.library()), TOAST_CHANGED,
+					changed.pattern().text());
 		}
-		int z = ExactRules.indexOfZone(rules.zones(), where.zoneId());
-		if (z < 0) {
-			return refused(ctx, rules, TraceEditError.ZONE_NOT_FOUND);
+		SoundSet set = ws.library().get(where.setId());
+		SetEntry old = set == null ? null : set.entry(where.entryId());
+		if (old == null) {
+			return refused(ctx, ws, TraceEditError.RULE_NOT_FOUND.message());
 		}
-		Zone zone = rules.zones().get(z);
-		List<SetEntry> entries = zone.sets().quickEntries();
-		int i = ExactRules.indexOfRule(entries, where.ruleId());
-		if (i < 0) {
-			return refused(ctx, rules, TraceEditError.RULE_NOT_FOUND);
+		SetEntry changed = edit.apply(old);
+		if (changed.equals(old)) {
+			return applied(ctx, ws, ws, TOAST_CHANGED, changed.pattern().text());
 		}
-		SetEntry changed = edit.apply(entries.get(i));
-		Zone edited = withRules(zone, replace(entries, i, changed));
-		EditableRules after = new EditableRules(rules.globalRules(), replace(rules.zones(), z, edited));
-		return applied(ctx, rules, after, TOAST_CHANGED, changed.pattern().text());
+		Workspace after = new Workspace(ws.profile(), ws.library().put(set.putEntry(changed)));
+		return applied(ctx, ws, after, TOAST_CHANGED, changed.pattern().text());
 	}
 
-	/** A zone line's enable/disable control. */
-	public static TraceEditResult setZoneEnabled(TraceEditContext ctx, EditableRules rules, String zoneId, boolean enabled) {
-		int z = ExactRules.indexOfZone(rules.zones(), zoneId);
-		if (z < 0) {
-			return refused(ctx, rules, TraceEditError.ZONE_NOT_FOUND);
+	/** A zone line's on/off control. */
+	public static TraceEditResult setZoneEnabled(TraceEditContext ctx, Workspace ws, String zoneId, boolean enabled) {
+		Zone zone = ws.profile().zone(zoneId);
+		if (zone == null) {
+			return refused(ctx, ws, TraceEditError.ZONE_NOT_FOUND.message());
 		}
-		Zone zone = rules.zones().get(z);
-		Zone edited = zone.withEnabled(enabled);
-		EditableRules after = new EditableRules(rules.globalRules(), replace(rules.zones(), z, edited));
-		return applied(ctx, rules, after, TOAST_CHANGED, zone.name());
+		Workspace after = new Workspace(ws.profile().putZone(zone.withEnabled(enabled)), ws.library());
+		return applied(ctx, ws, after, TOAST_CHANGED, zone.name());
 	}
 
 	/**
-	 * "Add rule for this sound": an exact-ID rule for the trace's sound, in the global list ({@code zoneId} null) or
-	 * in a zone shown in the trace, with {@code edit} applied. An exact rule for the sound already in that list is
-	 * reused, and turned on, instead of adding a second one.
+	 * Add to Quick changes: applies {@code edit} to the sound's single-sound entry in the Quick changes of Everywhere or
+	 * of a zone shown in the trace, creating the set or the entry when needed, exactly as the Sounds tab's quick actions
+	 * do (FR-1.5, FR-4.10). Quick changes is pinned first in its place, so the edit takes effect there.
 	 */
-	public static TraceEditResult addRuleForSound(TraceEditContext ctx, EditableRules rules, String zoneId, EntryEdit edit) {
-		ExactRules.Change change = ExactRules.edit(rules, zoneId, ctx.soundId(), edit, false);
-		if (change.error() != null) {
-			return refused(ctx, rules, change.error());
+	public static TraceEditResult addToQuickChanges(TraceEditContext ctx, Workspace ws, PlaceRef where, EntryEdit edit) {
+		QuickActionResult result = QuickActions.apply(ws, where, ctx.soundId(), edit);
+		if (!result.ok()) {
+			return refused(ctx, ws, result.error());
 		}
-		String toastKey = change.outcome() == ExactRules.Outcome.ADDED ? TOAST_ADDED : TOAST_CHANGED;
-		return applied(ctx, rules, change.after(), toastKey, ctx.soundId());
+		boolean existed = QuickActions.quickEntry(ws, where, ctx.soundId()) != null;
+		return applied(ctx, ws, result.after(), existed ? TOAST_CHANGED : TOAST_ADDED, ctx.soundId());
 	}
 
-	/**
-	 * The zone rule a zone line's controls edit: the zone's winning rule for {@code property}, or else its most
-	 * specific matching rule. {@code null} when the zone is not in the trace or none of its rules match; the panel
-	 * then offers "Add rule for this sound".
-	 */
-	public static SetEntry matchedZoneRule(SoundTrace trace, String zoneId, TraceProperty property) {
-		for (ZoneLine line : trace.zones()) {
-			if (!line.zone().id().equals(zoneId)) {
-				continue;
-			}
-			EntryWinner winner = line.rules().winners().get(property);
-			if (winner != null) {
-				return winner.rule();
-			}
-			return line.rules().matched().isEmpty() ? null : line.rules().matched().get(0);
-		}
-		return null;
+	private static TraceEditResult refused(TraceEditContext ctx, Workspace ws, Message error) {
+		return new TraceEditResult(error, ws, ws, ctx.trace(ws), ctx.play() != null, null, List.of());
 	}
 
-	/**
-	 * The stable ID of the exact-ID rule for a sound: {@code exact:<id>} in the global list, the same ID quick actions
-	 * use, and {@code <zone id>/exact:<id>} in a zone, so IDs stay unique across the profile.
-	 */
-	public static String exactRuleId(String zoneId, String soundId) {
-		return zoneId == null ? "exact:" + soundId : zoneId + "/exact:" + soundId;
-	}
-
-	private static TraceEditResult refused(TraceEditContext ctx, EditableRules rules, TraceEditError error) {
-		return new TraceEditResult(error, rules, rules, ctx.trace(rules), ctx.play() != null, null, List.of());
-	}
-
-	private static TraceEditResult applied(TraceEditContext ctx, EditableRules before, EditableRules after, String toastKey,
+	private static TraceEditResult applied(TraceEditContext ctx, Workspace before, Workspace after, String toastKey,
 			String toastArg) {
 		return new TraceEditResult(null, before, after, ctx.trace(after), ctx.play() != null, toastKey, List.of(toastArg));
-	}
-
-	/** The zone with these Quick changes entries. */
-	static Zone withRules(Zone zone, List<SetEntry> rules) {
-		return zone.withSets(zone.sets().withQuickEntries(rules));
-	}
-
-	static <T> List<T> replace(List<T> list, int i, T value) {
-		List<T> copy = new ArrayList<>(list);
-		copy.set(i, value);
-		return copy;
 	}
 }

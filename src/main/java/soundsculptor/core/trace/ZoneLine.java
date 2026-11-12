@@ -7,7 +7,7 @@ import soundsculptor.core.zones.Zone;
  *
  * @param weight   fade weight w, 0 to 1 (always 1 for MVP hard-edged zones)
  * @param distance straight-line distance from the sound to the zone's anchor, in blocks
- * @param rules    how the zone's own rule list treated the sound
+ * @param sets     how the zone's sets treated the sound
  */
-public record ZoneLine(Zone zone, double weight, double distance, ListTrace rules) {
+public record ZoneLine(Zone zone, double weight, double distance, PlaceTrace sets) {
 }

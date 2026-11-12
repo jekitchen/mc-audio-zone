@@ -12,6 +12,7 @@ import java.util.List;
 
 import soundsculptor.core.sets.Limit;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -37,7 +38,7 @@ class SoundTracerFullZonesTest {
 	}
 
 	private static SoundTrace trace(Precedence p, LastPlay play) {
-		return SoundTracer.trace(p, COW, play, false, false);
+		return SoundTracer.trace(p, SetLibrary.EMPTY, COW, play, false, false);
 	}
 
 	@Test
