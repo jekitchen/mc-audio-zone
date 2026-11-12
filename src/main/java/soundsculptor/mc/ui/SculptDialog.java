@@ -58,6 +58,11 @@ public final class SculptDialog extends Screen {
 		return parent;
 	}
 
+	/** The text under the title. */
+	public Component message() {
+		return message;
+	}
+
 	@Override
 	protected void init() {
 		buttons.clear();

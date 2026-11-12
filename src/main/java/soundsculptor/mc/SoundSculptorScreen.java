@@ -47,17 +47,18 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * The main Sound Sculptor screen (FR-12.1). Header: active profile and the Bypass toggle (FR-13.1). Tabs: Recently
- * Played (FR-1, with the Mute and Edit quick actions), Search, Rules (the global rules), Zones, Profiles (FR-11.2,
- * FR-11.3) and Settings; Inspect arrives with M12. Lives in {@code soundsculptor.mc} because it uses Minecraft's sound manager and GUI
- * classes.
+ * Played (FR-1, with the Mute and Edit quick actions), Search, Rules (the global rules), Sound Sets (the library,
+ * FR-4.7), Zones, Profiles (FR-11.2, FR-11.3) and Settings; Inspect arrives with M12. Lives in {@code soundsculptor.mc}
+ * because it uses Minecraft's sound manager and GUI classes.
  */
 public final class SoundSculptorScreen extends SculptScreen {
 	public static final int TAB_RECENT = 0;
 	public static final int TAB_SEARCH = 1;
 	public static final int TAB_RULES = 2;
-	public static final int TAB_ZONES = 3;
-	public static final int TAB_PROFILES = 4;
-	public static final int TAB_SETTINGS = 5;
+	public static final int TAB_SETS = 3;
+	public static final int TAB_ZONES = 4;
+	public static final int TAB_PROFILES = 5;
+	public static final int TAB_SETTINGS = 6;
 	/** FR-3.4: results update 150 ms after the player stops typing. */
 	public static final long SEARCH_DELAY_MS = 150;
 	/** FR-1.6: the list refreshes at most 4 times per second (every 5 ticks). */
@@ -99,6 +100,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 	public SculptToggle bypassToggle;
 	public SculptList rulesList;
 	private RuleListPanel rulesPanel;
+	private SetLibraryPanel setsPanel;
 	private ZoneListPanel zonesPanel;
 	private ProfileListPanel profilesPanel;
 	public SculptTextField searchField;
@@ -140,6 +142,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 				new Tab(Component.translatable("soundsculptor.tab.recent"), false),
 				new Tab(Component.translatable("soundsculptor.tab.search"), true),
 				new Tab(Component.translatable("soundsculptor.tab.rules"), true),
+				new Tab(Component.translatable("soundsculptor.tab.sets"), true),
 				new Tab(Component.translatable("soundsculptor.tab.zones"), true),
 				new Tab(Component.translatable("soundsculptor.tab.profiles"), true),
 				new Tab(Component.translatable("soundsculptor.tab.settings"), true));
@@ -186,6 +189,9 @@ public final class SoundSculptorScreen extends SculptScreen {
 			buildSearch(body);
 		} else if (index == TAB_RULES) {
 			buildRules(body);
+		} else if (index == TAB_SETS) {
+			setsPanel = new SetLibraryPanel(this);
+			setsPanel.build(body);
 		} else if (index == TAB_ZONES) {
 			buildZones(body);
 		} else if (index == TAB_PROFILES) {
@@ -256,6 +262,10 @@ public final class SoundSculptorScreen extends SculptScreen {
 		}
 		if (currentTab() == TAB_RECENT && !paused && ticks % REFRESH_TICKS == 0) {
 			refresh();
+		}
+		if (currentTab() == TAB_SETS && setsPanel != null && ticks % REFRESH_TICKS == 0) {
+			// The usage index reads other worlds' profiles in the background; show its counts once it has them.
+			setsPanel.refreshIfUsageChanged();
 		}
 		if ((currentTab() == TAB_RECENT || currentTab() == TAB_SEARCH) && ticks % REFRESH_TICKS == 0 && !hasOverlay()
 				&& applyToDropdown != null && !computeApplyChoices().equals(applyChoices)) {
@@ -425,6 +435,9 @@ public final class SoundSculptorScreen extends SculptScreen {
 			runSearch();
 		}
 		refreshRules();
+		if (setsPanel != null && currentTab() == TAB_SETS) {
+			setsPanel.refresh();
+		}
 		if (zonesPanel != null && currentTab() == TAB_ZONES) {
 			zonesPanel.refresh();
 		}
@@ -563,6 +576,12 @@ public final class SoundSculptorScreen extends SculptScreen {
 
 	public void deleteRule(String ruleId) {
 		rulesPanel.delete(ruleId);
+	}
+
+	// ---- Sound Sets (FR-4.7) ----
+
+	public SetLibraryPanel setsPanel() {
+		return setsPanel;
 	}
 
 	// ---- Zones (PRD 6.1, FR-8) ----

@@ -1,8 +1,5 @@
 package soundsculptor.mc;
 
-import soundsculptor.core.Translator;
-import soundsculptor.core.lists.EntrySummary;
-import soundsculptor.core.lists.SummaryPart;
 import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.ui.SculptButton;
@@ -29,7 +26,6 @@ public final class RuleListPanel {
 	private static final Identifier UP_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/up");
 	private static final Identifier DOWN_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/down");
 	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/delete");
-	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
 
 	private final SculptScreen host;
 	private final RuleTarget target;
@@ -77,8 +73,8 @@ public final class RuleListPanel {
 		for (int i = 0; i < rules.size(); i++) {
 			SetEntry rule = rules.get(i);
 			String pattern = rule.pattern().text();
-			String status = status(rule);
-			String details = details(rule, known);
+			String status = SetEditorScreen.status(rule);
+			String details = SetEditorScreen.details(rule, known);
 			List<SculptList.Row.Column> columns = List.of(
 					new SculptList.Row.Column(() -> pattern, 0, 0),
 					new SculptList.Row.Column(() -> status, STATUS_WIDTH, 0),
@@ -100,50 +96,6 @@ public final class RuleListPanel {
 		}
 		list.setRows(rows);
 	}
-
-	/**
-	 * What the rule does to loudness, in the same style as the Recently Played status (M8 review): "✖ Muted",
-	 * "▶ Volume 30%", "▶ Not muted", or "○ Off" for a rule that is turned off. Empty if it does not set loudness.
-	 */
-	static String status(SetEntry rule) {
-		if (!rule.enabled()) {
-			return Component.translatable("soundsculptor.rules.status.off").getString();
-		}
-		if (Boolean.TRUE.equals(rule.mute())) {
-			return Component.translatable("soundsculptor.rules.status.muted").getString();
-		}
-		if (rule.volume() != null) {
-			return Component.translatable("soundsculptor.rules.status.volume", rule.volume()).getString();
-		}
-		if (Boolean.FALSE.equals(rule.mute())) {
-			return Component.translatable("soundsculptor.rules.status.not_muted").getString();
-		}
-		return "";
-	}
-
-	/**
-	 * The second line: the rule's other settings (limit, cue, or "Sets nothing yet"), then for a wildcard pattern how
-	 * many known sounds it matches, so a typo shows up as "No known sound matches" (FR-4.3). An exact-ID rule always
-	 * matches its one sound, so it has no count.
-	 */
-	static String details(SetEntry rule, List<String> known) {
-		List<SummaryPart> parts = new ArrayList<>();
-		for (SummaryPart part : EntrySummary.parts(rule)) {
-			if (!LOUDNESS_PARTS.contains(part.key())) {
-				parts.add(part);
-			}
-		}
-		if (!rule.pattern().isExact()) {
-			int count = EntrySummary.matchCount(rule, known);
-			parts.add(SummaryPart.of(count == 0 ? "soundsculptor.rules.matches.none"
-					: count == 1 ? "soundsculptor.rules.matches.one" : "soundsculptor.rules.matches", Integer.toString(count)));
-		}
-		return EntrySummary.join(parts, TRANSLATOR);
-	}
-
-	/** Summary chips the status column already shows. */
-	private static final java.util.Set<String> LOUDNESS_PARTS = java.util.Set.of(EntrySummary.DISABLED, EntrySummary.MUTED,
-			EntrySummary.NOT_MUTED, EntrySummary.VOLUME);
 
 	/** FR-4.7: a rule can be turned off without deleting it; the effect stops at once. */
 	public void setEnabled(String ruleId, boolean enabled) {

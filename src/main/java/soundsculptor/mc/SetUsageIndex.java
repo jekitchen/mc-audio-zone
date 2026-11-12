@@ -45,8 +45,9 @@ public final class SetUsageIndex {
 
 	/** Whether a rebuild is waiting to start; requests made meanwhile are covered by it. */
 	private static final AtomicBoolean queued = new AtomicBoolean();
-	private static volatile List<FileProfile> files = List.of();
-	private static volatile Built built = new Built(files, null, SetUsage.EMPTY);
+	/** The files read by the last finished rebuild, or {@code null} until the first one has finished. */
+	private static volatile List<FileProfile> files;
+	private static volatile Built built = new Built(List.of(), null, SetUsage.EMPTY);
 
 	private SetUsageIndex() {
 	}
@@ -59,11 +60,15 @@ public final class SetUsageIndex {
 	}
 
 	/**
-	 * The usage as of the last finished rebuild, with the loaded profile taken from the live snapshot. Never blocks
-	 * (it reads volatile fields and, when the live profile changed, merges the profiles in memory).
+	 * The usage as of the last finished rebuild, with the loaded profile taken from the live snapshot, or {@code null}
+	 * until the first rebuild has finished (other profiles are then still being counted). Never blocks (it reads
+	 * volatile fields and, when the live profile changed, merges the profiles in memory).
 	 */
 	public static SetUsage current() {
 		List<FileProfile> read = files;
+		if (read == null) {
+			return null;
+		}
 		Map.Entry<String, Profile> live = ProfileManager.liveProfile();
 		Built b = built;
 		if (b.files() == read && sameLive(b.live(), live)) {
@@ -115,14 +120,23 @@ public final class SetUsageIndex {
 		files = List.copyOf(out);
 	}
 
-	/** The profile in the file, or {@code null} if it cannot be read (reading never changes a file). */
+	/**
+	 * The profile in the file, or {@code null} if it cannot be read (reading never changes a file). An unreadable file
+	 * is reported when its world is joined, so here it is only logged at debug level; anything else that goes wrong
+	 * reading it is logged and the file is skipped, so one bad file never stops the index.
+	 */
 	private static Profile readFile(Path file) {
 		try {
 			if (Files.size(file) > ProfileStore.MAX_FILE_BYTES) {
+				SoundSculptorClient.LOGGER.debug("Sound Sculptor skipped {} for the Sound Set usage: the file is too large", file);
 				return null;
 			}
 			return ProfileCodec.read(Files.readString(file, StandardCharsets.UTF_8), version -> { }).profile();
 		} catch (ProfileFormatException | IOException e) {
+			SoundSculptorClient.LOGGER.debug("Sound Sculptor skipped {} for the Sound Set usage: it could not be read", file, e);
+			return null;
+		} catch (RuntimeException e) {
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor skipped {} for the Sound Set usage", file, e);
 			return null;
 		}
 	}

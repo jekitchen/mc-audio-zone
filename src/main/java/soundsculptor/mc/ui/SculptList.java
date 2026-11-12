@@ -129,6 +129,13 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 
 	// ---- Focus and keys ----
 
+	/** Moves keyboard focus to the row's first button (or its focus target), e.g. when the list opens in an overlay. */
+	public void focusRow(Row row) {
+		if (Minecraft.getInstance().gui.screen() instanceof SculptScreen screen) {
+			screen.focusPath(pathTo(row, 0));
+		}
+	}
+
 	private ComponentPath pathTo(Row row, int buttonIndex) {
 		List<? extends GuiEventListener> buttons = row.children();
 		GuiEventListener target = buttons.get(Math.max(0, Math.min(buttonIndex, buttons.size() - 1)));

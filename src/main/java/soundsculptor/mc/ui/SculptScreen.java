@@ -606,6 +606,11 @@ public abstract class SculptScreen extends Screen {
 			return top + height;
 		}
 
+		/** Pixels left between the next row and the bottom of the body; negative when the content overflows. */
+		public int remaining() {
+			return bottom() - cursorY;
+		}
+
 		/** Whether the content is taller than the body (a scrolling list should be used instead). */
 		public boolean overflows() {
 			return cursorY - Theme.GAP > bottom();

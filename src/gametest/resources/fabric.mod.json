@@ -32,7 +32,9 @@
 			"soundsculptor.gametest.TraceEditClientGameTest",
 			"soundsculptor.gametest.AccessibilityClientGameTest",
 			"soundsculptor.gametest.M8StressClientGameTest",
-			"soundsculptor.gametest.SetUsageClientGameTest"
+			"soundsculptor.gametest.SetUsageClientGameTest",
+			"soundsculptor.gametest.SoundSetsTabClientGameTest",
+			"soundsculptor.gametest.SetEditorClientGameTest"
 		]
 	},
 	"depends": {

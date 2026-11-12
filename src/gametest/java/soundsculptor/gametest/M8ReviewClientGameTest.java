@@ -55,21 +55,22 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			check(typo.get(2).equals("⚠ No known sound matches"), "a pattern matching nothing is flagged, was " + typo);
 			context.takeScreenshot("m8-review-rules");
 
-			// SetEntry editor: an exact rule under the villager mute shows "Unchanged (muted)", not "Not set".
+			// Entry editor: a value the entry leaves alone reads "Unchanged" (Task 12 removed the inherited value; the
+			// trace shows what a sound gets).
 			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(main(mc))));
 			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("minecraft:entity.villager.celebrate");
 			context.waitTicks(1);
-			check(editor(context).equals(List.of("Mute: Unchanged (muted)", "Volume: Unchanged (muted)")),
-					"unset values should show what the sound gets now, was " + editor(context));
+			check(editor(context).equals(List.of("Mute: Unchanged", "Volume: Unchanged")),
+					"unset values should read Unchanged, was " + editor(context));
 			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.EntryDraft.Field.VOLUME)).isEmpty(),
 					"showing the current value must not set a volume");
 			context.takeScreenshot("m8-review-editor-unchanged");
 			// A wildcard pattern shows the plain default.
 			context.runOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).patternField.setValue("*:block.*.step"));
 			context.waitTicks(1);
-			check(editor(context).equals(List.of("Mute: Unchanged (not muted)", "Volume: Unchanged (100%)")),
-					"a wildcard shows 100% and not muted, was " + editor(context));
+			check(editor(context).equals(List.of("Mute: Unchanged", "Volume: Unchanged")),
+					"a wildcard reads Unchanged too, was " + editor(context));
 			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.EntryDraft.Field.VOLUME)).isEmpty(),
 					"changing the pattern must not set a volume");
 			context.runOnClient(mc -> mc.gui.screen().onClose());
