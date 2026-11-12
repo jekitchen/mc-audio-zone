@@ -57,6 +57,16 @@ public final class ProfilePrune {
 		return new Pruned(out, notes);
 	}
 
+	/**
+	 * {@link #dropMissingSets} when the library loaded completely, otherwise nothing (PRD 9.2). When a set file or the
+	 * folder could not be read ({@code SetStore.LoadAll.complete()} is false), a set the library lacks may still be on
+	 * disk and load at the next start, so its attachments are kept; every reader skips a set the library lacks.
+	 */
+	public static Pruned dropMissingSetsIfComplete(Profile p, SetLibrary lib, boolean libraryComplete,
+			Map<String, String> deletedNames) {
+		return libraryComplete ? dropMissingSets(p, lib, deletedNames) : new Pruned(p, List.of());
+	}
+
 	private static Profile prune(Profile profile, PlaceRef where, PlaceSets sets, Object placeName, SetLibrary lib,
 			Map<String, String> deletedNames, List<Message> notes) {
 		boolean missing = false;

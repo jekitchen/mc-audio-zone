@@ -8,6 +8,7 @@ import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileFormatException;
 import soundsculptor.core.profile.ProfilePrune;
 import soundsculptor.core.profile.ProfileStore;
+import soundsculptor.core.sets.LibraryWriter;
 import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SetStore;
 import soundsculptor.core.sets.SoundSet;
@@ -62,6 +63,13 @@ public final class ProfileManager {
 	private static volatile boolean bypass;
 	private static ProfileStore store;
 	private static SetStore setStore;
+	/** Writes library sets and retries failed writes; used only on the SAVER thread. */
+	private static LibraryWriter setWriter;
+	/**
+	 * Whether every set file loaded or was set aside as broken at start. When not, attachments to sets the library
+	 * lacks are kept, since those sets may load at the next start (PRD 9.2).
+	 */
+	private static boolean libraryComplete = true;
 
 	private ProfileManager() {
 	}
@@ -71,10 +79,16 @@ public final class ProfileManager {
 		Path root = configDir.resolve("soundsculptor");
 		store = new ProfileStore(root.resolve("profiles"));
 		setStore = new SetStore(root.resolve("sets"));
+		setWriter = new LibraryWriter(setStore);
 		SetStore.LoadAll loaded = setStore.loadAll();
 		for (Message problem : loaded.problems()) {
 			SoundSculptorClient.LOGGER.warn("Sound Sculptor: {}", problem);
 			Notices.show(Component.translatable("soundsculptor.notice.set_broken.title"), component(problem));
+		}
+		libraryComplete = loaded.complete();
+		if (!libraryComplete) {
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor: the Sound Set library did not load completely; "
+					+ "attachments to sets it lacks are kept until a start where it does");
 		}
 		current = snapshot(null, Profile.empty(NO_WORLD_NAME), loaded.library());
 	}
@@ -82,12 +96,13 @@ public final class ProfileManager {
 	/**
 	 * Loads the profile of the world the player just joined, creating an empty one named {@code displayName} if it
 	 * has none. A broken file is set aside as {@code .broken} and reported (FR-11.8). Attachments to sets the library no
-	 * longer has are removed, each with a toast.
+	 * longer has are removed, each with a toast and a log line, unless the library did not load completely.
 	 */
 	public static synchronized void join(String worldKey, String displayName) {
 		ProfileStore.LoadResult result = store.load(worldKey, displayName);
 		SetLibrary library = current.library();
-		ProfilePrune.Pruned pruned = ProfilePrune.dropMissingSets(result.profile(), library, setStore.deletedNames());
+		ProfilePrune.Pruned pruned = ProfilePrune.dropMissingSetsIfComplete(result.profile(), library, libraryComplete,
+				setStore.deletedNames());
 		current = snapshot(worldKey, pruned.profile(), library);
 		if (result.failed()) {
 			String problem = result.problem().text((key, args) -> Component.translatable(key, args).getString());
@@ -97,6 +112,7 @@ public final class ProfileManager {
 					Component.translatable("soundsculptor.notice.profile_broken.message", problem));
 		}
 		for (Message note : pruned.notes()) {
+			SoundSculptorClient.LOGGER.info("Sound Sculptor profile {}: {}", worldKey, text(note));
 			Notices.show(Component.translatable("soundsculptor.notice.set_removed.title"), component(note));
 		}
 		// Always a change, so the profile is saved, pruned or not.
@@ -162,9 +178,10 @@ public final class ProfileManager {
 
 	/**
 	 * Applies a change to the profile and the library, swaps in the new snapshot and saves in the background, in order:
-	 * the profile if it changed (only in a world), every library set that was added or changed, and the file of every
-	 * set the library lost. Sets are compared by identity against the previous library, so an untouched set is not
-	 * written again.
+	 * every library set that was added or changed, the profile if it changed (only in a world), and the file of every
+	 * set the library lost. Sets go first so a saved profile never refers to a set that was not written. Sets are
+	 * compared by identity against the previous library, so an untouched set is not written again; a set whose write
+	 * failed is tried again with the next change and in {@link #flushSaves}.
 	 */
 	public static synchronized void change(UnaryOperator<Workspace> f) {
 		Snapshot before = current;
@@ -188,15 +205,16 @@ public final class ProfileManager {
 		}
 		String key = before.key();
 		Profile profile = after.profile();
+		SetLibrary library = after.library();
 		SAVER.execute(() -> {
+			if (setWriter != null) {
+				setWriter.save(library, saved, ProfileManager::setWriteFailed);
+			}
 			if (profileChanged && store != null && key != null) {
 				save(key, profile);
 			}
-			for (SoundSet set : saved) {
-				saveSet(set);
-			}
-			for (SoundSet set : deleted) {
-				deleteSet(set);
+			if (setWriter != null) {
+				setWriter.delete(library, deleted, ProfileManager::setWriteFailed);
 			}
 		});
 	}
@@ -210,28 +228,10 @@ public final class ProfileManager {
 		}
 	}
 
-	private static void saveSet(SoundSet set) {
-		if (setStore == null) {
-			return;
-		}
-		try {
-			setStore.save(set);
-		} catch (IOException e) {
-			SoundSculptorClient.LOGGER.error("Sound Sculptor could not save {}", setStore.fileFor(set.id()), e);
-			saveFailed(e);
-		}
-	}
-
-	private static void deleteSet(SoundSet set) {
-		if (setStore == null) {
-			return;
-		}
-		try {
-			setStore.delete(set.id(), set.name());
-		} catch (IOException e) {
-			SoundSculptorClient.LOGGER.error("Sound Sculptor could not delete {}", setStore.fileFor(set.id()), e);
-			saveFailed(e);
-		}
+	private static void setWriteFailed(Path file, boolean deleting, IOException e) {
+		SoundSculptorClient.LOGGER.error("Sound Sculptor could not {} {}; it is tried again with the next change",
+				deleting ? "delete" : "save", file, e);
+		saveFailed(e);
 	}
 
 	private static void saveFailed(IOException e) {
@@ -239,11 +239,17 @@ public final class ProfileManager {
 				Component.translatable("soundsculptor.notice.save_failed.message", e.getMessage()));
 	}
 
-
-	/** Waits until every queued save has been written (tests, and before the game exits). */
+	/**
+	 * Waits until every queued save has been written (tests, and before the game exits), trying again any library set
+	 * whose write failed.
+	 */
 	public static void flushSaves() {
 		try {
-			SAVER.submit(() -> { }).get(10, TimeUnit.SECONDS);
+			SAVER.submit(() -> {
+				if (setWriter != null) {
+					setWriter.retry(ProfileManager::setWriteFailed);
+				}
+			}).get(10, TimeUnit.SECONDS);
 		} catch (Exception e) {
 			throw new IllegalStateException("profile save did not finish", e);
 		}

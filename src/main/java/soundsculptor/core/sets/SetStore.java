@@ -9,6 +9,8 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,12 +21,14 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
  * Library Sound Sets on disk (PRD FR-11.8): one JSON file per set in {@code config/soundsculptor/sets/}, named
  * {@code <id>.json}. Writes are atomic (temp file, then rename) and the previous version is kept as {@code .bak}. A
- * file that fails to load is renamed {@code .broken} and the other sets still load.
+ * file that is not a valid set is renamed {@code .broken} and the other sets still load. A file the disk would not
+ * read is left as it is and the load is marked incomplete, so no attachment is dropped because of it (PRD 9.2).
  *
  * <p>{@code deleted.json} remembers the names of deleted sets, so a note about a missing set can name it.
  *
@@ -40,18 +44,45 @@ public final class SetStore {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
 	private final Path directory;
+	private final DiskRead<Stream<Path>> lister;
+	private final DiskRead<String> reader;
 
 	public SetStore(Path directory) {
+		this(directory, Files::list, SetStore::readText);
+	}
+
+	/** For tests: {@code lister} lists the folder and {@code reader} reads one file, so disk failures can be staged. */
+	SetStore(Path directory, DiskRead<Stream<Path>> lister, DiskRead<String> reader) {
 		this.directory = directory;
+		this.lister = lister;
+		this.reader = reader;
+	}
+
+	/** One read from the disk. */
+	@FunctionalInterface
+	interface DiskRead<T> {
+		T read(Path path) throws IOException;
+	}
+
+	/** A file's text as UTF-8. */
+	static String readText(Path file) throws IOException {
+		return Files.readString(file, StandardCharsets.UTF_8);
 	}
 
 	public Path directory() {
 		return directory;
 	}
 
-	/** The sets that loaded, and one message for each file that did not (or for the sets beyond the limit). */
-	public record LoadAll(SetLibrary library, List<Message> problems) {
+	/**
+	 * The sets that loaded, and one message for each file that did not (or for the sets beyond the limit).
+	 *
+	 * @param complete whether the library holds every set file in the folder, so an attachment to a set it lacks
+	 *                 really is to a missing set. False when the folder or a file could not be read, or when sets
+	 *                 beyond the limit were left on disk: those sets may load at the next start.
+	 */
+	public record LoadAll(SetLibrary library, List<Message> problems, boolean complete) {
 		public LoadAll {
+			Objects.requireNonNull(library, "library");
 			problems = List.copyOf(problems);
 		}
 	}
@@ -65,15 +96,31 @@ public final class SetStore {
 	}
 
 	/**
-	 * Loads every set file. A file that cannot be read, is not valid, or whose name is not its set's ID is renamed
-	 * {@code <name>.broken} and reported; the rest still load. Backups, {@code .broken} copies, temp files and
-	 * {@code deleted.json} are not sets. At most {@link SetLibrary#MAX_SETS} load (the first by file name); the
-	 * files beyond that are left alone and one problem is reported. Never throws.
+	 * Loads every set file; the others still load when one does not. Never throws.
+	 *
+	 * <ul>
+	 *   <li>A file that is not a valid set, or whose name is not its set's ID, is renamed {@code <name>.broken} and
+	 *   reported (FR-11.8).</li>
+	 *   <li>A file the disk would not read (locked, no permission, device error) is not broken: it is left as it is,
+	 *   reported, and the load is {@linkplain LoadAll#complete() incomplete}. So is a folder that cannot be
+	 *   listed.</li>
+	 *   <li>Backups, {@code .broken} copies, temp files and {@code deleted.json} are not sets.</li>
+	 *   <li>At most {@link SetLibrary#MAX_SETS} load (the first by file name); the files beyond that are left alone,
+	 *   one problem is reported and the load is incomplete.</li>
+	 * </ul>
 	 */
 	public LoadAll loadAll() {
-		List<Path> files = setFiles();
+		List<Path> files;
+		try {
+			files = setFiles();
+		} catch (IOException e) {
+			return unlisted(e);
+		} catch (UncheckedIOException e) {
+			return unlisted(e.getCause());
+		}
 		List<SoundSet> sets = new ArrayList<>();
 		List<Message> problems = new ArrayList<>();
+		boolean complete = true;
 		int beyondLimit = 0;
 		for (Path file : files) {
 			if (sets.size() >= SetLibrary.MAX_SETS) {
@@ -92,37 +139,50 @@ public final class SetStore {
 				}
 			} catch (SetFormatException e) {
 				problem = e.problem();
+			} catch (CharacterCodingException e) {
+				problem = Message.of(SetText.UNREADABLE, String.valueOf(e.getMessage())); // the bytes are not text
 			} catch (IOException e) {
-				problem = Message.of(SetText.UNREADABLE, String.valueOf(e.getMessage()));
+				problems.add(Message.of(SetText.FILE_UNREADABLE, name, String.valueOf(e.getMessage())));
+				complete = false;
+				continue;
 			}
 			problems.add(Message.of(SetText.FILE_PROBLEM, name, problem));
 			setAside(file);
 		}
 		if (beyondLimit > 0) {
 			problems.add(Message.of(SetText.TOO_MANY_SETS, SetLibrary.MAX_SETS, beyondLimit));
+			complete = false;
 		}
-		return new LoadAll(new SetLibrary(sets), problems);
+		return new LoadAll(new SetLibrary(sets), problems, complete);
 	}
 
-	private List<Path> setFiles() {
-		if (!Files.isDirectory(directory)) {
+	private static LoadAll unlisted(IOException e) {
+		return new LoadAll(SetLibrary.EMPTY, List.of(Message.of(SetText.FOLDER_UNREADABLE, String.valueOf(e.getMessage()))),
+				false);
+	}
+
+	/**
+	 * The set files, by name; none when the folder does not exist.
+	 *
+	 * @throws UncheckedIOException if reading the listing fails part way
+	 */
+	private List<Path> setFiles() throws IOException {
+		if (Files.notExists(directory)) {
 			return List.of();
 		}
-		try (Stream<Path> entries = Files.list(directory)) {
+		try (Stream<Path> entries = lister.read(directory)) {
 			return entries.filter(f -> {
 				String name = f.getFileName().toString();
 				return name.endsWith(".json") && !name.equals(DELETED_FILE) && Files.isRegularFile(f);
 			}).sorted(Comparator.comparing(f -> f.getFileName().toString())).toList();
-		} catch (IOException e) {
-			return List.of();
 		}
 	}
 
-	private static SoundSet readFile(Path file) throws IOException, SetFormatException {
+	private SoundSet readFile(Path file) throws IOException, SetFormatException {
 		if (Files.size(file) > MAX_FILE_BYTES) {
 			throw new SetFormatException(Message.of(SetText.TOO_LARGE));
 		}
-		return SetCodec.read(Files.readString(file, StandardCharsets.UTF_8));
+		return SetCodec.read(reader.read(file));
 	}
 
 	private static void setAside(Path file) {

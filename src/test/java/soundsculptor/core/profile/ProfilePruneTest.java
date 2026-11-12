@@ -77,4 +77,17 @@ class ProfilePruneTest {
 				"'B' was deleted, so it was removed from Barn"),
 				pruned.notes().stream().map(m -> m.text(en)).toList(), "a zone with no name is named by its ID");
 	}
+
+	@Test
+	void incompleteLibraryPrunesNothing() {
+		Profile p = profile(PlaceSets.EMPTY.attach("set-unread").attach(KEPT.id()),
+				zone("z1", "Main base", PlaceSets.EMPTY.attach("set-unread")));
+		ProfilePrune.Pruned kept = ProfilePrune.dropMissingSetsIfComplete(p, LIBRARY, false, Map.of("set-unread", "Farm"));
+		assertSame(p, kept.profile(), "a set that could not be read may load at the next start");
+		assertEquals(List.of(), kept.notes());
+
+		ProfilePrune.Pruned pruned = ProfilePrune.dropMissingSetsIfComplete(p, LIBRARY, true, Map.of("set-unread", "Farm"));
+		assertEquals(ProfilePrune.dropMissingSets(p, LIBRARY, Map.of("set-unread", "Farm")), pruned);
+		assertEquals(2, pruned.notes().size());
+	}
 }

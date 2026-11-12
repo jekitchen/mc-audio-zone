@@ -40,6 +40,8 @@ final class SetText {
 
 	// The folder.
 	static final String FILE_PROBLEM = "soundsculptor.sets.store.problem";
+	static final String FILE_UNREADABLE = "soundsculptor.sets.store.file_unreadable";
+	static final String FOLDER_UNREADABLE = "soundsculptor.sets.store.folder_unreadable";
 	static final String TOO_MANY_SETS = "soundsculptor.sets.store.too_many_sets";
 
 	// Shared with profile files.

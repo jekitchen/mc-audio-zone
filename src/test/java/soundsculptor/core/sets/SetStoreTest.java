@@ -8,10 +8,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import soundsculptor.core.TestEnglish;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Spliterators;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,6 +50,87 @@ class SetStoreTest {
 		SetStore.LoadAll all = store().loadAll();
 		assertEquals(0, all.library().size());
 		assertTrue(all.problems().isEmpty());
+		assertTrue(all.complete(), "no folder means no sets, so attachments to missing sets really are missing");
+	}
+
+	@Test
+	void unreadableDirectoryReportsProblem() throws IOException {
+		Files.writeString(dir.resolve("sets"), "not a folder"); // listing it fails with an IOException
+		SetStore.LoadAll all = store().loadAll();
+		assertEquals(0, all.library().size());
+		assertFalse(all.complete(), "the sets on disk are unknown, so nothing may be pruned");
+		assertEquals(1, all.problems().size());
+		assertTrue(all.problems().get(0).text(EN).startsWith("The Sound Sets folder could not be read"),
+				all.problems().get(0).text(EN));
+		assertEquals("not a folder", Files.readString(dir.resolve("sets")), "nothing is moved or rewritten");
+	}
+
+	@Test
+	void ioErrorWhileListingDoesNotThrow() throws IOException {
+		store().save(set("a", "Alpha"));
+		Iterator<Path> failing = new Iterator<>() {
+			@Override
+			public boolean hasNext() {
+				throw new UncheckedIOException(new IOException("device not ready"));
+			}
+
+			@Override
+			public Path next() {
+				throw new AssertionError();
+			}
+		};
+		SetStore store = new SetStore(dir.resolve("sets"),
+				folder -> StreamSupport.stream(Spliterators.spliteratorUnknownSize(failing, 0), false), SetStore::readText);
+		SetStore.LoadAll all = store.loadAll();
+		assertFalse(all.complete());
+		assertEquals(0, all.library().size());
+		assertEquals(1, all.problems().size());
+		assertTrue(all.problems().get(0).text(EN).contains("device not ready"), all.problems().get(0).text(EN));
+		assertTrue(Files.exists(dir.resolve("sets/a.json")));
+	}
+
+	@Test
+	void fileWithIoErrorIsNotSetAside() throws IOException {
+		store().save(set("a", "Alpha"));
+		store().save(set("b", "Beta"));
+		SetStore store = new SetStore(dir.resolve("sets"), Files::list, file -> {
+			if (file.getFileName().toString().equals("b.json")) {
+				throw new AccessDeniedException(file.toString(), null, "locked by another program");
+			}
+			return SetStore.readText(file);
+		});
+		SetStore.LoadAll all = store.loadAll();
+		assertEquals(1, all.library().size());
+		assertTrue(all.library().contains("a"));
+		assertFalse(all.complete(), "b may load at the next start, so its attachments must stay");
+		assertEquals(1, all.problems().size());
+		String text = all.problems().get(0).text(EN);
+		assertTrue(text.contains("b.json") && text.contains("left as it is"), text);
+		assertTrue(Files.exists(dir.resolve("sets/b.json")), "an unreadable file is not broken");
+		assertFalse(Files.exists(dir.resolve("sets/b.json.broken")));
+		SetStore.LoadAll later = store().loadAll();
+		assertTrue(later.complete());
+		assertEquals(2, later.library().size(), "it loads once the disk lets it");
+	}
+
+	@Test
+	void tooLargeFileIsSetAside() throws IOException {
+		Files.createDirectories(dir.resolve("sets"));
+		Files.writeString(dir.resolve("sets/big.json"), " ".repeat((int) SetStore.MAX_FILE_BYTES + 1));
+		SetStore.LoadAll all = store().loadAll();
+		assertEquals(1, all.problems().size());
+		assertTrue(all.complete(), "a file too large to be a set is a content problem");
+		assertTrue(Files.exists(dir.resolve("sets/big.json.broken")));
+	}
+
+	@Test
+	void fileThatIsNotUtf8IsSetAside() throws IOException {
+		Files.createDirectories(dir.resolve("sets"));
+		Files.write(dir.resolve("sets/bad.json"), new byte[] {'{', (byte) 0xC3, (byte) 0x28, '}'});
+		SetStore.LoadAll all = store().loadAll();
+		assertEquals(1, all.problems().size());
+		assertTrue(all.complete(), "bytes that are not text are a content problem, not a disk one");
+		assertTrue(Files.exists(dir.resolve("sets/bad.json.broken")));
 	}
 
 	@Test
@@ -58,6 +144,7 @@ class SetStoreTest {
 		assertTrue(all.problems().get(0).text(EN).contains("b.json"), all.problems().get(0).text(EN));
 		assertTrue(Files.exists(dir.resolve("sets/b.json.broken")));
 		assertFalse(Files.exists(dir.resolve("sets/b.json")));
+		assertTrue(all.complete(), "a broken file is set aside, so its attachments may go (FR-11.8)");
 		assertTrue(store().loadAll().problems().isEmpty());
 	}
 
@@ -95,6 +182,7 @@ class SetStoreTest {
 		assertEquals(1, all.problems().size());
 		assertTrue(all.problems().get(0).text(EN).contains("3 more"), all.problems().get(0).text(EN));
 		assertTrue(Files.exists(dir.resolve("sets/s256.json")));
+		assertFalse(all.complete(), "the sets left on disk still exist, so their attachments must stay");
 	}
 
 	@Test
