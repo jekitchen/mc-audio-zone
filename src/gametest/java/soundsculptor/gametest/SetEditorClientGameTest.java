@@ -151,16 +151,34 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().zone("z-mob").sets().uses(farm.id())), "Discard keeps Mob farm attached");
 
-			// Detach and Save, with no change to the set itself: no confirmation.
+			// Detach and Save, with no change to the set itself: no confirmation, and a change made to the set behind the
+			// editor (as a quick action would) survives, because the unchanged draft is not written back.
 			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.edit(mc.gui.screen(), farm.id())));
 			context.waitForScreen(SetEditorScreen.class);
+			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(ws.profile(),
+					ws.library().put(ws.library().get(farm.id()).putEntry(SetEntry.of("e1", "minecraft:entity.cow.*").withVolume(70))))));
 			context.runOnClient(mc -> {
 				pressButton(panel(mc).list.findRow("z-mob"), "Detach");
 				editor(mc).save();
 			});
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(!context.computeOnClient(mc -> ProfileManager.profile().zone("z-mob").sets().uses(farm.id())), "Save detaches Mob farm");
+			check(context.computeOnClient(mc -> ProfileManager.library().get(farm.id()).entry("e1").volume()) == 70,
+					"a Save that only detaches keeps the change made to the set behind the editor");
 			check(volumeAt(context, COW, key, MOB_FARM) == 100F, "a cow in Mob farm is back to 100%");
+			check(volumeAt(context, COW, key, MAIN_BASE) == 70F, "Main base gets the change made behind the editor");
+
+			// While the other worlds are still being counted, a changed set always confirms (nobody can tell yet that no
+			// other world uses it), and the text says so.
+			check(context.computeOnClient(mc -> SetEditorScreen.confirms(1, 0, false) && SetEditorScreen.confirms(0, 0, false)
+					&& !SetEditorScreen.confirms(1, 0, true) && SetEditorScreen.confirms(2, 0, true) && SetEditorScreen.confirms(1, 1, true)),
+					"when Save confirms");
+			String counting = context.computeOnClient(mc -> SetEditorScreen.linkedMessage(List.of("Main base"), 0, false).getString());
+			check(counting.equals("This changes Main base.\nOther worlds are still being counted; any that use this set change too."),
+					"the counting confirmation, was " + counting);
+			String nowhere = context.computeOnClient(mc -> SetEditorScreen.linkedMessage(List.of(), 0, false).getString());
+			check(nowhere.equals("It is not attached in this world.\nOther worlds are still being counted; any that use this set change too."),
+					"the counting confirmation for a set not used here, was " + nowhere);
 		} finally {
 			before.restore(context);
 		}

@@ -344,8 +344,8 @@ public final class SetEditorScreen extends SculptScreen {
 	}
 
 	/**
-	 * The confirmation text when the set is used in more than one place after this save (this world's places, as the
-	 * panel will leave them, plus the places in other worlds), else {@code null}.
+	 * The confirmation text when the set may be used in more than one place after this save (this world's places, as
+	 * the panel will leave them, plus the places in other worlds), else {@code null}.
 	 */
 	private Component linkedConfirmation() {
 		Profile profile = ProfileManager.profile();
@@ -356,15 +356,25 @@ public final class SetEditorScreen extends SculptScreen {
 		SetUsage usage = SetUsageIndex.current();
 		String key = ProfileManager.key();
 		int otherPlaces = usage == null ? 0 : usage.otherPlaceCount(draft.id(), key);
-		if (here.size() + otherPlaces <= 1) {
+		if (!confirms(here.size(), otherPlaces, usage != null)) {
 			return null;
 		}
 		return linkedMessage(here, usage == null ? 0 : usage.otherCount(draft.id(), key), usage != null);
 	}
 
 	/**
+	 * Whether Save on a changed set must confirm first (FR-4.9): it is used in more than one place, counting this world's
+	 * places and the other worlds' places. While the other worlds are still being counted nobody can tell that they don't
+	 * use it, so Save always confirms then, whether or not the set is used here.
+	 */
+	public static boolean confirms(int placesHere, int otherPlaces, boolean othersCounted) {
+		return !othersCounted || placesHere + otherPlaces > 1;
+	}
+
+	/**
 	 * "This changes Main base, Mob farm and 1 other world." and, while the other worlds are still being counted, a
-	 * line saying any of them that use the set change too.
+	 * line saying any of them that use the set change too. With no place to name (none here, and the other worlds not
+	 * counted yet) the first line says the set is not attached in this world.
 	 *
 	 * @param placesHere  the names of this world's places that use the set
 	 * @param otherWorlds how many other worlds or servers use it
@@ -375,21 +385,33 @@ public final class SetEditorScreen extends SculptScreen {
 			parts.add(Component.translatable(otherWorlds == 1 ? "soundsculptor.set_editor.confirm.other_worlds.one"
 					: "soundsculptor.set_editor.confirm.other_worlds", otherWorlds).getString());
 		}
-		String list = parts.size() == 1 ? parts.get(0)
-				: Component.translatable("soundsculptor.set_editor.confirm.and", String.join(", ", parts.subList(0, parts.size() - 1)),
-						parts.get(parts.size() - 1)).getString();
-		MutableComponent text = Component.translatable("soundsculptor.set_editor.confirm.message", list);
+		MutableComponent text;
+		if (parts.isEmpty()) {
+			text = Component.translatable("soundsculptor.set_editor.confirm.not_here");
+		} else {
+			String list = parts.size() == 1 ? parts.get(0)
+					: Component.translatable("soundsculptor.set_editor.confirm.and", String.join(", ", parts.subList(0, parts.size() - 1)),
+							parts.get(parts.size() - 1)).getString();
+			text = Component.translatable("soundsculptor.set_editor.confirm.message", list);
+		}
 		if (!othersCounted) {
 			text.append("\n").append(Component.translatable("soundsculptor.set_editor.confirm.counting"));
 		}
 		return text;
 	}
 
-	/** Writes the set, and the panel's Attach and Detach, in one change. */
+	/**
+	 * Writes the set, and the panel's Attach and Detach, in one change. The set is written only if the draft changed:
+	 * otherwise the draft is still the copy taken when the editor opened, and writing it would undo any change made to
+	 * the set since (for example by a quick action).
+	 */
 	private void commit() {
 		SoundSet built = draft.build();
+		boolean setChanged = draft.changed();
 		if (quickPlace != null) {
-			ProfileManager.update(profile -> withQuickChanges(profile, quickPlace, built));
+			if (setChanged) {
+				ProfileManager.update(profile -> withQuickChanges(profile, quickPlace, built));
+			}
 			return;
 		}
 		ProfileManager.change(ws -> {
@@ -400,7 +422,7 @@ public final class SetEditorScreen extends SculptScreen {
 				return ws;
 			}
 			SoundSet saved = built.withName(library.uniqueName(built.name(), built.id()));
-			return new Workspace(attached.apply(ws.profile()), saved.equals(live) ? library : library.put(saved));
+			return new Workspace(attached.apply(ws.profile()), setChanged && !saved.equals(live) ? library.put(saved) : library);
 		});
 	}
 }

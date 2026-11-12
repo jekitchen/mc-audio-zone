@@ -689,6 +689,7 @@
 	"soundsculptor.set_editor.confirm.and": "%1$s and %2$s",
 	"soundsculptor.set_editor.confirm.other_worlds": "%s other worlds",
 	"soundsculptor.set_editor.confirm.other_worlds.one": "1 other world",
+	"soundsculptor.set_editor.confirm.not_here": "It is not attached in this world.",
 	"soundsculptor.set_editor.confirm.counting": "Other worlds are still being counted; any that use this set change too.",
 	"soundsculptor.attached.heading": "Attached to",
 	"soundsculptor.attached.list": "Places in this world that use this set",
