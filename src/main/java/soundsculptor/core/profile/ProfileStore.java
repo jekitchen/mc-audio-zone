@@ -1,9 +1,9 @@
 package soundsculptor.core.profile;
 
+import soundsculptor.core.AtomicFiles;
 import soundsculptor.core.Message;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -144,17 +144,6 @@ public final class ProfileStore {
 
 	/** Saves atomically, keeping the previous file as {@code .bak}. The file records {@code key} (see {@link #list}). */
 	public void save(String key, Profile profile) throws IOException {
-		Files.createDirectories(directory);
-		Path file = fileFor(key);
-		Path temp = file.resolveSibling(file.getFileName() + ".tmp");
-		Files.writeString(temp, ProfileCodec.toJson(profile, key), StandardCharsets.UTF_8);
-		if (Files.exists(file)) {
-			Files.copy(file, file.resolveSibling(file.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
-		}
-		try {
-			Files.move(temp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-		} catch (AtomicMoveNotSupportedException e) {
-			Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
-		}
+		AtomicFiles.write(fileFor(key), ProfileCodec.toJson(profile, key));
 	}
 }
