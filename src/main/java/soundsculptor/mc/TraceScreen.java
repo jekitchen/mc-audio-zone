@@ -160,14 +160,14 @@ public final class TraceScreen extends SculptScreen {
 	// ---- Trace and rows ----
 
 	/**
-	 * The context for this sound. "Used in N places" counts this profile's places plus the other profiles the usage
-	 * index has found; before its first rebuild has finished that is none, so only the local count shows.
+	 * The context for this sound. "Used in N places" counts this profile's places plus the places in the other profiles
+	 * the usage index has found; before its first rebuild has finished there are none, so only the local count shows.
 	 */
 	private TraceEditContext context() {
 		SetUsage usage = SetUsageIndex.current();
 		String key = ProfileManager.key();
 		return new TraceEditContext(soundId, play, ProfileManager.isBypassed(), vanillaCovered,
-				setId -> usage == null ? 0 : usage.otherCount(setId, key));
+				setId -> usage == null ? 0 : usage.otherPlaceCount(setId, key));
 	}
 
 	private void recompute() {

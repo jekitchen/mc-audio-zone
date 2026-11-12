@@ -13,8 +13,8 @@ import soundsculptor.core.sets.SoundSet;
  * @param setName     the library set's name; {@code ""} for Quick changes, which has none
  * @param quick       whether this is the place's Quick changes
  * @param matched     the set's enabled entries that match the sound, most specific first
- * @param placesUsing how many places use the set, in this profile and others ("used in 3 places", FR-14.4); 1 for
- *                    Quick changes, 0 when not known
+ * @param placesUsing how many places use the set: this profile's places plus the places in other profiles ("used in 3
+ *                    places", FR-14.4); 1 for Quick changes, 0 when not known
  */
 public record SetLine(String setId, String setName, boolean quick, List<SetEntry> matched, int placesUsing) {
 	public SetLine {

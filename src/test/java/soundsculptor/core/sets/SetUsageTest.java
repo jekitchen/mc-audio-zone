@@ -41,6 +41,19 @@ class SetUsageTest {
 	}
 
 	@Test
+	void otherPlaceCountSumsThePlacesInOtherProfiles() {
+		Map<String, Profile> all = Map.of(
+				"world:here", profile("Here", FARM, zone("a", FARM)),
+				"world:other", profile("Other", PlaceSets.EMPTY, zone("y", FARM), zone("z", FARM)));
+		SetUsage usage = SetUsage.of(all);
+		assertEquals(2, usage.otherPlaceCount("set-farm", "world:here"), "one other profile using the set in 2 places");
+		assertEquals(1, usage.otherCount("set-farm", "world:here"));
+		assertEquals(4, usage.otherPlaceCount("set-farm", "world:none"), "every profile is another one");
+		assertEquals(2, usage.otherPlaceCount("set-farm", "WORLD:HERE"), "world keys compare ignoring case, as for otherCount");
+		assertEquals(0, usage.otherPlaceCount("set-unused", "world:here"));
+	}
+
+	@Test
 	void otherNamesAreDisplayNamesOnly() {
 		Map<String, Profile> all = Map.of(
 				"world:here", profile("Here", FARM),

@@ -200,9 +200,10 @@ class TraceEditorTest {
 		for (ZoneLine zone : t.zones()) {
 			assertEquals(2, zone.sets().sets().get(0).placesUsing(), zone.zone().id());
 		}
-		TraceEditContext withOthers = new TraceEditContext(AMBIENT, PLAY, false, false, setId -> setId.equals("farm") ? 1 : 0);
-		assertEquals(3, withOthers.trace(start).zones().get(0).sets().sets().get(0).placesUsing(),
-				"another profile using the set counts too");
+		// Another world's profile using the set in 3 places adds those 3 places.
+		TraceEditContext withOthers = new TraceEditContext(AMBIENT, PLAY, false, false, setId -> setId.equals("farm") ? 3 : 0);
+		assertEquals(5, withOthers.trace(start).zones().get(0).sets().sets().get(0).placesUsing(),
+				"places in other profiles count too");
 	}
 
 	// --- Entry line controls ---

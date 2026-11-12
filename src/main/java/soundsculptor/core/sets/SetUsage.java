@@ -83,6 +83,11 @@ public record SetUsage(Map<String, List<Use>> bySet) {
 		return (int) uses(setId).stream().filter(use -> !sameWorld(use.worldKey(), currentKey)).count();
 	}
 
+	/** The places in the other profiles that attach the set, summed over those profiles ("used in N places", FR-14.4). */
+	public int otherPlaceCount(String setId, String currentKey) {
+		return uses(setId).stream().filter(use -> !sameWorld(use.worldKey(), currentKey)).mapToInt(use -> use.places().size()).sum();
+	}
+
 	private List<Use> uses(String setId) {
 		return bySet.getOrDefault(setId, List.of());
 	}

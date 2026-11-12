@@ -13,8 +13,8 @@ import soundsculptor.core.zones.Precedence;
  * @param play           the sound's last play (its position and the player's), or {@code null} if not heard yet
  * @param bypass         whether Bypass Sound Sculptor is on
  * @param vanillaCovered whether the sound has its own vanilla slider
- * @param usedElsewhere  for a library set ID, how many other profiles use the set (FR-4.11); added to this profile's
- *                       places for "used in N places". 0 while that is not known yet.
+ * @param usedElsewhere  for a library set ID, how many places in other profiles use the set (FR-4.11); added to this
+ *                       profile's places for "used in N places". 0 while that is not known yet.
  */
 public record TraceEditContext(String soundId, LastPlay play, boolean bypass, boolean vanillaCovered,
 		ToIntFunction<String> usedElsewhere) {
