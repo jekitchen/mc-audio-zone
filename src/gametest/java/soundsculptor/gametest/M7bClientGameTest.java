@@ -1,16 +1,18 @@
 package soundsculptor.gametest;
 
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.editor.ZoneDraft;
 import soundsculptor.core.profile.Profile;
+import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SoundSet;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.EntryEditorScreen;
+import soundsculptor.mc.PlaceSetsScreen;
 import soundsculptor.mc.SoundHook;
 import soundsculptor.mc.ZoneEditorScreen;
-import soundsculptor.mc.ZoneRulesScreen;
 import soundsculptor.mc.ui.SculptDialog;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;
@@ -28,11 +30,14 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Automated version of the M7b tests: the Zones tab and zone editor (PRD 6.1), A-2 core tasks "create a sphere zone
- * at your position" and "change a zone's color" with the keyboard, zone rules (FR-8.6), the FR-10.4 color AC, and the
- * unsaved-changes dialog (FR-12.4).
+ * at your position" and "change a zone's color" with the keyboard, the zone's attached Sound Sets (FR-8.6), the FR-10.4
+ * color AC, and the unsaved-changes dialog (FR-12.4).
  */
 public final class M7bClientGameTest implements FabricClientGameTest {
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
+	/** A library set muting villagers, attached to the new zone from the zone editor's Sound Sets…. */
+	private static final SoundSet QUIET_VILLAGERS = new SoundSet("set-m7b", "Quiet villagers",
+			List.of(SetEntry.of("e1", "*villager*").withMute(true)));
 	private static final float SILENT = 1.0E-6F;
 
 	@Override
@@ -41,7 +46,7 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			world.getConnection().waitForChunksRender();
 			context.runOnClient(mc -> {
 				ProfileManager.setBypass(false);
-				ProfileManager.update(p -> Profile.empty(p.name()));
+				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().put(QUIET_VILLAGERS)));
 			});
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
@@ -79,29 +84,22 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> editorScreen(mc).colorPicker.hexField().setValue("#56B4E9"));
 			check(editor(context, e -> e.colorPicker.color()) == 0x56B4E9, "#56B4E9 should set the color");
 
-			// Zone rules: saves the zone, then its rule list; add *villager* Mute.
-			context.runOnClient(mc -> editorScreen(mc).openRules());
-			context.waitForScreen(ZoneRulesScreen.class);
-			String zoneId = context.computeOnClient(mc -> ((ZoneRulesScreen) mc.gui.screen()).zoneId());
+			// Sound Sets…: saves the zone, then its attached sets; attach Quiet villagers.
+			context.runOnClient(mc -> editorScreen(mc).openSets());
+			context.waitForScreen(PlaceSetsScreen.class);
+			PlaceRef place = context.computeOnClient(mc -> ((PlaceSetsScreen) mc.gui.screen()).where());
+			String zoneId = place.zoneId();
 			Zone saved = context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId));
-			check(saved != null && saved.shape().equals(new Shape.Box(8, 10, 10)), "Zone rules should save the zone first, was " + saved);
+			check(saved != null && saved.shape().equals(new Shape.Box(8, 10, 10)), "Sound Sets… should save the zone first, was " + saved);
 			check(context.computeOnClient(mc -> ProfileManager.profile().colorOf(zoneId)) == 0x56B4E9, "the color should be saved");
-			context.runOnClient(mc -> ((ZoneRulesScreen) mc.gui.screen()).panel.addButton.onPress(null));
-			context.waitForScreen(EntryEditorScreen.class);
-			context.getInput().typeChars("*villager*");
-			context.runOnClient(mc -> {
-				EntryEditorScreen e = (EntryEditorScreen) mc.gui.screen();
-				e.setMute(EntryEditorScreen.MuteChoice.MUTE);
-				e.save();
-			});
-			context.waitForScreen(ZoneRulesScreen.class);
-			check(context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId).sets().quickEntries().size()) == 1, "the rule should be in the zone");
-			check(context.computeOnClient(mc -> RuleTarget.GLOBAL.rules(ProfileManager.profile()).isEmpty()), "and not in the global list");
-			context.takeScreenshot("m7b-zone-rules");
+			context.runOnClient(mc -> ((PlaceSetsScreen) mc.gui.screen()).panel.attach(QUIET_VILLAGERS.id()));
+			check(context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId).sets().uses(QUIET_VILLAGERS.id())), "the set should be attached to the zone");
+			check(context.computeOnClient(mc -> !ProfileManager.profile().everywhere().uses(QUIET_VILLAGERS.id())), "and not to Everywhere");
+			context.takeScreenshot("m7b-zone-sets");
 			context.runOnClient(mc -> mc.gui.screen().onClose());
 			context.waitForScreen(SoundSculptorScreen.class);
 
-			// The zone works: a villager where the player stands is muted; the row shows color, place and rule count.
+			// The zone works: a villager where the player stands is muted; the row shows color, place and set count.
 			check(play(context, feet.x + 2, feet.y, feet.z) <= SILENT, "a villager inside the new zone should be muted");
 			List<String> row = context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow(zoneId).columnTexts());
 			check(row.get(0).equals("Zone 1") && row.contains("Here") && row.contains("1 Sound Set") && row.contains("Box 8 × 10 × 10, Inside"), "the zone row should describe it, was " + row);
@@ -123,7 +121,7 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> editorScreen(mc).save());
 			context.waitForScreen(SoundSculptorScreen.class);
 			check(context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId).shape()) instanceof Shape.Box, "Save should store the box");
-			check(context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId).sets().quickEntries().size()) == 1, "saving the zone keeps its rules");
+			check(context.computeOnClient(mc -> ProfileManager.profile().zone(zoneId).sets().uses(QUIET_VILLAGERS.id())), "saving the zone keeps its sets");
 
 			// Off: the zone stops; Delete asks first.
 			context.runOnClient(mc -> main(mc).zonesPanel().setEnabled(zoneId, false));
@@ -136,10 +134,11 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> main(mc).zonesPanel().list.findRow(zoneId) == null), "the deleted zone's row should be gone at once");
 
 			context.runOnClient(mc -> {
-				ProfileManager.update(p -> Profile.empty(p.name()));
+				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().remove(QUIET_VILLAGERS.id())));
 				ProfileManager.flushSaves();
 			});
 		}
+
 	}
 
 	private static float play(ClientGameTestContext context, double x, double y, double z) {

@@ -49,8 +49,9 @@ class ProfileZonesTest {
 	void quickActionsKeepTheZones() {
 		Profile p = Profile.empty("A").withZones(List.of(fixed("z1", new Shape.Sphere(10))))
 				.withZoneColor("z1", 0xE69F00);
-		Profile muted = RuleTarget.GLOBAL.remove(RuleTarget.GLOBAL.put(p, SetEntry.of("q1", "minecraft:a").withMute(true))
-				.withSettings(new ProfileSettings(false)), "q1");
+		Profile muted = p.withEverywhere(p.everywhere().withQuickEntries(List.of(SetEntry.of("q1", "minecraft:a").withMute(true))))
+				.withSettings(new ProfileSettings(false));
+		muted = muted.withEverywhere(muted.everywhere().withQuickEntries(List.of()));
 		assertEquals(p.zones(), muted.zones());
 		assertEquals(p.zoneColors(), muted.zoneColors());
 	}

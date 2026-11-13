@@ -1,7 +1,6 @@
 package soundsculptor.gametest;
 
 import soundsculptor.core.profile.ExportCodec;
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.sets.Attachment;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
@@ -91,7 +90,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 			context.waitForScreen(SoundSculptorScreen.class);
 			Profile restored = context.computeOnClient(mc -> ProfileManager.profile());
-			check(restored.zones().equals(original.zones()) && RuleTarget.GLOBAL.rules(restored).equals(RuleTarget.GLOBAL.rules(original))
+			check(restored.zones().equals(original.zones()) && QuickEntries.of(restored).equals(QuickEntries.of(original))
 					&& restored.everywhere().equals(original.everywhere()),
 					"importing the export restores rules, the attached set and fixed zones exactly, was " + restored);
 			check(VILLAGERS.equals(context.computeOnClient(mc -> ProfileManager.library().get(VILLAGERS.id()))),
@@ -131,7 +130,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> main(mc).toast().message().getString())
 					.equals("Imported server-a.json. 2 fixed zones were skipped (another server)."), "the toast says 2 were skipped");
 			Profile afterA = context.computeOnClient(mc -> ProfileManager.profile());
-			check(RuleTarget.GLOBAL.rules(afterA).size() == 2 && RuleTarget.GLOBAL.rule(afterA, "a1") != null, "A's rules are imported, was " + RuleTarget.GLOBAL.rules(afterA));
+			check(QuickEntries.of(afterA).size() == 2 && QuickEntries.get(afterA, "a1") != null, "A's rules are imported, was " + QuickEntries.of(afterA));
 			check(afterA.everywhere().attached().size() == 1, "the missing set is not attached, was " + afterA.everywhere().attached());
 			check(afterA.zones().stream().map(Zone::id).toList().equals(List.of("hall", "near", "ba")),
 					"this world's fixed zones stay, A's bubble comes in, A's fixed zones do not, was " + afterA.zones());

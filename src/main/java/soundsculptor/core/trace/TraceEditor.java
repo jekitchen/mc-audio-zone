@@ -50,11 +50,17 @@ public final class TraceEditor {
 			if (old == null) {
 				return refused(ctx, ws, TraceEditError.RULE_NOT_FOUND.message());
 			}
-			SetEntry changed = edit.apply(old);
-			if (changed.equals(old)) {
+			// An edit that sets a value must take effect, as a quick action's does: it turns the entry on, and the place's
+			// Quick changes too if the player switched it off (FR-8.6). Clearing a value or turning the entry off does not.
+			boolean switchesOn = QuickActions.switchesQuickOn(edit);
+			SetEntry changed = switchesOn ? edit.apply(old.withEnabled(true)) : edit.apply(old);
+			PlaceSets edited = place.withQuickChanges(quick.putEntry(changed));
+			if (switchesOn) {
+				edited = edited.setEnabled(SoundSet.QUICK_ID, true);
+			}
+			if (edited.equals(place)) {
 				return applied(ctx, ws, ws, TOAST_CHANGED, changed.pattern().text());
 			}
-			PlaceSets edited = place.withQuickChanges(quick.putEntry(changed));
 			return applied(ctx, ws, new Workspace(ws.profile().withPlace(where.place(), edited), ws.library()), TOAST_CHANGED,
 					changed.pattern().text());
 		}

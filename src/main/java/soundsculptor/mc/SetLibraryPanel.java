@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import soundsculptor.core.Message;
 import soundsculptor.core.sets.LibraryOps;
+import soundsculptor.core.sets.NewSet;
 import soundsculptor.core.sets.SetUsage;
 import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.sets.Workspace;
@@ -77,8 +78,7 @@ public final class SetLibraryPanel {
 
 	private SculptList.Row row(SoundSet set, int here, int others, boolean othersCounted) {
 		String name = set.name();
-		int size = set.entries().size();
-		String entries = Component.translatable(size == 1 ? "soundsculptor.sets.entries.one" : "soundsculptor.sets.entries", size).getString();
+		String entries = PlaceSetsPanel.entriesText(set.entries().size());
 		String usage = usageText(here, others, othersCounted);
 		Component rowName = Component.literal(name);
 		String id = set.id();
@@ -144,28 +144,24 @@ public final class SetLibraryPanel {
 	/** Adds an empty set named {@code name} (made unique), attached nowhere; returns whether it was added. */
 	public boolean create(String name) {
 		Workspace ws = ProfileManager.workspace();
-		Message problem = LibraryOps.canCreate(ws, name);
-		if (problem != null) {
-			showProblem(problem);
-			return false;
-		}
-		String made = addedName(ws, LibraryOps.create(ws, name));
-		return apply(current -> LibraryOps.create(current, name), "soundsculptor.sets.toast.created", made);
+		return applyNewSet(ws, LibraryOps.create(ws, name), "soundsculptor.sets.toast.created");
 	}
 
 	/** An independent copy named "name (copy)", attached nowhere (FR-4.7). */
 	public boolean duplicate(String setId) {
 		Workspace ws = ProfileManager.workspace();
-		if (ws.library().get(setId) == null) {
+		return applyNewSet(ws, LibraryOps.duplicate(ws, setId), "soundsculptor.sets.toast.duplicated");
+	}
+
+	/** Applies an operation that added a library set, worked out once from {@code before}; or shows its problem. */
+	private boolean applyNewSet(Workspace before, NewSet result, String toastKey) {
+		if (!result.ok()) {
+			showProblem(result.problem());
 			return false;
 		}
-		Message problem = LibraryOps.canDuplicate(ws, setId);
-		if (problem != null) {
-			showProblem(problem);
-			return false;
-		}
-		String made = addedName(ws, LibraryOps.duplicate(ws, setId));
-		return apply(current -> LibraryOps.duplicate(current, setId), "soundsculptor.sets.toast.duplicated", made);
+		boolean changed = QuickUndo.applyResult(host, this::refreshAfterUndo, before, result.workspace(), toastKey, result.name());
+		refresh();
+		return changed;
 	}
 
 	/** Renames the set; a name another set has gets " (2)" and so on. The ID stays. */
@@ -220,16 +216,6 @@ public final class SetLibraryPanel {
 		} else {
 			refresh();
 		}
-	}
-
-	/** The name of the set {@code after} has and {@code before} lacks: what a create or duplicate is about to add. */
-	private static String addedName(Workspace before, Workspace after) {
-		for (SoundSet set : after.library().sets()) {
-			if (!before.library().contains(set.id())) {
-				return set.name();
-			}
-		}
-		return "";
 	}
 
 	private void showProblem(Message problem) {

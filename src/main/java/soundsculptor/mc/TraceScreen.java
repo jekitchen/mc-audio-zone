@@ -5,7 +5,6 @@ import soundsculptor.core.Translator;
 import soundsculptor.core.boost.BoostWarning;
 import soundsculptor.core.editor.FieldError;
 import soundsculptor.core.editor.EntryDraft;
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
@@ -225,7 +224,7 @@ public final class TraceScreen extends SculptScreen {
 			EntryLocation where = entryTarget.where();
 			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(entry.enabled()), ON_OFF_WIDTH,
 					() -> edit(where, new EntryEdit.Enabled(!entry.enabled()))),
-					Component.translatable(entry.enabled() ? "soundsculptor.rules.turn_off" : "soundsculptor.rules.turn_on")));
+					Component.translatable(entry.enabled() ? "soundsculptor.trace.edit.turn_off" : "soundsculptor.trace.edit.turn_on")));
 			if (where.isQuick()) {
 				// As in FR-1.5: the sound's actual state at the place, from every set attached there.
 				PlaceRef place = where.place();
@@ -425,13 +424,12 @@ public final class TraceScreen extends SculptScreen {
 
 	/** "Open full editor" on a Quick changes line: for changes the panel does not offer, such as the pattern. */
 	public void openEntryEditor(EntryLocation where) {
-		RuleTarget target = where.place().isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(where.place().zoneId());
-		SetEntry entry = where.isQuick() ? target.rule(ProfileManager.profile(), where.entryId()) : null;
-		if (entry == null) {
+		EntryEditorScreen editor = where.isQuick() ? EntryEditorScreen.forQuickEntry(this, where.place(), where.entryId()) : null;
+		if (editor == null) {
 			showToast(errorText(TraceEditError.RULE_NOT_FOUND.message()), null);
 			return;
 		}
-		minecraft.gui.setScreen(EntryEditorScreen.edit(this, target, entry));
+		minecraft.gui.setScreen(editor);
 	}
 
 	/** "Open full editor" on a zone line: shape, size and anchor. */

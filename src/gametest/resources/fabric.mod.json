@@ -22,7 +22,6 @@
 			"soundsculptor.gametest.M7bClientGameTest",
 			"soundsculptor.gametest.M7cClientGameTest",
 			"soundsculptor.gametest.M8ReviewClientGameTest",
-			"soundsculptor.gametest.CopyRuleClientGameTest",
 			"soundsculptor.gametest.ZoneToolsClientGameTest",
 			"soundsculptor.gametest.FindSoundClientGameTest",
 			"soundsculptor.gametest.ProfilesClientGameTest",
@@ -34,7 +33,8 @@
 			"soundsculptor.gametest.M8StressClientGameTest",
 			"soundsculptor.gametest.SetUsageClientGameTest",
 			"soundsculptor.gametest.SoundSetsTabClientGameTest",
-			"soundsculptor.gametest.SetEditorClientGameTest"
+			"soundsculptor.gametest.SetEditorClientGameTest",
+			"soundsculptor.gametest.PlaceSetsClientGameTest"
 		]
 	},
 	"depends": {

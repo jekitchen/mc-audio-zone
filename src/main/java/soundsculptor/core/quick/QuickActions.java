@@ -21,7 +21,9 @@ import soundsculptor.core.trace.TraceEditError;
  * editors (FR-12.7), and the result carries the before-state for the 5-second Undo toast. Not on the hot path.
  *
  * <p>An edit that clears a value never adds an entry or turns one on, an entry left setting nothing is removed, and an
- * empty Quick changes set is removed, so Mute followed by Unmute leaves the profile as it was.
+ * empty Quick changes set is removed, so Mute followed by Unmute leaves the profile as it was. An edit that sets a value
+ * switches the place's Quick changes back on if the player had switched it off (FR-8.6), so Mute never silently does
+ * nothing.
  */
 public final class QuickActions {
 	private QuickActions() {
@@ -99,6 +101,38 @@ public final class QuickActions {
 	}
 
 	/**
+	 * {@code null} if {@link #putQuickEntry} can save the entry, else the problem to show: the zone no longer exists, or
+	 * the entry is new and the place's Quick changes already holds {@value SoundSet#MAX_ENTRIES} entries.
+	 */
+	public static Message canPutQuickEntry(Workspace ws, PlaceRef where, SetEntry entry) {
+		PlaceSets place = ws.profile().place(where);
+		if (place == null) {
+			return TraceEditError.ZONE_NOT_FOUND.message();
+		}
+		SoundSet quick = quickOf(place);
+		return quick.entry(entry.id()) == null ? quick.canAdd(1) : null;
+	}
+
+	/**
+	 * Saves an entry from the entry editor (Edit… on a sound row, FR-1.5) into the place's Quick changes: it replaces
+	 * the entry with the same ID or is added at the end, creating the set if needed. An entry that is on and sets
+	 * something switches Quick changes back on, like a quick action. Returns {@code ws} unchanged when
+	 * {@link #canPutQuickEntry} reports a problem.
+	 */
+	public static Workspace putQuickEntry(Workspace ws, PlaceRef where, SetEntry entry) {
+		if (canPutQuickEntry(ws, where, entry) != null) {
+			return ws;
+		}
+		PlaceSets place = ws.profile().place(where);
+		SoundSet quick = quickOf(place);
+		PlaceSets after = place.withQuickChanges(quick.putEntry(entry));
+		if (entry.enabled() && setsAnything(entry)) {
+			after = after.setEnabled(SoundSet.QUICK_ID, true);
+		}
+		return new Workspace(ws.profile().withPlace(where, after), ws.library());
+	}
+
+	/**
 	 * The place with {@code edit} applied to the sound's single-sound entry in its Quick changes, or {@code null} when
 	 * that changes nothing. Call only with a valid edit that fits (see {@link #apply}).
 	 */
@@ -118,12 +152,29 @@ public final class QuickActions {
 			if (!setsAnything(changed)) {
 				changedSet = quick.removeEntry(old.id());
 			} else if (changed.equals(old)) {
-				return null;
+				changedSet = quick;
 			} else {
 				changedSet = quick.putEntry(changed);
 			}
 		}
-		return place.withQuickChanges(changedSet.entries().isEmpty() ? null : changedSet);
+		PlaceSets after = place.withQuickChanges(changedSet.entries().isEmpty() ? null : changedSet);
+		if (setsSomething) {
+			// Setting a value also switches the place's Quick changes back on, so the action takes effect (FR-8.6).
+			after = after.setEnabled(SoundSet.QUICK_ID, true);
+		}
+		return after.equals(place) ? null : after;
+	}
+
+	/**
+	 * Whether an edit to a Quick changes entry switches the place's Quick changes back on when it was switched off
+	 * (FR-8.6 On/Off): it does when it sets a value or turns the entry on, so a quick action always does what it says.
+	 * Clearing a value or turning the entry off leaves Quick changes as it was.
+	 */
+	public static boolean switchesQuickOn(EntryEdit edit) {
+		if (edit instanceof EntryEdit.Enabled enabled) {
+			return enabled.value();
+		}
+		return setsAnything(edit.apply(SetEntry.of("probe", "*")));
 	}
 
 	/** The place's Quick changes, or an empty one to start from. */

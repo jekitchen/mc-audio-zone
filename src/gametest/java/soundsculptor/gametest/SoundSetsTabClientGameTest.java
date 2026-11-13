@@ -50,9 +50,10 @@ public final class SoundSetsTabClientGameTest implements FabricClientGameTest {
 		try {
 			openTab(context);
 			check(context.computeOnClient(mc -> main(mc).tabButtons().get(SoundSculptorScreen.TAB_SETS).getMessage().getString())
-					.equals("Sound Sets"), "the Sound Sets tab follows Rules");
-			check(context.computeOnClient(mc -> main(mc).tabButtons().get(SoundSculptorScreen.TAB_RULES).getMessage().getString())
-					.equals("Rules"), "the Rules tab stays until it is replaced");
+					.equals("Sound Sets"), "the Sound Sets tab follows Search");
+			check(context.computeOnClient(mc -> main(mc).tabButtons().stream().map(t -> t.getMessage().getString()).toList())
+					.equals(List.of("Recently Played", "Search", "Sound Sets", "Zones", "Profiles", "Settings")),
+					"Sound Sets replaces the Rules tab (FR-12.1)");
 
 			// New: a name screen; an empty name disables Save.
 			context.runOnClient(mc -> panel(mc).newButton.onPress(null));

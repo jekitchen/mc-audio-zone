@@ -11,13 +11,13 @@ import soundsculptor.core.editor.EntryDraft;
 import soundsculptor.core.editor.EntryDraft.Field;
 import soundsculptor.core.editor.SetDraft;
 import soundsculptor.core.Message;
-import soundsculptor.core.profile.RuleTarget;
-import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.EntryResolver;
 import soundsculptor.core.sets.SoundSet;
+import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.ui.SliderModel;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptDropdown;
@@ -71,11 +71,14 @@ public final class EntryEditorScreen extends SculptScreen {
 	}
 
 	private final EntryDraft draft;
+	private final boolean isNew;
 	/** The set the entry belongs to; Save puts the entry into it. */
 	private final SetDraft set;
 	private final Component subtitle;
-	// M8c shim: removed in Task 13
-	/** For the old RuleTarget callers: the place whose Quick changes {@link #set} is, written back on Save; else null. */
+	/**
+	 * For Edit… on a sound row and the trace: the place whose Quick changes the entry is saved into at once, since there
+	 * is no set editor to save it; {@code null} when the entry belongs to a set being edited.
+	 */
 	private final PlaceRef quickPlace;
 	private PatternPreview preview;
 	private Component overridden = Component.empty();
@@ -92,6 +95,7 @@ public final class EntryEditorScreen extends SculptScreen {
 
 	private EntryEditorScreen(Screen parent, SetDraft set, EntryDraft draft, boolean isNew, Component subtitle, PlaceRef quickPlace) {
 		super(Component.translatable(isNew ? "soundsculptor.rule_editor.title.new" : "soundsculptor.rule_editor.title.edit"), parent);
+		this.isNew = isNew;
 		this.set = set;
 		this.draft = draft;
 		this.subtitle = subtitle;
@@ -118,69 +122,41 @@ public final class EntryEditorScreen extends SculptScreen {
 				? Component.translatable("soundsculptor.set_editor.quick.title") : Component.literal(set.name()));
 	}
 
-	// ---- M8c shim: removed in Task 13. The Rules tab, a zone's Rules screen, the sound rows' Edit… and the trace open
-	// the editor on a place's Quick changes through a RuleTarget: the editor gets a draft of that Quick changes set, and
-	// Save writes it back (SetEditorScreen.withQuickChanges). ----
-
-	/** Opens the editor for a new entry in Everywhere's Quick changes. */
-	public static EntryEditorScreen create(Screen parent) {
-		return create(parent, RuleTarget.GLOBAL);
-	}
-
-	/** Opens the editor for a new entry in the Quick changes of Everywhere or a zone. */
-	public static EntryEditorScreen create(Screen parent, RuleTarget target) {
-		SetDraft quick = SetEditorScreen.quickDraft(target.place());
-		return new EntryEditorScreen(parent, quick, EntryDraft.blank(quick.newEntryId(), false), true, targetSubtitle(target), target.place());
-	}
-
-	/** Opens the editor on an entry of Everywhere's Quick changes. */
-	public static EntryEditorScreen edit(Screen parent, SetEntry rule) {
-		return edit(parent, RuleTarget.GLOBAL, rule);
-	}
-
-	/** Opens the editor on an entry of the Quick changes of Everywhere or a zone. */
-	public static EntryEditorScreen edit(Screen parent, RuleTarget target, SetEntry rule) {
-		return new EntryEditorScreen(parent, SetEditorScreen.quickDraft(target.place()), EntryDraft.of(rule, false), false,
-				targetSubtitle(target), target.place());
-	}
-
-	/** Opens the editor on a sound's single-sound entry in Everywhere's Quick changes, or a new one for it. */
-	public static EntryEditorScreen forSound(Screen parent, String soundId) {
-		return forSound(parent, ApplyTarget.EVERYWHERE, soundId);
-	}
-
 	/**
-	 * Opens the editor on the sound's single-sound entry in the Quick changes of the place "Apply to" chose (FR-1.5,
-	 * FR-3.7), or a new single-sound entry for it there.
+	 * Edit… on a sound row (FR-1.5, FR-3.7): opens the sound's single-sound entry in the place's Quick changes, or a new
+	 * single-sound entry for it there. Save writes the entry into Quick changes, creating the set if needed; an existing
+	 * entry for the sound is always reused, never duplicated.
 	 */
-	public static EntryEditorScreen forSound(Screen parent, ApplyTarget applyTo, String soundId) {
-		RuleTarget target = applyTo.isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(applyTo.zoneId());
-		SetEntry exact = QuickActions.quickEntry(ProfileManager.workspace(), applyTo.place(), soundId);
+	public static EntryEditorScreen forSound(Screen parent, PlaceRef where, String soundId) {
+		SetEntry exact = QuickActions.quickEntry(ProfileManager.workspace(), where, soundId);
 		if (exact != null) {
-			return edit(parent, target, exact);
+			return forQuickEntry(parent, where, exact.id());
 		}
-		EntryEditorScreen screen = create(parent, target);
+		SetDraft quick = SetEditorScreen.quickDraft(where);
+		EntryEditorScreen screen = new EntryEditorScreen(parent, quick, EntryDraft.blank(quick.newEntryId(), false), true, placeSubtitle(where), where);
 		screen.draft.set(Field.TARGET, soundId);
 		screen.updatePreview();
 		return screen;
 	}
 
-	private static Component targetSubtitle(RuleTarget target) {
-		if (!target.isGlobal()) {
-			return Component.translatable("soundsculptor.rule_editor.zone", SetDeleteDialog.placeName(ProfileManager.profile(), target.place()));
-		}
-		return Component.translatable("soundsculptor.header.profile", ProfileManager.profile().name());
+	/**
+	 * "Open full editor" on a Quick changes line of the trace (FR-14.4): the entry, saved straight into the place's
+	 * Quick changes. {@code null} if the place no longer has that entry.
+	 */
+	public static EntryEditorScreen forQuickEntry(Screen parent, PlaceRef where, String entryId) {
+		SetDraft quick = SetEditorScreen.quickDraft(where);
+		SetEntry entry = quick.entry(entryId);
+		return entry == null ? null : new EntryEditorScreen(parent, quick, EntryDraft.of(entry, false), false, placeSubtitle(where), where);
 	}
 
-	/** The Quick changes list the entry is saved in, for the old RuleTarget callers; null when editing a set's entry. */
-	public RuleTarget target() {
-		if (quickPlace == null) {
-			return null;
-		}
-		return quickPlace.isEverywhere() ? RuleTarget.GLOBAL : RuleTarget.zone(quickPlace.zoneId());
+	private static Component placeSubtitle(PlaceRef where) {
+		return Component.translatable("soundsculptor.entry_editor.quick_subtitle", SetDeleteDialog.placeName(ProfileManager.profile(), where));
 	}
 
-	// ---- End of the M8c shim ----
+	/** The place whose Quick changes the entry is saved into, or {@code null} when it belongs to a set being edited. */
+	public PlaceRef quickPlace() {
+		return quickPlace;
+	}
 
 	public EntryDraft draft() {
 		return draft;
@@ -552,16 +528,30 @@ public final class EntryEditorScreen extends SculptScreen {
 		}
 		SetEntry entry = draft.build();
 		Message full = set.canPut(entry);
+		if (full == null && quickPlace != null) {
+			Workspace ws = ProfileManager.workspace();
+			full = QuickActions.canPutQuickEntry(ws, quickPlace, withFreeId(ws, entry));
+		}
 		if (full != null) {
-			// The set is full: say so and keep the editor open, so nothing typed is lost.
+			// The set is full, or the zone is gone: say so and keep the editor open, so nothing typed is lost.
 			showToast(ProfileManager.component(full), null);
 			return false;
 		}
 		set.putEntry(entry);
-		if (quickPlace != null) { // M8c shim: removed in Task 13
-			SoundSet quick = set.build();
-			ProfileManager.update(profile -> SetEditorScreen.withQuickChanges(profile, quickPlace, quick));
+		if (quickPlace != null) {
+			// Only this entry is written, so changes made to the place's Quick changes since the editor opened are kept.
+			ProfileManager.change(ws -> QuickActions.putQuickEntry(ws, quickPlace, withFreeId(ws, entry)));
 		}
 		return true;
+	}
+
+	/** A new entry keeps its ID unless another entry took it in Quick changes since the editor opened. */
+	private SetEntry withFreeId(Workspace ws, SetEntry entry) {
+		if (!isNew) {
+			return entry;
+		}
+		PlaceSets place = ws.profile().place(quickPlace);
+		SoundSet live = place == null ? null : place.quickChanges();
+		return live == null || live.entry(entry.id()) == null ? entry : entry.withId(live.newEntryId());
 	}
 }

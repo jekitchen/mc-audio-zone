@@ -2,7 +2,6 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
@@ -75,12 +74,15 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> main(mc).setApplyTarget(ApplyTarget.EVERYWHERE));
 			check(rowButton(context).equals("Mute"), "with Everywhere chosen, the row offers Mute");
 
-			// Edit follows Apply to: it opens Pen's rule for the sound.
+			// Edit follows Apply to: it opens the sound's entry in Pen's Quick changes.
 			context.runOnClient(mc -> main(mc).setApplyTarget(main(mc).applyChoices().get(1)));
 			context.runOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(1).onPress(null));
 			context.waitForScreen(EntryEditorScreen.class);
-			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).target()).equals(RuleTarget.zone("pen")),
-					"Edit opens the rule in Pen's list");
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).quickPlace()).equals(PlaceRef.zone("pen")),
+					"Edit opens the entry in Pen's Quick changes");
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().build().id()
+					.equals(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.zone("pen"), VILLAGER).id())),
+					"Edit reuses the sound's existing entry, never a duplicate");
 			context.runOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).onClose());
 			context.waitForScreen(SoundSculptorScreen.class);
 

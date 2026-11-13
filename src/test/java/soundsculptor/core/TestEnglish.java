@@ -71,6 +71,8 @@ public final class TestEnglish implements Translator {
 			Map.entry("soundsculptor.sets.error.library_full", "The library can hold up to %s Sound Sets."),
 			Map.entry("soundsculptor.sets.error.import_library_full", "The library can hold up to %1$s Sound Sets. This import adds %2$s, and there is room for %3$s."),
 			Map.entry("soundsculptor.sets.error.no_quick_changes", "There are no quick changes to save."),
+			Map.entry("soundsculptor.sets.error.not_found", "This Sound Set no longer exists."),
+			Map.entry("soundsculptor.place_sets.zone_gone", "This zone no longer exists."),
 			Map.entry("soundsculptor.sets.error.entries_full", "A Sound Set can have up to %s entries."),
 			Map.entry("soundsculptor.sets.note.removed", "'%s' was deleted, so it was removed from %s"),
 			Map.entry("soundsculptor.sets.note.removed_unnamed", "A Sound Set that no longer exists was removed from %s"),

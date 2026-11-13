@@ -2,10 +2,12 @@ package soundsculptor.gametest;
 
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.profile.Profile;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.EntryEditorScreen;
+import soundsculptor.mc.SetEditorScreen;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -13,9 +15,9 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContex
 import net.minecraft.client.Minecraft;
 
 /**
- * The M8 dev-client review: readable names for sounds without a subtitle, Settings page tabs, rule rows in the
- * Recently Played status style with match counts only for wildcards, and the rule editor showing what an unset volume
- * or mute currently is instead of "Not set".
+ * The M8 dev-client review: readable names for sounds without a subtitle, Settings page tabs, entry rows in the
+ * Recently Played status style with match counts only for groups, and the entry editor showing "Unchanged" for an
+ * unset volume or mute.
  */
 public final class M8ReviewClientGameTest implements FabricClientGameTest {
 	private static final String BASALT = "minecraft:ambient.basalt_deltas.additions";
@@ -44,20 +46,21 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("m8-review-search-names");
 			context.runOnClient(mc -> main(mc).searchField.setValue(""));
 
-			// Rules: status like Recently Played; counts only for wildcards; a typo is flagged.
-			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_RULES));
+			// Entry rows (Everywhere's Quick changes): status like Recently Played; counts only for groups; a typo is flagged.
+			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.forQuickChanges(main(mc), PlaceRef.EVERYWHERE)));
+			context.waitForScreen(SetEditorScreen.class);
 			List<String> wildcard = rowTexts(context, "r1");
 			check(wildcard.get(1).equals("✖ Muted") && wildcard.get(2).startsWith("Matches ") && wildcard.get(2).endsWith(" sounds"),
-					"a wildcard mute row should show ✖ Muted and its match count, was " + wildcard);
+					"a group mute row should show ✖ Muted and its match count, was " + wildcard);
 			List<String> exact = rowTexts(context, "r2");
-			check(exact.get(1).equals("▶ Volume 30%") && exact.get(2).isEmpty(), "an exact rule has no count, was " + exact);
+			check(exact.get(1).equals("▶ Volume 30%") && exact.get(2).equals(AMBIENT), "a single-sound entry has no count, was " + exact);
 			List<String> typo = rowTexts(context, "r3");
 			check(typo.get(2).equals("⚠ No known sound matches"), "a pattern matching nothing is flagged, was " + typo);
-			context.takeScreenshot("m8-review-rules");
+			context.takeScreenshot("m8-review-entries");
 
 			// Entry editor: a value the entry leaves alone reads "Unchanged" (Task 12 removed the inherited value; the
 			// trace shows what a sound gets).
-			context.runOnClient(mc -> mc.gui.setScreen(EntryEditorScreen.create(main(mc))));
+			context.runOnClient(mc -> ((SetEditorScreen) mc.gui.screen()).addSounds());
 			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("minecraft:entity.villager.celebrate");
 			context.waitTicks(1);
@@ -80,6 +83,8 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 					dialog.choose(1); // Discard
 				}
 			});
+			context.waitForScreen(SetEditorScreen.class);
+			context.runOnClient(mc -> mc.gui.screen().onClose());
 			context.waitForScreen(SoundSculptorScreen.class);
 
 			// Settings: page tabs, the current one selected; choosing one switches the page.
@@ -100,9 +105,10 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	private static List<String> rowTexts(ClientGameTestContext context, String ruleId) {
-		return context.computeOnClient(mc -> main(mc).rulesList.findRow(ruleId).columnTexts());
+	private static List<String> rowTexts(ClientGameTestContext context, String entryId) {
+		return context.computeOnClient(mc -> ((SetEditorScreen) mc.gui.screen()).entryList.findRow(entryId).columnTexts());
 	}
+
 
 	/** The Mute dropdown's and the Volume slider's text. */
 	private static List<String> editor(ClientGameTestContext context) {

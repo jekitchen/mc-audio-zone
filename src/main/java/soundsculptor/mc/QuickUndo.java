@@ -55,6 +55,18 @@ public final class QuickUndo {
 		return true;
 	}
 
+	/**
+	 * Applies a change worked out once from {@code before}, the workspace as it is now (for example a new set, whose ID
+	 * the operation chose), and, if it changed anything, shows the toast with Undo. Nothing happens if the workspace has
+	 * changed since {@code before} was read.
+	 *
+	 * @return whether the profile or the library changed
+	 */
+	public static boolean applyResult(SculptScreen host, Runnable refresh, Workspace before, Workspace after, String toastKey,
+			String... toastArgs) {
+		return applyWorkspace(host, refresh, current -> current.equals(before) ? after : current, toastKey, toastArgs);
+	}
+
 	/** Offers Undo for a profile change already saved; the library is taken as it is now. */
 	public static void offer(SculptScreen host, Runnable refresh, Profile before, Profile after, String toastKey, List<String> toastArgs) {
 		offer(host, refresh, new Workspace(before, ProfileManager.library()), new Workspace(after, ProfileManager.library()), toastKey, toastArgs);

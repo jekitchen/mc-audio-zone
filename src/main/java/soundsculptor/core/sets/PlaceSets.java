@@ -53,10 +53,12 @@ public record PlaceSets(List<Attachment> attached, SoundSet quickChanges) {
 		if (uses(setId)) {
 			return Message.of("soundsculptor.sets.error.already_attached");
 		}
-		if (!setId.equals(SoundSet.QUICK_ID) && librarySetCount() >= MAX_SETS) {
-			return Message.of("soundsculptor.sets.error.place_full", MAX_SETS);
-		}
-		return null;
+		return setId.equals(SoundSet.QUICK_ID) ? null : canAttachAnother();
+	}
+
+	/** {@code null} if one more library set fits here, else the problem: the place already has {@value #MAX_SETS}. */
+	public Message canAttachAnother() {
+		return librarySetCount() >= MAX_SETS ? Message.of("soundsculptor.sets.error.place_full", MAX_SETS) : null;
 	}
 
 	/** Appends the set at the bottom, enabled; unchanged if {@link #canAttach} reports a problem. */
@@ -140,10 +142,7 @@ public record PlaceSets(List<Attachment> attached, SoundSet quickChanges) {
 		if (uses(newSetId)) {
 			return Message.of("soundsculptor.sets.error.already_attached");
 		}
-		if (librarySetCount() >= MAX_SETS) {
-			return Message.of("soundsculptor.sets.error.place_full", MAX_SETS);
-		}
-		return null;
+		return canAttachAnother();
 	}
 
 	/** Quick changes was saved to the library as {@code newSetId}: that set takes its slot, and Quick changes is gone. */

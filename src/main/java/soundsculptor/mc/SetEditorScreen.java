@@ -105,7 +105,7 @@ public final class SetEditorScreen extends SculptScreen {
 	 * The profile with the place's Quick changes replaced by {@code quick}'s entries, pinned first; no entries removes
 	 * the set. Unchanged for a zone the profile no longer has.
 	 */
-	static Profile withQuickChanges(Profile profile, PlaceRef where, SoundSet quick) {
+	private static Profile withQuickChanges(Profile profile, PlaceRef where, SoundSet quick) {
 		PlaceSets sets = profile.place(where);
 		return sets == null ? profile : profile.withPlace(where, sets.withQuickEntries(quick.entries()));
 	}

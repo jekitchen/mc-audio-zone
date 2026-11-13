@@ -3,7 +3,6 @@ package soundsculptor.gametest;
 import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.i18n.PseudoLocale;
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.profile.RuleTarget;
 import soundsculptor.core.sets.LibraryOps;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
@@ -15,7 +14,8 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.RuleCopyScreen;
+import soundsculptor.mc.AttachSetScreen;
+import soundsculptor.mc.PlaceSetsScreen;
 import soundsculptor.core.editor.SetDraft;
 import soundsculptor.mc.SetDeleteDialog;
 import soundsculptor.mc.SetEditorScreen;
@@ -24,7 +24,6 @@ import soundsculptor.mc.SetNameScreen;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
-import soundsculptor.mc.ZoneRulesScreen;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
@@ -54,8 +53,8 @@ import net.minecraft.util.FormattedCharSequence;
  *   {@code -Pmodmenu=true}), the screen says to join a world instead of offering settings that would go nowhere.</li>
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
- *   <li>A-4 narration: every control on the Rules, Sound Sets, Zones and Profiles tabs, including list row buttons, has a
- *   label to read.</li>
+ *   <li>A-4 narration: every control on the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
+ *   including list row buttons, has a label to read.</li>
  *   <li>Pseudo-language (PRD 9.3): the same layout check with every Sound Sculptor text about 40% longer, reported.</li>
  * </ul>
  * Grayscale, Sodium, Iris, Sound Physics Remastered and servers stay manual checks.
@@ -65,7 +64,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final int[] GUI_SCALES = {1, 2, 3, 4, 0};
 	/** Room a button needs around its text (vanilla's 4 px each side). */
 	private static final int BUTTON_PADDING = 8;
-	/** The Rules tab fixture's second entry, in Everywhere's Quick changes, as the trace lists it. */
+	/** The fixture's second entry in Everywhere's Quick changes, as the trace lists it. */
 	private static final EntryLocation QUICK_R2 = new EntryLocation(PlaceRef.EVERYWHERE, SoundSet.QUICK_ID, "r2");
 	/** A library set for the Sound Sets tab, its name screen and its delete warning. */
 	private static final SoundSet SET = new SoundSet("set-a11y", "Animals of the farm and the barn by the river",
@@ -96,16 +95,17 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
-			// SET is attached to the first zone, so the set editor's Attached to panel has a line and Attach to… has choices.
+			// SET is attached to Everywhere and the first zone, so the set editor's Attached to panel has lines, Attach to…
+			// has a choice, Everywhere's Sound Sets show the pinned Quick changes and a shared set, and Attach set… for the
+			// second zone offers SET.
 			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
 					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
-							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))))
+							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))).attach(SET.id()))
 					.withZones(List.of(attached(zone("z1", "Trading hall", key), SET.id()),
 							zone("z2", "Very long zone name for the bee farm by the river", key))), ws.library().put(SET))));
 
-			// A-4: every control on the Rules and Zones tabs has something to read out.
-			for (int tab : new int[] {SoundSculptorScreen.TAB_RULES, SoundSculptorScreen.TAB_SETS, SoundSculptorScreen.TAB_ZONES,
-					SoundSculptorScreen.TAB_PROFILES}) {
+			// A-4: every control on the Sound Sets, Zones and Profiles tabs has something to read out.
+			for (int tab : new int[] {SoundSculptorScreen.TAB_SETS, SoundSculptorScreen.TAB_ZONES, SoundSculptorScreen.TAB_PROFILES}) {
 				List<String> silent = context.computeOnClient(mc -> {
 					SoundSculptorScreen screen = new SoundSculptorScreen();
 					mc.gui.setScreen(screen);
@@ -119,7 +119,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				TraceScreen trace = new TraceScreen(null, "minecraft:entity.villager.ambient");
 				mc.gui.setScreen(trace);
 				List<String> silent = new ArrayList<>(silentControls(trace));
-				trace.openVolume(QUICK_R2, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
+				trace.openVolume(QUICK_R2, QuickEntries.get(ProfileManager.profile(), "r2"));
 				silent.addAll(silentControls(trace));
 				return silent;
 			});
@@ -140,6 +140,20 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentEditors.isEmpty(), "controls without a label in the set and entry editors: " + silentEditors);
+			// A-4 for a place's Sound Sets (FR-8.6) and Attach set….
+			List<String> silentPlaces = context.computeOnClient(mc -> {
+				List<String> silent = new ArrayList<>();
+				for (PlaceRef where : List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("z1"))) {
+					PlaceSetsScreen places = new PlaceSetsScreen(null, where);
+					mc.gui.setScreen(places);
+					silent.addAll(silentControls(places));
+				}
+				AttachSetScreen attach = new AttachSetScreen(null, PlaceRef.zone("z2"));
+				mc.gui.setScreen(attach);
+				silent.addAll(silentControls(attach));
+				return silent;
+			});
+			check(silentPlaces.isEmpty(), "controls without a label in the Sound Sets of a place: " + silentPlaces);
 			context.setScreen(() -> null);
 
 			// A-3: every screen at every window size and GUI scale.
@@ -209,7 +223,6 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			((SoundSculptorScreen) s).toggleSearchHelp();
 			return null;
 		}),
-		RULES(mc -> tab(SoundSculptorScreen.TAB_RULES), null),
 		SETS(mc -> tab(SoundSculptorScreen.TAB_SETS), null),
 		SET_NEW(mc -> SetNameScreen.create(null, new SetLibraryPanel(null)), null),
 		SET_RENAME(mc -> SetNameScreen.rename(null, new SetLibraryPanel(null), SET.id()), null),
@@ -223,7 +236,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		SETTINGS_GENERAL(mc -> settings(SoundSculptorScreen.SettingsPage.GENERAL), null),
 		SETTINGS_ZONES(mc -> settings(SoundSculptorScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(SoundSculptorScreen.SettingsPage.DIAGNOSTICS), null),
-		RULE_EDITOR(mc -> EntryEditorScreen.edit(null, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r1")), null),
+		QUICK_ENTRY_EDITOR(mc -> EntryEditorScreen.forQuickEntry(null, PlaceRef.EVERYWHERE, "r1"), null),
 		SET_EDITOR(mc -> SetEditorScreen.edit(null, SET.id()), null),
 		SET_EDITOR_ATTACH(mc -> SetEditorScreen.edit(null, SET.id()), s -> {
 			((SetEditorScreen) s).attachedPanel().openAttachMenu();
@@ -237,11 +250,16 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			((ZoneEditorScreen) s).setShape(soundsculptor.core.editor.ZoneDraft.ShapeKind.BOX);
 			return null;
 		}),
-		ZONE_RULES(mc -> new ZoneRulesScreen(null, "z2"), null),
-		RULE_COPY(mc -> new RuleCopyScreen(null, RuleTarget.zone("z2")), null),
+		PLACE_SETS_EVERYWHERE(mc -> new PlaceSetsScreen(null, PlaceRef.EVERYWHERE), null),
+		PLACE_SETS_ZONE(mc -> new PlaceSetsScreen(null, PlaceRef.zone("z2")), null),
+		ATTACH_SET(mc -> new AttachSetScreen(null, PlaceRef.zone("z2")), null),
+		SAVE_TO_LIBRARY(mc -> new PlaceSetsScreen(null, PlaceRef.EVERYWHERE), s -> {
+			((PlaceSetsScreen) s).panel.openSaveToLibrary();
+			return null;
+		}),
 		TRACE(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), null),
 		TRACE_VOLUME(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), s -> {
-			((TraceScreen) s).openVolume(QUICK_R2, RuleTarget.GLOBAL.rule(ProfileManager.profile(), "r2"));
+			((TraceScreen) s).openVolume(QUICK_R2, QuickEntries.get(ProfileManager.profile(), "r2"));
 			return null;
 		});
 

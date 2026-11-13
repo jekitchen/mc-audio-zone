@@ -14,6 +14,8 @@ import soundsculptor.core.profile.ProfileOps;
  */
 public final class LibraryOps {
 	private static final String COPY_SUFFIX = " (copy)";
+	/** The place is a zone this profile no longer has. */
+	static final String ZONE_GONE = "soundsculptor.place_sets.zone_gone";
 
 	private LibraryOps() {
 	}
@@ -24,14 +26,46 @@ public final class LibraryOps {
 		return problem != null ? problem : ws.library().canCreate();
 	}
 
-	/** An empty set named {@code name} (made unique), in the library and attached nowhere; unchanged if {@link #canCreate} reports a problem. */
-	public static Workspace create(Workspace ws, String name) {
-		if (canCreate(ws, name) != null) {
-			return ws;
+	/**
+	 * An empty set named {@code name} (made unique), in the library and attached nowhere, with its new ID; refused with
+	 * {@link #canCreate}'s problem.
+	 */
+	public static NewSet create(Workspace ws, String name) {
+		Message problem = canCreate(ws, name);
+		if (problem != null) {
+			return NewSet.refused(ws, problem);
 		}
 		SetLibrary lib = ws.library();
 		SoundSet set = new SoundSet(lib.newId(), lib.uniqueName(name.strip(), null), List.of());
-		return new Workspace(ws.profile(), lib.put(set));
+		return NewSet.added(new Workspace(ws.profile(), lib.put(set)), set.id());
+	}
+
+	/**
+	 * {@code null} if {@link #createAttached} will go ahead, else why not: the name is not usable, the library is full,
+	 * the zone no longer exists, or the place already has {@value PlaceSets#MAX_SETS} library sets.
+	 */
+	public static Message canCreateAttached(Workspace ws, PlaceRef where, String name) {
+		Message problem = canCreate(ws, name);
+		if (problem != null) {
+			return problem;
+		}
+		PlaceSets place = ws.profile().place(where);
+		return place == null ? Message.of(ZONE_GONE) : place.canAttachAnother();
+	}
+
+	/**
+	 * New set from a place's Attach set… (FR-8.6): an empty set named {@code name} (made unique), attached at the bottom
+	 * of the place, in one workspace; refused with {@link #canCreateAttached}'s problem.
+	 */
+	public static NewSet createAttached(Workspace ws, PlaceRef where, String name) {
+		Message problem = canCreateAttached(ws, where, name);
+		if (problem != null) {
+			return NewSet.refused(ws, problem);
+		}
+		NewSet made = create(ws, name);
+		Workspace after = made.workspace();
+		PlaceSets place = after.profile().place(where);
+		return NewSet.added(new Workspace(after.profile().withPlace(where, place.attach(made.setId())), after.library()), made.setId());
 	}
 
 	/** {@code null} if the set can be duplicated, else the problem to show (the library is full). */
@@ -41,19 +75,24 @@ public final class LibraryOps {
 
 	/**
 	 * A copy named "name (copy)" (made unique, and cut to fit the name limit), with a new set ID, the same entries and
-	 * attached nowhere. Unchanged if the set is not in the library or {@link #canDuplicate} reports a problem.
+	 * attached nowhere, with its new ID. Refused if the set is not in the library or {@link #canDuplicate} reports a
+	 * problem.
 	 *
 	 * <p>Entry IDs are only unique within a set, so the copy keeps them: entries are immutable, so the copy is
 	 * independent of the original.
 	 */
-	public static Workspace duplicate(Workspace ws, String setId) {
+	public static NewSet duplicate(Workspace ws, String setId) {
 		SoundSet source = ws.library().get(setId);
-		if (source == null || canDuplicate(ws, setId) != null) {
-			return ws;
+		if (source == null) {
+			return NewSet.refused(ws, Message.of("soundsculptor.sets.error.not_found"));
+		}
+		Message problem = canDuplicate(ws, setId);
+		if (problem != null) {
+			return NewSet.refused(ws, problem);
 		}
 		SetLibrary lib = ws.library();
 		SoundSet copy = new SoundSet(lib.newId(), lib.uniqueName(source.name(), null, COPY_SUFFIX), source.entries());
-		return new Workspace(ws.profile(), lib.put(copy));
+		return NewSet.added(new Workspace(ws.profile(), lib.put(copy)), copy.id());
 	}
 
 	/** {@code null} if the set can be renamed to {@code name}, else why not: the name is empty or too long. */
