@@ -42,7 +42,7 @@ Five personas drive the requirements. The accessibility persona is a first-class
 | **Tess, technical/farm player** | Runs iron farms, villager halls and redstone builds on a survival SMP. | Silence or rate-limit farm noise only near the farm; keep danger sounds. No FPS loss with 300+ sounds per second. | FR-1, FR-4, FR-6, FR-8, FR-9 |
 | **Sam, streamer/recorder** | Records or streams gameplay; viewers complain about repetitive noise. | Per-sound volume for a clean mix; settings that follow each server automatically; stable behavior on stream. | FR-5, FR-11, FR-12 |
 | **Alex, accessibility needs** | Has sound sensitivity (misophonia or sensory overload) or partial hearing loss; may use a screen reader or keyboard only. | Remove specific harsh sounds; boost quiet ones up to 200%; still *know* a muted sound happened via cues; every screen usable by keyboard and narrator. | FR-5, FR-7, FR-13 (all UI), section 6.4 |
-| **Bea, builder** | Builds for hours in creative or on a build server. | A calm Everywhere set that quiets ambient and mob noise while they build, easy to toggle on and off; zone outlines that don't clutter the view. | FR-8, FR-10 |
+| **Bea, builder** | Builds for hours in creative or on a build server. | A calm Everywhere set that quiets ambient and mob noise while they build, easy to toggle on and off; zone outlines that don't clutter the view. | FR-4, FR-10 |
 | **Mo, multiplayer regular** | Plays on several servers, some with strict mod rules. | Settings that follow each server automatically; a clear statement that the mod gives no advantage, so admins allow it. | FR-11, section 8 |
 
 ## 3. Goals, non-goals and success metrics
