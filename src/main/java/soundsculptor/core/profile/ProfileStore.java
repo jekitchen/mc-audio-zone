@@ -144,6 +144,11 @@ public final class ProfileStore {
 
 	/** Saves atomically, keeping the previous file as {@code .bak}. The file records {@code key} (see {@link #list}). */
 	public void save(String key, Profile profile) throws IOException {
-		AtomicFiles.write(fileFor(key), ProfileCodec.toJson(profile, key));
+		save(key, profile, true);
+	}
+
+	/** Like {@link #save(String, Profile)}; see {@link AtomicFiles#write(Path, String, boolean)} for {@code waitOutLock}. */
+	public void save(String key, Profile profile, boolean waitOutLock) throws IOException {
+		AtomicFiles.write(fileFor(key), ProfileCodec.toJson(profile, key), waitOutLock);
 	}
 }

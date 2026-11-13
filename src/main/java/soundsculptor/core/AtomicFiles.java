@@ -24,6 +24,16 @@ public final class AtomicFiles {
 
 	/** Writes {@code text} (UTF-8) to {@code file}; an existing file is copied to {@code <name>.bak} first. */
 	public static void write(Path file, String text) throws IOException {
+		write(file, text, true);
+	}
+
+	/**
+	 * Like {@link #write(Path, String)}.
+	 *
+	 * @param waitOutLock whether a refused rename is tried again for about 0.3 seconds; {@code false} makes one attempt,
+	 *                    for a file that already failed and is tried again later anyway
+	 */
+	public static void write(Path file, String text, boolean waitOutLock) throws IOException {
 		Files.createDirectories(file.toAbsolutePath().getParent());
 		Path temp = file.resolveSibling(file.getFileName() + ".tmp");
 		Files.writeString(temp, text, StandardCharsets.UTF_8);
@@ -36,7 +46,7 @@ public final class AtomicFiles {
 				return;
 			} catch (AccessDeniedException e) {
 				// A folder in the way is not a passing lock.
-				if (attempt >= RETRY_PAUSES_MILLIS.length || Files.isDirectory(file)) {
+				if (!waitOutLock || attempt >= RETRY_PAUSES_MILLIS.length || Files.isDirectory(file)) {
 					throw e;
 				}
 				try {

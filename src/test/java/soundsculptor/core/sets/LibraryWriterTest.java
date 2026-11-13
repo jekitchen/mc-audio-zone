@@ -4,7 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.sun.nio.file.ExtendedOpenOption;
 import java.io.IOException;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -12,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 /** PRD 9.2: a library set whose save failed is written again, so the next start does not lose it. */
@@ -148,5 +153,31 @@ class LibraryWriterTest {
 		writer.retry(this::failed);
 		assertFalse(Files.exists(dir.resolve("sets")));
 		assertTrue(failures.isEmpty());
+	}
+	/**
+	 * A set file held open (Windows) while the set changes many times, e.g. a level slider dragged in the trace: only the
+	 * first save waits out the lock, the rest make one quick attempt each, so the save queue and a flush behind it stay
+	 * short; the newest set is written once the file is free.
+	 */
+	@Test
+	@EnabledOnOs(OS.WINDOWS)
+	void manySavesToAHeldFileWaitOnlyOnce() throws Exception {
+		SetStore store = store();
+		LibraryWriter writer = new LibraryWriter(store);
+		SoundSet a = set("a", "Step 0");
+		writer.save(library(a), List.of(a), this::failed);
+		long start = System.nanoTime();
+		SoundSet last = a;
+		try (SeekableByteChannel held = Files.newByteChannel(store.fileFor("a"), StandardOpenOption.READ, ExtendedOpenOption.NOSHARE_DELETE)) {
+			for (int step = 1; step <= 40; step++) {
+				last = a.withName("Step " + step);
+				writer.save(library(last), List.of(last), this::failed);
+			}
+		}
+		long millis = (System.nanoTime() - start) / 1_000_000;
+		assertTrue(millis < 2000, "40 saves to a held file should cost about one wait (0.3 s), took " + millis + " ms");
+		assertEquals(40, failures.size());
+		writer.retry(this::failed);
+		assertEquals("Step 40", nameOnDisk("a"));
 	}
 }

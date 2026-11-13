@@ -16,6 +16,10 @@ import java.util.Set;
  * written only when it changes, so without this a set whose save failed (disk full, file locked) would never be
  * written, and the next start would treat it as missing.
  *
+ * <p>A set whose file is not failing waits out a brief lock ({@link soundsculptor.core.AtomicFiles}); one whose save
+ * already failed gets a single quick attempt each time, so many changes to a file that stays held cost one wait, not
+ * one each, and a flush stays short.
+ *
  * <p>Each failure is reported once per attempt. A failed save is retried with the set as it is in the latest library;
  * a failed delete is retried while the set stays out of the library. A set that comes back (Undo) is saved and its
  * failed delete forgotten.
@@ -67,7 +71,7 @@ public final class LibraryWriter {
 		}
 		for (SoundSet set : toSave) {
 			try {
-				store.save(set);
+				store.save(set, !unsaved.contains(set.id()));
 				unsaved.remove(set.id());
 			} catch (IOException e) {
 				unsaved.add(set.id());

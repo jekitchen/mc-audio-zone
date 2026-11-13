@@ -8,6 +8,7 @@ import soundsculptor.core.profile.ProfileCodec;
 import soundsculptor.core.profile.ProfileFormatException;
 import soundsculptor.core.profile.ProfilePrune;
 import soundsculptor.core.profile.ProfileStore;
+import soundsculptor.core.profile.ProfileWriter;
 import soundsculptor.core.sets.LibraryWriter;
 import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SetStore;
@@ -21,7 +22,6 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,11 +76,15 @@ public final class ProfileManager {
 	 */
 	private static boolean libraryComplete = true;
 	/**
-	 * The latest profile whose save failed, by world key: tried again with the next change and in {@link #flushSaves},
-	 * so a file held open for a while (Windows) does not lose the change, not even the last one before the game exits.
-	 * Used only on the SAVER thread.
+	 * Writes profiles and keeps every profile not on disk yet (queued, or whose save failed), so a file held open for a
+	 * while (Windows) does not lose a change, not even the last one before the game exits; joining a world and the
+	 * Profiles tab read the newest profile from it before the file.
 	 */
-	private static final Map<String, Profile> unsavedProfiles = new LinkedHashMap<>();
+	private static ProfileWriter profileWriter;
+	/** How long the game thread waits for queued saves before the Profiles tab reads; it never throws. */
+	private static final long STORED_FLUSH_MILLIS = 2000;
+	/** How long {@link #flushSaves()} waits. */
+	private static final long FLUSH_MILLIS = 10_000;
 	/** Files whose failed write was already reported with a toast; they are reported again only after a write succeeds. */
 	private static final Set<Path> reportedFailures = ConcurrentHashMap.newKeySet();
 
@@ -93,6 +97,7 @@ public final class ProfileManager {
 		store = new ProfileStore(root.resolve("profiles"));
 		setStore = new SetStore(root.resolve("sets"));
 		setWriter = new LibraryWriter(setStore);
+		profileWriter = new ProfileWriter(store);
 		reportedFailures.clear();
 		SetStore.LoadAll loaded = setStore.loadAll();
 		for (Message problem : loaded.problems()) {
@@ -112,9 +117,14 @@ public final class ProfileManager {
 	 * Loads the profile of the world the player just joined, creating an empty one named {@code displayName} if it
 	 * has none. A broken file is set aside as {@code .broken} and reported (FR-11.8). Attachments to sets the library no
 	 * longer has are removed, each with a toast and a log line, unless the library did not load completely.
+	 *
+	 * <p>A profile of this world that is not on disk yet (its save is queued, or failed and waits to be tried again) is
+	 * newer than the file, so it is used instead, and the save on join writes it.
 	 */
 	public static synchronized void join(String worldKey, String displayName) {
-		ProfileStore.LoadResult result = store.load(worldKey, displayName);
+		Profile pending = profileWriter.latest(worldKey);
+		ProfileStore.LoadResult result = pending != null ? new ProfileStore.LoadResult(pending, null, null)
+				: store.load(worldKey, displayName);
 		SetLibrary library = current.library();
 		ProfilePrune.Pruned pruned = ProfilePrune.dropMissingSetsIfComplete(result.profile(), library, libraryComplete,
 				setStore.deletedNames());
@@ -237,16 +247,19 @@ public final class ProfileManager {
 		String key = before.key();
 		Profile profile = after.profile();
 		SetLibrary library = after.library();
+		boolean saveProfile = profileChanged && key != null && profileWriter != null;
+		if (saveProfile) {
+			profileWriter.queue(key, profile);
+		}
 		SAVER.execute(() -> {
 			if (setWriter != null) {
 				setWriter.save(library, saved, ProfileManager::setWriteFailed);
 			}
-			if (profileChanged && key != null) {
-				unsavedProfiles.remove(key); // this newer profile replaces the one that failed
+			if (saveProfile) {
+				profileWriter.save(key, profile, ProfileManager::profileWriteFailed);
 			}
-			retryProfiles();
-			if (profileChanged && store != null && key != null) {
-				save(key, profile);
+			if (profileWriter != null) {
+				profileWriter.retry(saveProfile ? key : null, ProfileManager::profileWriteFailed);
 			}
 			if (setWriter != null) {
 				setWriter.delete(library, deleted, ProfileManager::setWriteFailed);
@@ -255,31 +268,20 @@ public final class ProfileManager {
 		});
 	}
 
-	/**
-	 * Writes a profile; if that fails, it is kept to try again (see {@link #unsavedProfiles}). Like a set, a failing file
-	 * is logged every time but toasts once until a write of it works again.
-	 */
-	private static void save(String key, Profile profile) {
-		Path file = store.fileFor(key);
-		try {
-			store.save(key, profile);
-			unsavedProfiles.remove(key);
-		} catch (IOException e) {
-			unsavedProfiles.put(key, profile);
-			SoundSculptorClient.LOGGER.error("Sound Sculptor could not save {}; it is tried again with the next change", file, e);
-			if (reportedFailures.add(file)) {
-				saveFailed(e);
-			}
-		}
+	/** Queues {@code profile} to be written under {@code key}, and writes it on the SAVER thread. */
+	private static void saveInBackground(String key, Profile profile, Runnable then) {
+		profileWriter.queue(key, profile);
+		SAVER.execute(() -> {
+			profileWriter.save(key, profile, ProfileManager::profileWriteFailed);
+			then.run();
+		});
 	}
 
-	/** Tries again every profile whose save failed. */
-	private static void retryProfiles() {
-		if (store == null) {
-			return;
-		}
-		for (Map.Entry<String, Profile> unsaved : List.copyOf(unsavedProfiles.entrySet())) {
-			save(unsaved.getKey(), unsaved.getValue());
+	/** Like a set, a failing profile file is logged every time but toasts once until a write of it works again. */
+	private static void profileWriteFailed(Path file, IOException e) {
+		SoundSculptorClient.LOGGER.error("Sound Sculptor could not save {}; it is tried again with the next change", file, e);
+		if (reportedFailures.add(file)) {
+			saveFailed(e);
 		}
 	}
 
@@ -300,8 +302,8 @@ public final class ProfileManager {
 				stillFailing.add(setStore.fileFor(id));
 			}
 		}
-		if (store != null) {
-			for (String key : unsavedProfiles.keySet()) {
+		if (store != null && profileWriter != null) {
+			for (String key : profileWriter.unsavedKeys()) {
 				stillFailing.add(store.fileFor(key));
 			}
 		}
@@ -314,20 +316,35 @@ public final class ProfileManager {
 	}
 
 	/**
-	 * Waits until every queued save has been written (tests, and before the game exits), trying again any library set
-	 * or profile whose write failed.
+	 * Waits until every queued save has been written (tests, and before the game exits), trying again, once each, any
+	 * library set or profile whose write failed. It waits at most 10 seconds and never throws: a file still failing
+	 * after that stays kept in memory, and the caller goes on (at exit, the other settings still flush).
+	 *
+	 * @return whether every queued save finished in time (some may still have failed and be kept for later)
 	 */
-	public static void flushSaves() {
+	public static boolean flushSaves() {
+		return flushSaves(FLUSH_MILLIS);
+	}
+
+	private static boolean flushSaves(long timeoutMillis) {
 		try {
 			SAVER.submit(() -> {
 				if (setWriter != null) {
 					setWriter.retry(ProfileManager::setWriteFailed);
 				}
-				retryProfiles();
+				if (profileWriter != null) {
+					profileWriter.retry(null, ProfileManager::profileWriteFailed);
+				}
 				forgetRecoveredFailures();
-			}).get(10, TimeUnit.SECONDS);
+			}).get(timeoutMillis, TimeUnit.MILLISECONDS);
+			return true;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor stopped waiting for saves: interrupted");
+			return false;
 		} catch (Exception e) {
-			throw new IllegalStateException("profile save did not finish", e);
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor saves did not finish within {} ms; they go on in the background", timeoutMillis, e);
+			return false;
 		}
 	}
 
@@ -364,11 +381,14 @@ public final class ProfileManager {
 
 	/**
 	 * Every profile in the profiles folder, plus the current world's (from memory, so it is up to date even before its
-	 * first save). Waits for queued saves first, so the list shows what was last changed. Reading never changes a
-	 * file: a broken file is listed with its problem, and an older file is shown migrated without being rewritten.
+	 * first save). Waits briefly for queued saves first; a profile that is still not on disk (queued, or its save
+	 * failed) is shown as it is in memory instead of its older file, so the list always shows what was last changed,
+	 * even when a file is held. Reading never changes a file: a broken file is listed with its problem, and an older
+	 * file is shown migrated without being rewritten.
 	 */
 	public static synchronized List<Stored> storedProfiles() {
-		flushSaves();
+		flushSaves(STORED_FLUSH_MILLIS);
+		Map<String, Profile> notOnDisk = new java.util.HashMap<>(profileWriter.notOnDisk());
 		Snapshot snapshot = current;
 		List<Stored> out = new ArrayList<>();
 		boolean currentListed = false;
@@ -388,6 +408,11 @@ public final class ProfileManager {
 			}
 			String name = file.file().getFileName().toString();
 			String key = file.worldKey() != null ? file.worldKey() : name.substring(0, name.length() - ".json".length());
+			Profile newer = file.worldKey() == null ? null : notOnDisk.remove(key);
+			if (newer != null) {
+				out.add(new Stored(key, true, newer, null, false));
+				continue;
+			}
 			Profile profile = null;
 			Message problem = null;
 			try {
@@ -406,10 +431,19 @@ public final class ProfileManager {
 		if (!currentListed && snapshot.key() != null) {
 			out.add(new Stored(snapshot.key(), true, snapshot.profile(), null, true));
 		}
+		// Profiles whose first file is not written yet.
+		notOnDisk.forEach((key, profile) -> {
+			if (!key.equals(snapshot.key()) && !store.fileFor(key).equals(currentFile) && out.stream().noneMatch(s -> s.key().equals(key))) {
+				out.add(new Stored(key, true, profile, null, false));
+			}
+		});
 		return out;
 	}
 
-	/** The profile stored under {@code key} as it is now (after queued saves), or null if there is none or it cannot be read. */
+	/**
+	 * The profile stored under {@code key} as it is now (the newest not on disk yet, else the file), or null if there is
+	 * none or it cannot be read.
+	 */
 	public static Profile storedProfile(String key) {
 		for (Stored s : storedProfiles()) {
 			if (s.key().equals(key)) {
@@ -425,10 +459,7 @@ public final class ProfileManager {
 			update(p -> profile);
 			return;
 		}
-		SAVER.execute(() -> {
-			save(key, profile);
-			SetUsageIndex.rebuild();
-		});
+		saveInBackground(key, profile, SetUsageIndex::rebuild);
 	}
 
 	/**
@@ -439,8 +470,9 @@ public final class ProfileManager {
 		if (key.equals(current.key())) {
 			throw new IllegalArgumentException("the current world's profile cannot be deleted");
 		}
+		profileWriter.forget(key); // not offered any more
 		SAVER.execute(() -> {
-			unsavedProfiles.remove(key); // a failed save must not bring it back
+			profileWriter.forget(key); // a save that failed meanwhile must not bring it back
 			try {
 				store.delete(key);
 			} catch (IOException e) {
@@ -458,7 +490,7 @@ public final class ProfileManager {
 	 */
 	static synchronized void moveTo(String newKey, Profile profile) {
 		current = snapshot(newKey, profile, current.library());
-		SAVER.execute(() -> save(newKey, profile));
+		saveInBackground(newKey, profile, () -> { });
 		reindex();
 	}
 

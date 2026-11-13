@@ -67,9 +67,17 @@ public final class SoundSculptorClient implements ClientModInitializer {
 		ZoneOutlines.register();
 		ZoneMarking.register();
 		ClientTickEvents.END_CLIENT_TICK.register(SoundSculptorClient::onEndTick);
+		// Before the game exits, every queued save is written. Each flush is bounded and one failing must not skip the
+		// other, so the app settings are flushed even if the profile saves could not finish.
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
-			ProfileManager.flushSaves();
-			AppSettingsManager.flushSaves();
+			if (!ProfileManager.flushSaves()) {
+				LOGGER.warn("Sound Sculptor: some saves had not finished when the game closed");
+			}
+			try {
+				AppSettingsManager.flushSaves();
+			} catch (RuntimeException e) {
+				LOGGER.warn("Sound Sculptor: the settings save had not finished when the game closed", e);
+			}
 		});
 		SoundLogger.registerIfEnabled();
 		RecentLog.register();
