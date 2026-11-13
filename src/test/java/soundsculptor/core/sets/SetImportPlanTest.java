@@ -132,6 +132,54 @@ class SetImportPlanTest {
 	}
 
 	@Test
+	void entryIdsAreNotCompared() {
+		// The same entries in the same order, under other entry IDs (e.g. a set edited down and back up).
+		List<SetEntry> reIded = List.of(FARM.entries().get(0).withId("e7"), FARM.entries().get(1).withId("e9"));
+		SetLibrary other = library(new SoundSet("set-mine", "Barnyard", reIded));
+		assertEquals(Status.EXACT_MATCH, SetImportPlan.of(List.of(FARM), FILE, other).statusById().get("set-farm"));
+		SetLibrary same = library(new SoundSet("set-farm", "Farm animals", reIded));
+		SetImportPlan plan = SetImportPlan.of(List.of(FARM), FILE, same);
+		assertEquals(Status.SAME, plan.statusById().get("set-farm"));
+		assertSame(same, plan.apply(FILE, same, Map.of()).library(), "the library's own set is used");
+	}
+
+	@Test
+	void entriesInAnotherOrderAreNotTheSameSet() {
+		SoundSet reversed = new SoundSet("set-farm", "Farm animals", List.of(FARM.entries().get(1), FARM.entries().get(0)));
+		assertEquals(Status.NAME_CLASH, SetImportPlan.of(List.of(FARM), FILE, library(reversed)).statusById().get("set-farm"),
+				"same ID and name, but the entries are in another order");
+	}
+
+	@Test
+	void anEntryThatDiffersInAnyPropertyIsNotTheSame() {
+		SetEntry base = FARM.entries().get(0);
+		for (SetEntry changed : List.of(base.withEnabled(false), base.withVolume(41), base.withMute(true),
+				base.withLimit(new Limit(2, 1000, false)), base.withCue(true), new SetEntry("e1", true, SoundPattern.of("*calf*"),
+						null, 40, null, null))) {
+			SoundSet mine = new SoundSet("set-mine", "Barnyard", List.of(changed, FARM.entries().get(1)));
+			assertEquals(Status.NEW, SetImportPlan.of(List.of(FARM), FILE, library(mine)).statusById().get("set-farm"), changed.toString());
+		}
+	}
+
+	@Test
+	void emptySetsAreNeverAnExactMatch() {
+		SoundSet todo = new SoundSet("set-todo", "To do", List.of());
+		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-todo"));
+		// Another empty set under another ID and name: added, not a reason to cancel.
+		SetLibrary otherName = library(new SoundSet("set-other", "Later", List.of()));
+		SetImportPlan plan = SetImportPlan.of(List.of(todo), file, otherName);
+		assertEquals(Status.NEW, plan.statusById().get("set-todo"));
+		assertNull(plan.canApply(otherName, Map.of()));
+		assertEquals(todo, plan.apply(file, otherName, Map.of()).library().get("set-todo"));
+		// With the same name: a name clash, not an exact match.
+		SetLibrary sameName = library(new SoundSet("set-other", "To do", List.of()));
+		assertEquals(Status.NAME_CLASH, SetImportPlan.of(List.of(todo), file, sameName).statusById().get("set-todo"));
+		// The same ID: still the same set.
+		SetLibrary sameId = library(todo.withName("Renamed"));
+		assertEquals(Status.SAME, SetImportPlan.of(List.of(todo), file, sameId).statusById().get("set-todo"));
+	}
+
+	@Test
 	void anExactMatchWinsOverANameClash() {
 		// The file's set clashes by name with set-farm (other entries) and has exactly the entries of set-copy.
 		SoundSet copy = new SoundSet("set-copy", "Farm copy", FARM.entries());
@@ -200,7 +248,8 @@ class SetImportPlanTest {
 	void theSuggestedNameAvoidsNamesChosenEarlierInThisImport() {
 		SoundSet farm2 = new SoundSet("set-farm2", "farm animals", List.of(SetEntry.of("e1", "*goat*")));
 		SetLibrary lib = library(FARM_MINE);
-		SetImportPlan plan = SetImportPlan.of(List.of(FARM, farm2), FILE, lib);
+		Profile file = FILE.withEverywhere(FILE.everywhere().attach("set-farm2"));
+		SetImportPlan plan = SetImportPlan.of(List.of(FARM, farm2), file, lib);
 		assertEquals(List.of(FARM, farm2), plan.nameClashes());
 		assertEquals(Map.of("set-farm", "Farm animals (imported)", "set-farm2", "farm animals (imported) (2)"),
 				plan.suggestedNames(lib));
@@ -212,7 +261,8 @@ class SetImportPlanTest {
 	void theSuggestedNameOfALongNameStillFits() {
 		SoundSet longFile = new SoundSet("set-long", "x".repeat(SoundSet.MAX_NAME_LENGTH), List.of(SetEntry.of("e1", "*a*")));
 		SetLibrary lib = library(longFile.withEntries(List.of()));
-		String name = SetImportPlan.of(List.of(longFile), FILE, lib).suggestedName("set-long", lib, Map.of());
+		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-long"));
+		String name = SetImportPlan.of(List.of(longFile), file, lib).suggestedName("set-long", lib, Map.of());
 		assertEquals(SoundSet.MAX_NAME_LENGTH, name.length());
 		assertTrue(name.endsWith(" (imported)"), name);
 	}
@@ -248,7 +298,8 @@ class SetImportPlanTest {
 		// The file also brings a new set called "Bees": the renamed farm set cannot take that name.
 		SoundSet bees = new SoundSet("set-bees", "Bees", List.of(SetEntry.of("e1", "*bee*")));
 		SetLibrary lib = library(FARM_MINE);
-		SetImportPlan plan = SetImportPlan.of(List.of(FARM, bees), FILE, lib);
+		Profile file = FILE.withEverywhere(FILE.everywhere().attach("set-bees"));
+		SetImportPlan plan = SetImportPlan.of(List.of(FARM, bees), file, lib);
 		assertEquals(Status.NEW, plan.statusById().get("set-bees"));
 		assertEquals(TAKEN, plan.nameProblem("set-farm", "bees", lib, Map.of()).text(EN));
 	}
@@ -271,6 +322,40 @@ class SetImportPlanTest {
 		Attachment farm = applied.profile().everywhere().attached().get(1);
 		assertEquals("set-000000000001", farm.setId());
 		assertFalse(farm.enabled());
+	}
+
+	@Test
+	void twoIdenticalFileSetsNotInTheLibraryAreBothAdded() {
+		// The file itself may hold two sets with the same entries; only the library is compared, so both are new.
+		SoundSet twin = new SoundSet("set-twin", "Farm twin", FARM.entries());
+		Profile file = FILE.withEverywhere(FILE.everywhere().attach("set-twin"));
+		SetLibrary lib = library();
+		SetImportPlan plan = SetImportPlan.of(List.of(FARM, twin), file, lib);
+		assertEquals(Map.of("set-farm", Status.NEW, "set-twin", Status.NEW), plan.statusById());
+		SetImportPlan.Applied applied = plan.apply(file, lib, Map.of());
+		assertNull(applied.problem());
+		assertEquals(FARM, applied.library().get("set-farm"));
+		assertEquals(twin, applied.library().get("set-twin"));
+	}
+
+	// ---- Only the sets the imported places use ----
+
+	@Test
+	void aSetNoImportedPlaceUsesIsIgnored() {
+		// RAIN would cancel the import (an exact match) and BEES would ask for a name, but no imported place attaches them.
+		SoundSet bees = new SoundSet("set-bees", "Bees", List.of(SetEntry.of("e1", "*bee*")));
+		SetLibrary lib = library(new SoundSet("set-wet", "Wet", RAIN.entries()), new SoundSet("set-hive", "bees", List.of()));
+		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"));
+		SetImportPlan plan = SetImportPlan.of(List.of(FARM, RAIN, bees), file, lib);
+		assertEquals(Map.of("set-farm", Status.NEW), plan.statusById(), "only the attached set is compared");
+		assertEquals(List.of(FARM), plan.fileSets());
+		assertEquals(List.of(), plan.nameClashes());
+		assertNull(plan.exactMatchProblem(lib));
+		assertNull(plan.canApply(lib, Map.of()));
+		SetImportPlan.Applied applied = plan.apply(file, lib, Map.of());
+		assertEquals(3, applied.library().size(), "only the attached set is added");
+		assertFalse(applied.library().contains("set-rain"));
+		assertFalse(applied.library().contains("set-bees"));
 	}
 
 	// ---- Missing sets and limits ----

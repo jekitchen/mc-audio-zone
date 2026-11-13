@@ -17,14 +17,16 @@ import soundsculptor.core.zones.Zone;
 
 /**
  * What importing a file does with the Sound Sets it carries (PRD FR-11.5a), worked out before anything changes. Two
- * sets have the same entries when their entries are identical and in the same order; names are not compared. Each set
- * in the file is compared with the library:
+ * sets have the same entries when their entries are identical and in the same order ({@link #sameEntries}); names and
+ * entry IDs are not compared. Only the file's sets that the imported places attach take part; the others (used only by
+ * a skipped fixed zone, or by no place) are ignored. Each of them is compared with the library:
  *
  * <ul>
  *   <li>{@link Status#SAME}: a library set has the same ID and the same entries. It is the player's own set; the
  *       library set is used and nothing is duplicated.</li>
- *   <li>{@link Status#EXACT_MATCH}: a library set with another ID has the same entries. The whole import is refused
- *       ({@link #canApply}), naming that set. This wins over a name clash.</li>
+ *   <li>{@link Status#EXACT_MATCH}: a library set with another ID has the same entries, and they are not empty (any
+ *       two empty sets would match). The whole import is refused ({@link #canApply}), naming that set. This wins over a
+ *       name clash.</li>
  *   <li>{@link Status#NAME_CLASH}: the set's name (ignoring case) is used by a library set with other entries. The
  *       player chooses a new name ({@link #suggestedName} fills in "name (imported)"); the set is added under that
  *       name with a new ID.</li>
@@ -39,7 +41,7 @@ import soundsculptor.core.zones.Zone;
  * <p>Nothing here throws for a player-facing problem: {@link #canApply} reports it, and {@link #apply} then changes
  * nothing.
  *
- * @param fileSets    the library sets in the file, in file order
+ * @param fileSets    the library sets in the file that the imported places attach, in file order
  * @param statusById  the status of each set in the file, by ID, in file order (for the import dialog)
  * @param matchById   for an {@link Status#EXACT_MATCH} or {@link Status#NAME_CLASH} set, the ID of the library set it
  *                    matches or clashes with
@@ -71,9 +73,23 @@ public record SetImportPlan(List<SoundSet> fileSets, Map<String, Status> statusB
 	 * @param fileProfile the places that are imported (fixed zones for another server already left out)
 	 */
 	public static SetImportPlan of(List<SoundSet> fileSets, Profile fileProfile, SetLibrary lib) {
-		Match match = match(fileSets, lib);
-		Set<String> known = new HashSet<>(lib.ids());
+		// Only the sets the imported places attach take part: one used only by a skipped fixed zone, or by no place, is
+		// not compared, not added, and never cancels the import or asks for a name.
+		Set<String> attached = new HashSet<>();
+		for (PlaceSets place : placesByRef(fileProfile).values()) {
+			for (Attachment a : place.attached()) {
+				attached.add(a.setId());
+			}
+		}
+		List<SoundSet> used = new ArrayList<>();
 		for (SoundSet set : fileSets) {
+			if (attached.contains(set.id())) {
+				used.add(set);
+			}
+		}
+		Match match = match(used, lib);
+		Set<String> known = new HashSet<>(lib.ids());
+		for (SoundSet set : used) {
 			known.add(set.id());
 		}
 		int missing = 0;
@@ -84,7 +100,7 @@ public record SetImportPlan(List<SoundSet> fileSets, Map<String, Status> statusB
 				}
 			}
 		}
-		return new SetImportPlan(fileSets, match.status(), match.libraryId(), missing);
+		return new SetImportPlan(used, match.status(), match.libraryId(), missing);
 	}
 
 	/** The file's sets whose name clashes with a library set, in file order: each needs a new name before the import. */
@@ -278,14 +294,15 @@ public record SetImportPlan(List<SoundSet> fileSets, Map<String, Status> statusB
 		Map<String, String> libraryId = new HashMap<>();
 		for (SoundSet set : fileSets) {
 			SoundSet sameId = lib.get(set.id());
-			if (sameId != null && sameId.entries().equals(set.entries())) {
+			if (sameId != null && sameEntries(sameId.entries(), set.entries())) {
 				status.put(set.id(), Status.SAME);
 				continue;
 			}
 			SoundSet exact = null;
 			SoundSet clash = null;
 			for (SoundSet mine : lib.sets()) {
-				if (exact == null && mine.entries().equals(set.entries())) {
+				// Empty sets are never an exact match: any two would be (controller ruling, 2026-11-13).
+				if (exact == null && !set.entries().isEmpty() && sameEntries(mine.entries(), set.entries())) {
 					exact = mine;
 				}
 				if (clash == null && key(mine.name()).equals(key(set.name()))) {
@@ -304,6 +321,26 @@ public record SetImportPlan(List<SoundSet> fileSets, Map<String, Status> statusB
 			}
 		}
 		return new Match(status, libraryId);
+	}
+
+	/**
+	 * Whether two sets have the same entries (FR-11.5a): the same number, and in each position the same on/off, pattern,
+	 * mute, level, repeat limit and cue. Entry IDs are not compared: they only tell entries apart within one set.
+	 */
+	static boolean sameEntries(List<SetEntry> a, List<SetEntry> b) {
+		if (a.size() != b.size()) {
+			return false;
+		}
+		for (int i = 0; i < a.size(); i++) {
+			SetEntry x = a.get(i);
+			SetEntry y = b.get(i);
+			if (x.enabled() != y.enabled() || !x.pattern().equals(y.pattern()) || !Objects.equals(x.mute(), y.mute())
+					|| !Objects.equals(x.volume(), y.volume()) || !Objects.equals(x.limit(), y.limit())
+					|| !Objects.equals(x.cue(), y.cue())) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**

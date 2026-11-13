@@ -134,6 +134,22 @@ class ImportPlanTest {
 		assertEquals(List.of("set-rain"), ids(plan.result().zone("b1").sets()));
 	}
 
+	@Test
+	void aSetUsedOnlyByASkippedFixedZoneIsNotComparedOrAdded() {
+		// RAIN is attached only by another server's fixed zone, and the library has exactly its entries under another ID:
+		// that would cancel the import, but the zone is skipped, so RAIN plays no part. The dialog counts only FARM.
+		SetLibrary lib = new SetLibrary(List.of(new SoundSet("set-wet", "Wet", RAIN.entries())));
+		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
+				.withZones(List.of(fixedOn("theirs", "other.net").withSets(PlaceSets.EMPTY.attach("set-rain"))));
+		ImportPlan plan = ImportPlan.of(CURRENT, new ExportCodec.Read(file, List.of(FARM, RAIN), List.of()), lib, SERVER, Map.of());
+		assertNull(plan.problem());
+		assertEquals(Map.of("set-farm", SetImportPlan.Status.NEW), plan.sets().statusById());
+		assertEquals(1, plan.setsAdded(), "\"1 Sound Set will be added\" counts FARM only");
+		assertTrue(plan.library().contains("set-farm"));
+		assertFalse(plan.library().contains("set-rain"));
+		assertEquals(1, plan.fixedSkipped());
+	}
+
 	private static ExportCodec.Read parse(String json) {
 		try {
 			return ExportCodec.read(json);
