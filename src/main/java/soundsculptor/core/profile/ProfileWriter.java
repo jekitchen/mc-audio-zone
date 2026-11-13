@@ -50,8 +50,10 @@ public final class ProfileWriter {
 
 	/** Every profile not on disk yet, by key, the newest for each. */
 	public Map<String, Profile> notOnDisk() {
-		Map<String, Profile> all = new HashMap<>(unsaved);
-		all.putAll(queued);
+		// Read queued first, like latest(): a failing save on the SAVER thread adds to unsaved and only then removes
+		// from queued, so a pending profile is always in at least one map in this order, and a queued (newer) one wins.
+		Map<String, Profile> all = new HashMap<>(queued);
+		unsaved.forEach(all::putIfAbsent);
 		return all;
 	}
 

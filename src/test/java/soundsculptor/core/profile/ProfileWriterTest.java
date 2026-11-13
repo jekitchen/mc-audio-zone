@@ -87,6 +87,18 @@ class ProfileWriterTest {
 	}
 
 	@Test
+	void notOnDiskPrefersQueuedOverUnsaved() throws IOException {
+		ProfileWriter writer = new ProfileWriter(store());
+		blockSaves();
+		Profile older = Profile.empty("Older");
+		writer.queue(KEY, older);
+		assertFalse(writer.save(KEY, older, this::failed));
+		Profile newer = Profile.empty("Newer");
+		writer.queue(KEY, newer);
+		assertEquals(Map.of(KEY, newer), writer.notOnDisk(), "a key in both maps gives the queued profile");
+	}
+
+	@Test
 	void retrySkipsTheKeyJustSaved() throws IOException {
 		ProfileWriter writer = new ProfileWriter(store());
 		blockSaves();
