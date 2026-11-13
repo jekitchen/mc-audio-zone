@@ -20,6 +20,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -73,6 +75,12 @@ public final class ProfileManager {
 	 * lacks are kept, since those sets may load at the next start (PRD 9.2).
 	 */
 	private static boolean libraryComplete = true;
+	/**
+	 * The latest profile whose save failed, by world key: tried again with the next change and in {@link #flushSaves},
+	 * so a file held open for a while (Windows) does not lose the change, not even the last one before the game exits.
+	 * Used only on the SAVER thread.
+	 */
+	private static final Map<String, Profile> unsavedProfiles = new LinkedHashMap<>();
 	/** Files whose failed write was already reported with a toast; they are reported again only after a write succeeds. */
 	private static final Set<Path> reportedFailures = ConcurrentHashMap.newKeySet();
 
@@ -203,8 +211,8 @@ public final class ProfileManager {
 	 * Applies a change to the profile and the library, swaps in the new snapshot and saves in the background, in order:
 	 * every library set that was added or changed, the profile if it changed (only in a world), and the file of every
 	 * set the library lost. Sets go first so a saved profile never refers to a set that was not written. Sets are
-	 * compared by identity against the previous library, so an untouched set is not written again; a set whose write
-	 * failed is tried again with the next change and in {@link #flushSaves}.
+	 * compared by identity against the previous library, so an untouched set is not written again. A set or profile
+	 * whose write failed is tried again with the next change and in {@link #flushSaves}.
 	 */
 	public static synchronized void change(UnaryOperator<Workspace> f) {
 		Snapshot before = current;
@@ -233,22 +241,45 @@ public final class ProfileManager {
 			if (setWriter != null) {
 				setWriter.save(library, saved, ProfileManager::setWriteFailed);
 			}
+			if (profileChanged && key != null) {
+				unsavedProfiles.remove(key); // this newer profile replaces the one that failed
+			}
+			retryProfiles();
 			if (profileChanged && store != null && key != null) {
 				save(key, profile);
 			}
 			if (setWriter != null) {
 				setWriter.delete(library, deleted, ProfileManager::setWriteFailed);
-				forgetRecoveredFailures();
 			}
+			forgetRecoveredFailures();
 		});
 	}
 
+	/**
+	 * Writes a profile; if that fails, it is kept to try again (see {@link #unsavedProfiles}). Like a set, a failing file
+	 * is logged every time but toasts once until a write of it works again.
+	 */
 	private static void save(String key, Profile profile) {
+		Path file = store.fileFor(key);
 		try {
 			store.save(key, profile);
+			unsavedProfiles.remove(key);
 		} catch (IOException e) {
-			SoundSculptorClient.LOGGER.error("Sound Sculptor could not save {}", store.fileFor(key), e);
-			saveFailed(e);
+			unsavedProfiles.put(key, profile);
+			SoundSculptorClient.LOGGER.error("Sound Sculptor could not save {}; it is tried again with the next change", file, e);
+			if (reportedFailures.add(file)) {
+				saveFailed(e);
+			}
+		}
+	}
+
+	/** Tries again every profile whose save failed. */
+	private static void retryProfiles() {
+		if (store == null) {
+			return;
+		}
+		for (Map.Entry<String, Profile> unsaved : List.copyOf(unsavedProfiles.entrySet())) {
+			save(unsaved.getKey(), unsaved.getValue());
 		}
 	}
 
@@ -263,12 +294,16 @@ public final class ProfileManager {
 
 	/** After a write pass: files that no longer fail may toast again if they fail later. */
 	private static void forgetRecoveredFailures() {
-		if (setWriter == null || setStore == null) {
-			return;
+		Set<Path> stillFailing = new HashSet<>();
+		if (setWriter != null && setStore != null) {
+			for (String id : setWriter.pending()) {
+				stillFailing.add(setStore.fileFor(id));
+			}
 		}
-		Set<Path> stillFailing = new java.util.HashSet<>();
-		for (String id : setWriter.pending()) {
-			stillFailing.add(setStore.fileFor(id));
+		if (store != null) {
+			for (String key : unsavedProfiles.keySet()) {
+				stillFailing.add(store.fileFor(key));
+			}
 		}
 		reportedFailures.retainAll(stillFailing);
 	}
@@ -280,15 +315,16 @@ public final class ProfileManager {
 
 	/**
 	 * Waits until every queued save has been written (tests, and before the game exits), trying again any library set
-	 * whose write failed.
+	 * or profile whose write failed.
 	 */
 	public static void flushSaves() {
 		try {
 			SAVER.submit(() -> {
 				if (setWriter != null) {
 					setWriter.retry(ProfileManager::setWriteFailed);
-					forgetRecoveredFailures();
 				}
+				retryProfiles();
+				forgetRecoveredFailures();
 			}).get(10, TimeUnit.SECONDS);
 		} catch (Exception e) {
 			throw new IllegalStateException("profile save did not finish", e);
@@ -404,6 +440,7 @@ public final class ProfileManager {
 			throw new IllegalArgumentException("the current world's profile cannot be deleted");
 		}
 		SAVER.execute(() -> {
+			unsavedProfiles.remove(key); // a failed save must not bring it back
 			try {
 				store.delete(key);
 			} catch (IOException e) {

@@ -39,11 +39,11 @@ class TraceTextLinesTest {
 				PLAY, false, false);
 	}
 
-	/** Entry, zone and "no entry" targets; set lines are checked on their own. */
+	/** Entry, zone and "no entry" targets; set lines and the Everywhere heading are checked on their own. */
 	private static List<TraceText.Target> targets(List<TraceText.Line> lines) {
 		List<TraceText.Target> targets = new ArrayList<>();
 		for (TraceText.Line line : lines) {
-			if (line.target() != null && !(line.target() instanceof TraceText.SetTarget)) {
+			if (line.target() != null && !(line.target() instanceof TraceText.SetTarget) && !(line.target() instanceof TraceText.PlaceTarget)) {
 				targets.add(line.target());
 			}
 		}
@@ -131,6 +131,14 @@ class TraceTextLinesTest {
 		int everywhereIndex = indexOf(lines, "Everywhere");
 		assertEquals("  Quick changes", lines.get(everywhereIndex + 1).text());
 		assertEquals(sets.get(1), lines.get(indexOf(lines, "  Farm animals · used in 2 places")).target());
+	}
+
+	/** The Everywhere heading is about Everywhere, so the panel can offer Add to Quick changes there (FR-4.10). */
+	@Test
+	void everywhereHeadingCarriesItsPlace() {
+		List<TraceText.Line> lines = TraceText.lines(trace(List.of(SetEntry.of("e", AMBIENT).withVolume(60)), List.of()), EN);
+		assertEquals(new TraceText.PlaceTarget(PlaceRef.EVERYWHERE), lines.get(indexOf(lines, "Everywhere")).target());
+		assertNull(lines.get(indexOf(lines, "Zones")).target(), "the zones heading has nothing to edit");
 	}
 
 	@Test

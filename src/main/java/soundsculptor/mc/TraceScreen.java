@@ -16,12 +16,15 @@ import soundsculptor.core.search.SoundSearch;
 import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.trace.EntryLocation;
 import soundsculptor.core.trace.LastPlay;
+import soundsculptor.core.trace.PlaceTrace;
+import soundsculptor.core.trace.SetLine;
 import soundsculptor.core.trace.SoundTrace;
 import soundsculptor.core.trace.TraceEditContext;
 import soundsculptor.core.trace.TraceEditError;
 import soundsculptor.core.trace.TraceEditResult;
 import soundsculptor.core.trace.TraceEditor;
 import soundsculptor.core.trace.TraceText;
+import soundsculptor.core.trace.ZoneLine;
 import soundsculptor.core.ui.SliderModel;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.ui.SculptButton;
@@ -53,15 +56,17 @@ import net.minecraft.resources.Identifier;
  * the player knows an edit there changes every one (FR-4.9).
  *
  * <p>Inline editing (FR-14.4): entry lines have On/Off, Mute, Level… and "Open full editor" (the set editor or the
- * place's Quick changes, at that entry); zone lines have On/Off and open the zone editor; a "No entry matches" line has
- * Add to Quick changes, which offers Mute or Level… for the sound's single-sound entry in that place's Quick changes
- * (FR-4.10). An entry of a library set is edited in the library, so every place using the set changes, and its
- * tooltips say so. Each line's Mute edits the line's own entry, except on the sound's single-sound entry in Quick
- * changes and on Add to Quick changes, where it shows and toggles the sound's actual state at the place, as the Sounds
- * tab's quick actions do (FR-1.5). Edits save at once through {@link ProfileManager#change}, recompute the trace from
- * the sound's last play (labelled "Predicted for next play" until it plays again) and show a 5-second Undo toast.
- * Level changes made in one visit to the Level panel are undone together; returning from a full editor recomputes the
- * trace. Limit and Cue controls come with their milestones (M11, M9), like in the entry editor.
+ * place's Quick changes, at that entry); zone lines have On/Off and open the zone editor. Every place whose Quick
+ * changes has no entry matching the sound offers Add to Quick changes, which offers Mute or Level… for the sound's
+ * single-sound entry in that place's Quick changes (FR-4.10): on its "No entry matches" line, or, when a library set
+ * there matches, on the place's own line (the Everywhere heading or the zone's line), so a library set's mute can be
+ * overridden in one place without changing the set. An entry of a library set is edited in the library, so every place
+ * using the set changes, and its tooltips say so. Each line's Mute edits the line's own entry, except on the sound's
+ * single-sound entry in Quick changes and on Add to Quick changes, where it shows and toggles the sound's actual state
+ * at the place, as the Sounds tab's quick actions do (FR-1.5). Edits save at once through {@link ProfileManager#change},
+ * recompute the trace from the sound's last play (labelled "Predicted for next play" until it plays again) and show a
+ * 5-second Undo toast. Level changes made in one visit to the Level panel are undone together; returning from a full
+ * editor recomputes the trace. Limit and Cue controls come with their milestones (M11, M9), like in the entry editor.
  */
 public final class TraceScreen extends SculptScreen {
 	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
@@ -71,6 +76,7 @@ public final class TraceScreen extends SculptScreen {
 	private static final int VOLUME_WIDTH = 60;
 	private static final int PANEL_WIDTH = 240;
 	private static final int FIELD_WIDTH = 40;
+	private static final String ADD_QUICK_KEY = "soundsculptor.trace.edit.add_quick";
 
 	private final String soundId;
 	private final boolean vanillaCovered;
@@ -139,8 +145,11 @@ public final class TraceScreen extends SculptScreen {
 
 	@Override
 	protected void buildTab(int index, Body body) {
-		// A relayout drops an open Level panel: finish its change so Undo still covers it.
+		// A relayout drops an open overlay without its close callback: finish the Level panel's change so Undo still
+		// covers it, and forget the Add to Quick changes choice.
 		finishVolume();
+		addQuickMute = null;
+		addQuickLevel = null;
 		// Back from a full editor (or any other change): show the trace for the sets and zones as they are now.
 		if (!Objects.equals(ProfileManager.workspace(), shownWorkspace)) {
 			predicted = predicted || play != null;
@@ -231,6 +240,9 @@ public final class TraceScreen extends SculptScreen {
 		if (target instanceof TraceText.NoEntryTarget none) {
 			return "none:" + none.place().zoneId();
 		}
+		if (target instanceof TraceText.PlaceTarget place) {
+			return "place:" + place.place().zoneId();
+		}
 		return "line:" + index;
 	}
 
@@ -265,13 +277,42 @@ public final class TraceScreen extends SculptScreen {
 			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), ON_OFF_WIDTH,
 					() -> setZoneEnabled(zone.id(), !zone.enabled())),
 					Component.translatable(zone.enabled() ? "soundsculptor.zones.turn_off" : "soundsculptor.zones.turn_on")));
+			if (offersAddOnPlaceLine(zonePlace(zone.id()))) {
+				buttons.add(addToQuickButton(PlaceRef.zone(zone.id())));
+			}
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.trace.edit.open_zone"), () -> openZoneEditor(zone.id())));
+		} else if (target instanceof TraceText.PlaceTarget placeTarget) {
+			if (placeTarget.place().isEverywhere() && offersAddOnPlaceLine(trace.everywhere())) {
+				buttons.add(addToQuickButton(PlaceRef.EVERYWHERE));
+			}
 		} else if (target instanceof TraceText.NoEntryTarget none) {
-			PlaceRef place = none.place();
-			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.trace.edit.add_quick"),
-					() -> openAddToQuickChanges(place)), Component.translatable("soundsculptor.trace.edit.add_quick.tip")));
+			buttons.add(addToQuickButton(none.place()));
 		}
 		return buttons;
+	}
+
+	/** Add to Quick changes for {@code place}: opens the Mute / Level… choice. */
+	private SculptButton addToQuickButton(PlaceRef place) {
+		return Tooltips.describe(SculptButton.text(Component.translatable(ADD_QUICK_KEY), () -> openAddToQuickChanges(place)),
+				Component.translatable("soundsculptor.trace.edit.add_quick.tip"));
+	}
+
+	/**
+	 * Whether the place's own line offers Add to Quick changes: a library set there matches the sound, but its Quick
+	 * changes has no matching entry. (With no matching entry at all, the "No entry matches" line offers it instead.)
+	 */
+	private static boolean offersAddOnPlaceLine(PlaceTrace place) {
+		return place != null && !place.sets().isEmpty() && place.sets().stream().noneMatch(SetLine::quick);
+	}
+
+	/** How the zone treated the sound, or {@code null} if the trace does not list it. */
+	private PlaceTrace zonePlace(String zoneId) {
+		for (ZoneLine line : trace.zones()) {
+			if (line.zone().id().equals(zoneId)) {
+				return line.sets();
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -427,9 +468,10 @@ public final class TraceScreen extends SculptScreen {
 	// ---- Add to Quick changes ----
 
 	/**
-	 * A "No entry matches" line's Add to Quick changes: a small choice above the screen, Mute (or Unmute, the sound's
-	 * actual state at the place, FR-1.5) and Level…, each read with where it goes ("Add to Quick changes in Pen"). Mute
-	 * applies at once; Level… opens the Level panel. Esc closes the choice and returns focus to the button.
+	 * Add to Quick changes (on a "No entry matches" line or a place's own line): a small choice above the screen, Mute
+	 * (or Unmute, the sound's actual state at the place, FR-1.5) and Level…, each read with where it goes ("Add to Quick
+	 * changes in Pen"). Mute applies at once; Level… opens the Level panel. Esc closes the choice and returns focus to the
+	 * button.
 	 */
 	public void openAddToQuickChanges(PlaceRef where) {
 		Component context = Component.translatable("soundsculptor.trace.edit.add_quick.choice", SetDeleteDialog.placeName(ProfileManager.profile(), where));
@@ -453,11 +495,29 @@ public final class TraceScreen extends SculptScreen {
 		openOverlay(x, y, panelWidth, panelHeight, List.of(mute, level), mute, () -> {
 			addQuickMute = null;
 			addQuickLevel = null;
-			SculptList.Row row = lines == null ? null : lines.findRow(key(new TraceText.NoEntryTarget(where), -1));
-			if (row != null) {
-				focusPath(lines.revealRow(row, 0));
+			ComponentPath button = addToQuickButtonPath(where);
+			if (button != null) {
+				focusPath(button);
 			}
 		});
+	}
+
+	/** The path to the place's Add to Quick changes button, on its "No entry matches" line or its own line, if shown. */
+	private ComponentPath addToQuickButtonPath(PlaceRef where) {
+		if (lines == null) {
+			return null;
+		}
+		Object placeLine = where.isEverywhere() ? key(new TraceText.PlaceTarget(where), -1) : "zone:" + where.zoneId();
+		String label = Component.translatable(ADD_QUICK_KEY).getString();
+		for (Object rowKey : List.of(key(new TraceText.NoEntryTarget(where), -1), placeLine)) {
+			SculptList.Row row = lines.findRow(rowKey);
+			for (int i = 0; row != null && i < row.buttons().size(); i++) {
+				if (row.buttons().get(i).getMessage().getString().equals(label)) {
+					return lines.revealRow(row, i);
+				}
+			}
+		}
+		return null;
 	}
 
 	// ---- Level panel ----

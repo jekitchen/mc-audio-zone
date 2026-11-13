@@ -365,19 +365,27 @@ public final class SetEditorScreen extends SculptScreen {
 		}
 		Component linked = attached != null && draft.changed() ? linkedConfirmation() : null;
 		if (linked != null) {
-			minecraft.gui.setScreen(new SculptDialog(this,
-					Component.translatable("soundsculptor.set_editor.confirm.title", draft.build().name()),
-					linked,
-					List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.ui.save"), () -> {
-								commit();
-								closeNow();
-							}),
-							new SculptDialog.Choice(Component.translatable("soundsculptor.ui.keep_editing"), () -> { })),
-					0, 1));
+			minecraft.gui.setScreen(linkedSaveDialog(this, draft.build().name(), linked, () -> {
+				commit();
+				closeNow();
+			}));
 			return false;
 		}
 		commit();
 		return true;
+	}
+
+	/**
+	 * The confirmation before saving a set used in more than one place (FR-4.9): Save and Keep editing, Save focused, Esc
+	 * keeps editing. A long list of places scrolls inside it.
+	 *
+	 * @param message the places, from {@link #linkedMessage}
+	 */
+	public static SculptDialog linkedSaveDialog(Screen parent, String setName, Component message, Runnable save) {
+		return new SculptDialog(parent, Component.translatable("soundsculptor.set_editor.confirm.title", setName), message,
+				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.ui.save"), save),
+						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.keep_editing"), () -> { })),
+				0, 1);
 	}
 
 	/**
