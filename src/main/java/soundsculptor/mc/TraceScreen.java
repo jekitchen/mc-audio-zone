@@ -356,7 +356,7 @@ public final class TraceScreen extends SculptScreen {
 	}
 
 	private static Component muteLabel(boolean muted) {
-		return Component.translatable(muted ? "soundsculptor.recent.unmute" : "soundsculptor.recent.mute");
+		return Component.translatable(muted ? "soundsculptor.sounds.unmute" : "soundsculptor.sounds.mute");
 	}
 
 	private static boolean cueDefault() {

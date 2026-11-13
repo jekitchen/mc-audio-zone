@@ -34,10 +34,10 @@ class DistanceBandTest {
 	@Test
 	void everyBandAndStatusHasATranslationKey() {
 		for (DistanceBand band : DistanceBand.values()) {
-			assertTrue(band.translationKey().startsWith("soundsculptor.recent.distance."), band.name());
+			assertTrue(band.translationKey().startsWith("soundsculptor.sounds.distance."), band.name());
 		}
 		for (PlayStatus status : PlayStatus.values()) {
-			assertTrue(status.translationKey().startsWith("soundsculptor.recent.status."), status.name());
+			assertTrue(status.translationKey().startsWith("soundsculptor.sounds.status."), status.name());
 		}
 	}
 }

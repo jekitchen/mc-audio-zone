@@ -38,6 +38,7 @@ class AppSettingsTest {
 		assertTrue(D.outlinesThroughBlocks(), "FR-10.5: default on");
 		assertFalse(D.reducedMotion());
 		assertEquals(AppSettings.DEFAULT_TAB, D.lastTab());
+		assertEquals("sounds", AppSettings.DEFAULT_TAB);
 	}
 
 	@Test

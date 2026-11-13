@@ -35,6 +35,6 @@ public enum DistanceBand {
 
 	/** Key in {@code assets/soundsculptor/lang/en_us.json}. */
 	public String translationKey() {
-		return "soundsculptor.recent.distance." + key;
+		return "soundsculptor.sounds.distance." + key;
 	}
 }

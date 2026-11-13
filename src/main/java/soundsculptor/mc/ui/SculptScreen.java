@@ -431,7 +431,7 @@ public abstract class SculptScreen extends Screen {
 
 	/**
 	 * Tab widths: each tab gets its text's width plus padding, and spare room is shared equally up to
-	 * {@value #MAX_TAB_WIDTH} per tab, so a long title ("Recently Played") is not cut off just because every tab got the
+	 * {@value #MAX_TAB_WIDTH} per tab, so a long title ("Sound Sets") is not cut off just because every tab got the
 	 * same share. If the titles do not fit even so, every tab shrinks in proportion.
 	 */
 	private int[] tabWidths(List<Tab> tabs) {

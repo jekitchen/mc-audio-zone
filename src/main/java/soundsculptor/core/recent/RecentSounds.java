@@ -16,7 +16,7 @@ import java.util.function.Function;
 import soundsculptor.core.diag.MemoryEstimate;
 
 /**
- * The recently played sounds log behind the Recently Played tab (PRD FR-1.1 to FR-1.3).
+ * The recently played sounds log behind the Sounds tab's Recently played filter (PRD FR-1.1 to FR-1.3).
  *
  * <p>A play is recorded only if it is non-positional, or positional and within vanilla hearing range: the same set
  * vanilla subtitles would show (fair play). Sounds Sound Sculptor muted or limited are recorded too, with their status.

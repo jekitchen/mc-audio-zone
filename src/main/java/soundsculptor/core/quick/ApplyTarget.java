@@ -6,7 +6,7 @@ import java.util.Objects;
 import soundsculptor.core.sets.PlaceRef;
 
 /**
- * One choice in the Recently Played "Apply to" selector (PRD FR-1.5): Everywhere or one zone. Quick actions on a row
+ * One choice in the Sounds tab's "Apply to" selector (PRD FR-1.5): Everywhere or one zone. Quick actions on a row
  * edit the sound's single-sound entry in that place's Quick changes set (FR-4.10).
  *
  * @param zoneId   the zone's ID, or {@code null} for Everywhere
@@ -38,9 +38,9 @@ public record ApplyTarget(String zoneId, String zoneName, boolean bubble) {
 	/** Key in {@code assets/soundsculptor/lang/en_us.json} for the selector entry; takes {@link #args()}. */
 	public String translationKey() {
 		if (isEverywhere()) {
-			return "soundsculptor.recent.apply_to.everywhere";
+			return "soundsculptor.sounds.apply_to.everywhere";
 		}
-		return bubble ? "soundsculptor.recent.apply_to.bubble" : "soundsculptor.recent.apply_to.zone";
+		return bubble ? "soundsculptor.sounds.apply_to.bubble" : "soundsculptor.sounds.apply_to.zone";
 	}
 
 	/** The label arguments: nothing for Everywhere, else the zone's name. */

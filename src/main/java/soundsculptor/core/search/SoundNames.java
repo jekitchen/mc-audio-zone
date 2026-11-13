@@ -9,7 +9,7 @@ import java.util.Locale;
  * instead of underscores, the first part (the group, such as "ambient" or "block") last in brackets, and a mod's
  * namespace after it. {@code minecraft:ambient.basalt_deltas.additions} becomes "Basalt deltas: additions (ambient)".
  *
- * <p>Shown where a subtitle would be (Recently Played, Search); the ID itself is always shown too. English word order
+ * <p>Shown where a subtitle would be (the Sounds tab); the ID itself is always shown too. English word order
  * only: these are not translations.
  */
 public final class SoundNames {

@@ -28,6 +28,7 @@
 			"soundsculptor.gametest.ImportExportClientGameTest",
 			"soundsculptor.gametest.UndoClientGameTest",
 			"soundsculptor.gametest.ApplyToClientGameTest",
+			"soundsculptor.gametest.SoundsTabClientGameTest",
 			"soundsculptor.gametest.TraceEditClientGameTest",
 			"soundsculptor.gametest.AccessibilityClientGameTest",
 			"soundsculptor.gametest.M8StressClientGameTest",

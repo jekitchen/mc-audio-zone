@@ -7,6 +7,7 @@ import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.SetEditorScreen;
@@ -104,19 +105,20 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(SetEditorScreen.class);
 			context.runOnClient(mc -> mc.gui.screen().onClose());
 
-			// The Search tab finds readable names too.
+			// The Sounds tab finds readable names too.
 			context.waitForScreen(SoundSculptorScreen.class);
 			context.runOnClient(mc -> {
 				SoundSculptorScreen screen = (SoundSculptorScreen) mc.gui.screen();
-				screen.selectTab(SoundSculptorScreen.TAB_SEARCH);
-				screen.searchField.setValue("basalt deltas additions");
-				screen.runSearch();
+				screen.selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				screen.sounds().setRecentOnly(false);
+				screen.sounds().searchField.setValue("basalt deltas additions");
+				screen.sounds().runSearch();
 			});
-			check(context.computeOnClient(mc -> ((SoundSculptorScreen) mc.gui.screen()).searchList.findRow(BASALT) != null),
-					"Search should find a sound by its readable name");
+			check(context.computeOnClient(mc -> ((SoundSculptorScreen) mc.gui.screen()).sounds().list.findRow(BASALT) != null),
+					"the Sounds tab should find a sound by its readable name");
 
 			context.runOnClient(mc -> {
-				((SoundSculptorScreen) mc.gui.screen()).searchField.setValue("");
+				SoundsPanel.resetRememberedState();
 				ProfileManager.update(p -> Profile.empty(p.name()));
 				ProfileManager.flushSaves();
 			});

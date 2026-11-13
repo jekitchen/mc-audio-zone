@@ -5,6 +5,7 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.SetEditorScreen;
@@ -34,17 +35,18 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 
-			// Search: a sound without a subtitle gets a readable name; its ID stays on the second line.
+			// Sounds: a sound without a subtitle gets a readable name; its ID stays on the second line.
 			context.runOnClient(mc -> {
-				main(mc).selectTab(SoundSculptorScreen.TAB_SEARCH);
-				main(mc).searchField.setValue("basalt additions");
-				main(mc).runSearch();
+				main(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				main(mc).sounds().setRecentOnly(false);
+				main(mc).sounds().searchField.setValue("basalt additions");
+				main(mc).sounds().runSearch();
 			});
-			List<String> basalt = context.computeOnClient(mc -> main(mc).searchList.findRow(BASALT).columnTexts());
+			List<String> basalt = context.computeOnClient(mc -> main(mc).sounds().list.findRow(BASALT).columnTexts());
 			check(basalt.get(0).equals("Basalt deltas: additions (ambient)") && basalt.contains(BASALT),
 					"an unnamed sound should get a readable name, was " + basalt);
 			context.takeScreenshot("m8-review-search-names");
-			context.runOnClient(mc -> main(mc).searchField.setValue(""));
+			context.runOnClient(mc -> SoundsPanel.resetRememberedState());
 
 			// Entry rows (Everywhere's Quick changes): status like Recently Played; counts only for groups; a typo is flagged.
 			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.forQuickChanges(main(mc), PlaceRef.EVERYWHERE)));

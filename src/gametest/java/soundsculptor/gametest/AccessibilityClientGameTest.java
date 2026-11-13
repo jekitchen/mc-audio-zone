@@ -14,6 +14,8 @@ import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundsPanel;
+import soundsculptor.mc.AddToSetScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.AttachSetScreen;
 import soundsculptor.mc.PlaceSetsScreen;
@@ -61,7 +63,8 @@ import net.minecraft.util.FormattedCharSequence;
  *   {@code -Pmodmenu=true}), the screen says to join a world instead of offering settings that would go nowhere.</li>
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
- *   <li>A-4 narration: every control on the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
+ *   <li>A-4 narration: every control on the Sounds tab (the Recently played filter on and off, its search help, its
+ *   Level pop-up and Add to set…), the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
  *   the sound trace (a shared set's line, which reads its places, and Add to Quick changes with its choice), the set
  *   editor, the delete warning, the linked-save confirmation and the import dialogs, including list row buttons, has a
  *   label to read.</li>
@@ -80,6 +83,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final EntryLocation QUICK_R2 = new EntryLocation(PlaceRef.EVERYWHERE, SoundSet.QUICK_ID, "r2");
 	/** A sound SET matches: a shared set's line in the trace. */
 	private static final String COW = "minecraft:entity.cow.ambient";
+	/** A sound for the Sounds tab's Level pop-up and Add to set…. */
+	private static final String VILLAGER = "minecraft:entity.villager.ambient";
 	/** A sound nothing on Everywhere matches: the trace's Add to Quick changes line. */
 	private static final String PIG = "minecraft:entity.pig.ambient";
 	/** A library set for the Sound Sets tab, its name screen and its delete warning. */
@@ -94,10 +99,10 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		context.setScreen(SoundSculptorScreen::new);
 		context.waitForScreen(SoundSculptorScreen.class);
 		check(!context.computeOnClient(mc -> ProfileManager.isLoaded()), "no profile is loaded on the title screen");
-		// The screen opens on the last used tab; this check is about Recently Played.
-		context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_RECENT));
+		// The screen opens on the last used tab; this check is about the Sounds tab.
+		context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS));
 		check(context.computeOnClient(mc -> labels(main(mc)).stream().anyMatch(t -> t.startsWith("Join a world or server"))),
-				"Recently Played should say to join a world");
+				"the Sounds tab should say to join a world");
 		context.takeScreenshot("a11y-no-world");
 		context.setScreen(() -> null);
 
@@ -121,6 +126,36 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))).attach(SET.id()))
 					.withZones(List.of(attached(zone("z1", "Trading hall", key), SET.id()),
 							zone("z2", "Very long zone name for the bee farm by the river", key))), ws.library().put(SET))));
+
+			// A-4: every control on the Sounds tab, with the Recently played filter on and off, has something to read out,
+			// and so do its search help, its Level pop-up and both steps of Add to set….
+			List<String> silentSounds = context.computeOnClient(mc -> {
+				List<String> silent = new ArrayList<>();
+				for (boolean recentOnly : new boolean[] {true, false}) {
+					SoundSculptorScreen screen = new SoundSculptorScreen();
+					mc.gui.setScreen(screen);
+					screen.selectTab(SoundSculptorScreen.TAB_SOUNDS);
+					screen.sounds().setRecentOnly(recentOnly);
+					silent.addAll(silentControls(screen));
+				}
+				SoundSculptorScreen screen = (SoundSculptorScreen) mc.gui.screen();
+				check(!screen.sounds().list.children().isEmpty(), "with the filter off, every known sound is listed");
+				screen.sounds().openHelp();
+				silent.addAll(silentControls(screen));
+				check(screen.sounds().helpList.getFocused() != null, "the search help takes focus, so arrows and Esc work in it");
+				screen.closeOverlay();
+				screen.sounds().openLevel(VILLAGER);
+				silent.addAll(silentControls(screen));
+				screen.closeOverlay();
+				AddToSetScreen add = new AddToSetScreen(screen, VILLAGER, "Villager mumbles", () -> { });
+				mc.gui.setScreen(add);
+				silent.addAll(silentControls(add));
+				add.chooseSet(SET.id());
+				silent.addAll(silentControls(add));
+				return silent;
+			});
+			check(silentSounds.isEmpty(), "controls without a label on the Sounds tab: " + silentSounds);
+			context.runOnClient(mc -> SoundsPanel.resetRememberedState());
 
 			// A-4: every control on the Sound Sets, Zones and Profiles tabs has something to read out.
 			for (int tab : new int[] {SoundSculptorScreen.TAB_SETS, SoundSculptorScreen.TAB_ZONES, SoundSculptorScreen.TAB_PROFILES}) {
@@ -269,6 +304,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 					+ (pseudo.isEmpty() ? "" : "\n  " + String.join("\n  ", pseudo)));
 
 			context.runOnClient(mc -> {
+				SoundsPanel.resetRememberedState();
 				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().remove(SET.id())));
 				ProfileManager.flushSaves();
 			});
@@ -313,10 +349,25 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 	/** The screens to check; each opens on its own, as the player would reach it. */
 	private enum Screens {
-		RECENT(mc -> tab(SoundSculptorScreen.TAB_RECENT), null),
-		SEARCH(mc -> tab(SoundSculptorScreen.TAB_SEARCH), null),
-		SEARCH_HELP(mc -> tab(SoundSculptorScreen.TAB_SEARCH), s -> {
-			((SoundSculptorScreen) s).toggleSearchHelp();
+		SOUNDS_RECENT(mc -> tab(SoundSculptorScreen.TAB_SOUNDS), s -> {
+			((SoundSculptorScreen) s).sounds().setRecentOnly(true);
+			return null;
+		}),
+		SOUNDS_ALL(mc -> tab(SoundSculptorScreen.TAB_SOUNDS), s -> {
+			((SoundSculptorScreen) s).sounds().setRecentOnly(false);
+			return null;
+		}),
+		SOUNDS_HELP(mc -> tab(SoundSculptorScreen.TAB_SOUNDS), s -> {
+			((SoundSculptorScreen) s).sounds().openHelp();
+			return null;
+		}),
+		SOUNDS_LEVEL(mc -> tab(SoundSculptorScreen.TAB_SOUNDS), s -> {
+			((SoundSculptorScreen) s).sounds().openLevel(VILLAGER);
+			return null;
+		}),
+		ADD_TO_SET(mc -> new AddToSetScreen((SculptScreen) tab(SoundSculptorScreen.TAB_SOUNDS), VILLAGER, "Villager mumbles", () -> { }), null),
+		ADD_TO_SET_TARGETS(mc -> new AddToSetScreen((SculptScreen) tab(SoundSculptorScreen.TAB_SOUNDS), VILLAGER, "Villager mumbles", () -> { }), s -> {
+			((AddToSetScreen) s).chooseSet(SET.id());
 			return null;
 		}),
 		SETS(mc -> tab(SoundSculptorScreen.TAB_SETS), null),

@@ -22,6 +22,6 @@ public enum PlayStatus {
 
 	/** Key in {@code assets/soundsculptor/lang/en_us.json}. */
 	public String translationKey() {
-		return "soundsculptor.recent.status." + key;
+		return "soundsculptor.sounds.status." + key;
 	}
 }

@@ -33,7 +33,7 @@ class AppSettingsCodecTest {
 				  "cueOffsetY": 0,
 				  "outlinesThroughBlocks": true,
 				  "reducedMotion": false,
-				  "lastTab": "recent"
+				  "lastTab": "sounds"
 				}
 				""".formatted(soundsculptor.core.ui.Palette.formatHex(AppSettings.DEFAULT_CUE_COLOR)), AppSettingsCodec.toJson(D));
 	}
@@ -113,6 +113,16 @@ class AppSettingsCodecTest {
 		AppSettingsCodec.Read read = read("{\"schemaVersion\": 1, \"lastTab\": \"../../etc\"}");
 		assertEquals(D, read.settings());
 		assertEquals("lastTab: \"../../etc\" is not a tab name, so the default is used.", only(read));
+	}
+
+	@Test
+	void theRetiredRecentAndSearchTabsOpenTheSoundsTab() throws AppSettingsFormatException {
+		// FR-12.1: Sounds replaced the Recently Played and Search tabs; a file saved before still opens a tab.
+		for (String old : List.of("recent", "search")) {
+			AppSettingsCodec.Read read = read("{\"schemaVersion\": 1, \"lastTab\": \"" + old + "\"}");
+			assertEquals("sounds", read.settings().lastTab());
+			assertEquals(List.of(), read.problems());
+		}
 	}
 
 	@Test

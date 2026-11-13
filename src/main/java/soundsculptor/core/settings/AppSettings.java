@@ -18,7 +18,7 @@ import java.util.Objects;
  * @param cueOffsetY            section 8.1 cue box offset in GUI pixels, positive is down
  * @param outlinesThroughBlocks FR-10.5 "Outlines visible through blocks"
  * @param reducedMotion         A-6 no list animations and no toast slide-in
- * @param lastTab               FR-12.2 the tab the hotkey opens, e.g. "recent"; see {@link #isValidTab}
+ * @param lastTab               FR-12.2 the tab the hotkey opens, e.g. "sounds"; see {@link #isValidTab}
  */
 public record AppSettings(boolean showCues, boolean cuesWithoutSubtitles, int cueColor, int cueTextScale, int cueOffsetX,
 		int cueOffsetY, boolean outlinesThroughBlocks, boolean reducedMotion, String lastTab) {
@@ -28,7 +28,7 @@ public record AppSettings(boolean showCues, boolean cuesWithoutSubtitles, int cu
 	public static final int MAX_CUE_SCALE = 200;
 	/** The offset can move the cue box this far in each direction; the renderer still keeps it on screen. */
 	public static final int MAX_CUE_OFFSET = 1000;
-	public static final String DEFAULT_TAB = "recent";
+	public static final String DEFAULT_TAB = "sounds";
 	static final int MAX_TAB_LENGTH = 32;
 
 	public static final AppSettings DEFAULTS = new AppSettings(true, false, DEFAULT_CUE_COLOR, 100, 0, 0, true, false,

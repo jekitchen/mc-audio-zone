@@ -258,7 +258,7 @@ public final class SetEditorScreen extends SculptScreen {
 	}
 
 	/**
-	 * What the entry does to loudness, in the same style as the Recently Played status: "✖ Muted", "▶ Level 30%",
+	 * What the entry does to loudness, in the same style as the Sounds tab's status: "✖ Muted", "▶ Level 30%",
 	 * "▶ Not muted", or "○ Off" for an entry that is turned off. Empty if it does not set loudness.
 	 */
 	static String status(SetEntry entry) {

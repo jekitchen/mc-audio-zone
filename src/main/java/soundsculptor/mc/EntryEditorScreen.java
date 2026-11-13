@@ -433,7 +433,7 @@ public final class EntryEditorScreen extends SculptScreen {
 	private String shownListKey;
 	private List<SoundEntry> searchEntries;
 
-	/** The sounds matching the words, with the Search tab's syntax, each with This sound and Like this. */
+	/** The sounds matching the words, with the Sounds tab's search syntax, each with This sound and Like this. */
 	private void fillSearchResults() {
 		if (searchEntries == null) {
 			searchEntries = KnownSounds.entries();
