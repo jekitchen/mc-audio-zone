@@ -28,7 +28,7 @@ class EntrySummaryTest {
 	@Test
 	void everySettingInAFixedOrder() {
 		SetEntry rule = SetEntry.of("r", "*").withCue(false).withLimit(new Limit(3, 1000, false)).withVolume(60).withMute(false);
-		assertEquals(List.of("Not muted", "Volume 60%", "At most 3 per 1 s", "Cue off"), chips(rule));
+		assertEquals(List.of("Not muted", "Level 60%", "At most 3 per 1 s", "Cue off"), chips(rule));
 	}
 
 	@Test

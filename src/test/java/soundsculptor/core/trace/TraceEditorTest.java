@@ -254,7 +254,7 @@ class TraceEditorTest {
 	@Test
 	void unknownSetEntryOrZoneIsRefused() {
 		Workspace start = ws(List.of(farm()), attached("farm"), sphere("hall", 10, PlaceSets.EMPTY));
-		Message noEntry = TraceEditError.RULE_NOT_FOUND.message();
+		Message noEntry = TraceEditError.ENTRY_NOT_FOUND.message();
 		Message noZone = TraceEditError.ZONE_NOT_FOUND.message();
 		assertEquals(noEntry, TraceEditor.edit(context(PLAY), start, inLibrary(PlaceRef.EVERYWHERE, "gone", "e1"),
 				new EntryEdit.Mute(true)).error(), "the set was deleted since the panel opened");

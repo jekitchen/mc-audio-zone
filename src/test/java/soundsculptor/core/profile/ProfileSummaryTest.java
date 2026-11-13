@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.zones.Shape;
 
@@ -24,13 +25,14 @@ class ProfileSummaryTest {
 
 	@Test
 	void rowHasNameKeyCountsAndLastJoined() {
-		// fixed() carries one zone rule.
-		Profile p = new Profile("My server", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b"))))
-				.withZones(List.of(fixed("z1", new Shape.Sphere(4)), bubble("b1")));
+		// fixed() carries Quick changes; Everywhere and the bubble share one library set, and Everywhere has another.
+		Profile p = new Profile("My server", ProfileSettings.DEFAULTS,
+				quick(List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b"))).attach("set-farm").attach("set-rain"))
+				.withZones(List.of(fixed("z1", new Shape.Sphere(4)), bubble("b1").withSets(PlaceSets.EMPTY.attach("set-farm"))));
 		ProfileSummary row = ProfileSummary.of("play.example.net", p, MONDAY, "play.example.net");
 		assertEquals("My server", row.displayName());
 		assertEquals("play.example.net", row.worldKey());
-		assertEquals(4, row.ruleCount(), "global rules plus zone rules");
+		assertEquals(4, row.setCount(), "set-farm once, set-rain, and the Quick changes of Everywhere and of z1");
 		assertEquals(2, row.zoneCount());
 		assertEquals(MONDAY, row.lastJoined());
 		assertTrue(row.connected());

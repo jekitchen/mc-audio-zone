@@ -86,16 +86,76 @@ class ImportPlanTest {
 	}
 
 	@Test
-	void aDifferentSetIsKeptBothByDefault() {
+	void aNameClashWaitsForANameThenAddsTheImportedSet() {
 		SoundSet mine = FARM.withEntries(List.of());
 		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"));
-		ImportPlan plan = ImportPlan.of(CURRENT, new ExportCodec.Read(file, List.of(FARM), List.of()), new SetLibrary(List.of(mine)),
-				SERVER, Map.of());
+		ExportCodec.Read read = new ExportCodec.Read(file, List.of(FARM), List.of());
+		SetLibrary lib = new SetLibrary(List.of(mine));
+		ImportPlan waiting = ImportPlan.of(CURRENT, read, lib, SERVER, Map.of());
+		assertEquals(SetImportPlan.Status.NAME_CLASH, waiting.sets().statusById().get("set-farm"));
+		assertEquals("Choose a new name for the Sound Set \"Farm animals\" to import it.", waiting.problem().text(EN));
+		assertEquals(CURRENT, waiting.result(), "nothing changes until the name is chosen");
+		assertEquals(lib, waiting.library());
+
+		ImportPlan plan = ImportPlan.of(CURRENT, read, lib, SERVER, waiting.sets().suggestedNames(lib));
+		assertNull(plan.problem());
 		String importedId = ids(plan.result().everywhere()).get(0);
 		assertEquals("Farm animals (imported)", plan.library().get(importedId).name());
-		assertEquals(mine, plan.library().get("set-farm"));
+		assertEquals(mine, plan.library().get("set-farm"), "the library set is unchanged");
 		assertEquals(1, plan.setsAdded());
-		assertEquals(SetImportPlan.Status.DIFFERENT, plan.sets().statusById().get("set-farm"));
+	}
+
+	@Test
+	void anExactMatchUnderAnotherIdCancelsAndNothingChanges() {
+		SoundSet same = new SoundSet("set-mine", "My farm", FARM.entries());
+		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
+				.withZones(List.of(bubble("b1")));
+		SetLibrary lib = new SetLibrary(List.of(same));
+		ImportPlan plan = ImportPlan.of(CURRENT, new ExportCodec.Read(file, List.of(FARM, RAIN), List.of()), lib, SERVER, Map.of());
+		assertEquals("The import failed because \"My farm\" already has exactly these entries.", plan.problem().text(EN));
+		assertEquals(CURRENT, plan.result());
+		assertEquals(lib, plan.library());
+		assertEquals(0, plan.setsAdded());
+	}
+
+	@Test
+	void ownExportIntoAnotherWorldLinksTheSets() {
+		// The export of another world on this computer: its sets are the library's own, so they are attached, not copied.
+		SetLibrary lib = new SetLibrary(List.of(FARM, RAIN));
+		Profile other = Profile.empty("Other world").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
+				.withZones(List.of(bubble("b1").withSets(PlaceSets.EMPTY.attach("set-rain"))));
+		ExportCodec.Read read = parse(ExportCodec.toJson(other, "world:other", lib));
+		ImportPlan plan = ImportPlan.of(CURRENT, read, lib, SERVER, Map.of());
+		assertNull(plan.problem());
+		assertEquals(Map.of("set-farm", SetImportPlan.Status.SAME, "set-rain", SetImportPlan.Status.SAME), plan.sets().statusById());
+		assertEquals(lib, plan.library(), "nothing is duplicated");
+		assertEquals(0, plan.setsAdded());
+		assertEquals(List.of("set-farm"), ids(plan.result().everywhere()));
+		assertEquals(List.of("set-rain"), ids(plan.result().zone("b1").sets()));
+	}
+
+	@Test
+	void aSetUsedOnlyByASkippedFixedZoneIsNotComparedOrAdded() {
+		// RAIN is attached only by another server's fixed zone, and the library has exactly its entries under another ID:
+		// that would cancel the import, but the zone is skipped, so RAIN plays no part. The dialog counts only FARM.
+		SetLibrary lib = new SetLibrary(List.of(new SoundSet("set-wet", "Wet", RAIN.entries())));
+		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
+				.withZones(List.of(fixedOn("theirs", "other.net").withSets(PlaceSets.EMPTY.attach("set-rain"))));
+		ImportPlan plan = ImportPlan.of(CURRENT, new ExportCodec.Read(file, List.of(FARM, RAIN), List.of()), lib, SERVER, Map.of());
+		assertNull(plan.problem());
+		assertEquals(Map.of("set-farm", SetImportPlan.Status.NEW), plan.sets().statusById());
+		assertEquals(1, plan.setsAdded(), "\"1 Sound Set will be added\" counts FARM only");
+		assertTrue(plan.library().contains("set-farm"));
+		assertFalse(plan.library().contains("set-rain"));
+		assertEquals(1, plan.fixedSkipped());
+	}
+
+	private static ExportCodec.Read parse(String json) {
+		try {
+			return ExportCodec.read(json);
+		} catch (ProfileFormatException e) {
+			throw new AssertionError(e);
+		}
 	}
 
 	@Test

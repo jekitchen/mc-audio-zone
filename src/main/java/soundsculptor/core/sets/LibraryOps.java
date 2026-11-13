@@ -145,7 +145,8 @@ public final class LibraryOps {
 		return new Workspace(profile, ws.library().remove(setId));
 	}
 
-	private static Message nameProblem(String name) {
+	/** Why a set name cannot be used (empty, or longer than {@link SoundSet#MAX_NAME_LENGTH}), or null. */
+	static Message nameProblem(String name) {
 		Message problem = ProfileOps.nameProblem(name);
 		if (problem == null && name.strip().length() > SoundSet.MAX_NAME_LENGTH) {
 			// The set file limits characters, not code points.

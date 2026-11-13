@@ -113,7 +113,7 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> editor(mc).draft().entry("e1").volume()) == 60, "the draft has 60%");
 			check(context.computeOnClient(mc -> ProfileManager.library().get(farm.id()).entry("e1").volume()) == 40,
 					"the library is unchanged until Save");
-			check(context.computeOnClient(mc -> editor(mc).entryList.findRow("e1").columnTexts().get(1)).equals("▶ Volume 60%"),
+			check(context.computeOnClient(mc -> editor(mc).entryList.findRow("e1").columnTexts().get(1)).equals("▶ Level 60%"),
 					"the row shows the new level");
 
 			// Save: the set is used in three places, so the confirmation lists them.
@@ -198,11 +198,11 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(EntryEditorScreen.class);
 			String overridden = context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).overriddenText().getString());
 			check(overridden.equals("Partly overridden by: " + COW), "the group entry is overridden by the cow entry, was " + overridden);
-			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).getTitle().getString()).equals("Edit rule"), "the title");
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).getTitle().getString()).equals("Edit entry"), "the title");
 			context.takeScreenshot("set-editor-overridden");
 			// The unchanged value is just "Unchanged": the inherited value is no longer shown.
 			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).volumeSlider.getMessage().getString())
-					.equals("Volume: Unchanged"), "an unset level reads Unchanged");
+					.equals("Level: Unchanged"), "an unset level reads Unchanged");
 			context.runOnClient(mc -> mc.gui.screen().onClose());
 			context.waitForScreen(SetEditorScreen.class);
 
@@ -273,7 +273,7 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(SetEditorScreen.class);
 			context.runOnClient(mc -> editor(mc).addButton.onPress(null));
 			context.waitForScreen(EntryEditorScreen.class);
-			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).getTitle().getString()).equals("New rule"), "a new entry");
+			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).getTitle().getString()).equals("New entry"), "a new entry");
 			context.getInput().typeChars("*:ENTITY.COW.*");
 			context.waitTicks(1);
 			check(context.computeOnClient(mc -> entryEditor(mc).patternField.getValue()).equals("*:entity.cow.*"), "uppercase becomes lowercase");

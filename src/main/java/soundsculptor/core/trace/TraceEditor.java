@@ -48,7 +48,7 @@ public final class TraceEditor {
 			SoundSet quick = place.quickChanges();
 			SetEntry old = quick == null ? null : quick.entry(where.entryId());
 			if (old == null) {
-				return refused(ctx, ws, TraceEditError.RULE_NOT_FOUND.message());
+				return refused(ctx, ws, TraceEditError.ENTRY_NOT_FOUND.message());
 			}
 			// An edit that sets a value must take effect, as a quick action's does: it turns the entry on, and the place's
 			// Quick changes too if the player switched it off (FR-8.6). Clearing a value or turning the entry off does not.
@@ -67,7 +67,7 @@ public final class TraceEditor {
 		SoundSet set = ws.library().get(where.setId());
 		SetEntry old = set == null ? null : set.entry(where.entryId());
 		if (old == null) {
-			return refused(ctx, ws, TraceEditError.RULE_NOT_FOUND.message());
+			return refused(ctx, ws, TraceEditError.ENTRY_NOT_FOUND.message());
 		}
 		SetEntry changed = edit.apply(old);
 		if (changed.equals(old)) {

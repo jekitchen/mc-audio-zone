@@ -140,8 +140,9 @@ public final class EntryEditorScreen extends SculptScreen {
 	}
 
 	/**
-	 * "Open full editor" on a Quick changes line of the trace (FR-14.4): the entry, saved straight into the place's
-	 * Quick changes. {@code null} if the place no longer has that entry.
+	 * An entry of the place's Quick changes, saved straight back into it: {@link #forSound} uses it when the sound
+	 * already has its single-sound entry there. (The trace's "Open full editor" on a Quick changes line opens the place's
+	 * Quick changes in the set editor instead, at that entry.) {@code null} if the place no longer has that entry.
 	 */
 	public static EntryEditorScreen forQuickEntry(Screen parent, PlaceRef where, String entryId) {
 		SetDraft quick = SetEditorScreen.quickDraft(where);

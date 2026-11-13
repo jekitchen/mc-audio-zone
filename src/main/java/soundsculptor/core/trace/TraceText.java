@@ -21,7 +21,7 @@ import soundsculptor.core.zones.Zone;
  * indentation are added here.
  *
  * <p>{@link #lines} gives the same text line by line, each with what it is about, so the panel can put inline edit
- * controls on entry, zone and "no entry" lines (FR-14.4).
+ * controls on the Everywhere heading and on set, entry, zone and "no entry" lines (FR-14.4).
  */
 public final class TraceText {
 	public static final String HEADER = "soundsculptor.trace.text.header";
@@ -65,8 +65,22 @@ public final class TraceText {
 	public sealed interface Target {
 	}
 
+	/**
+	 * A set with a matching entry, at the place it is listed under (Quick changes first): the panel puts "Open full
+	 * editor" on it and, for a library set, lists the places that use it (FR-14.4).
+	 */
+	public record SetTarget(PlaceRef place, SetLine set) implements Target {
+	}
+
 	/** A matched entry, in the set and at the place it is listed under. */
 	public record EntryTarget(EntryLocation where, SetEntry entry) implements Target {
+	}
+
+	/**
+	 * The Everywhere heading: like a zone's line for its zone, where Add to Quick changes goes when a set there matches
+	 * but Everywhere's Quick changes does not (FR-4.10).
+	 */
+	public record PlaceTarget(PlaceRef place) implements Target {
 	}
 
 	/** A zone that contains the sound. */
@@ -96,7 +110,7 @@ public final class TraceText {
 			line(out, 1, tr.translate(notice.translationKey()));
 		}
 
-		line(out, 0, tr.translate(EVERYWHERE));
+		line(out, 0, tr.translate(EVERYWHERE), new PlaceTarget(PlaceRef.EVERYWHERE));
 		place(out, 1, trace.everywhere(), PlaceRef.EVERYWHERE, tr);
 
 		line(out, 0, tr.translate(ZONES));
@@ -141,7 +155,7 @@ public final class TraceText {
 		}
 		for (SetLine set : trace.sets()) {
 			String name = setName(set, tr);
-			line(out, level, set.placesUsing() > 1 ? tr.translate(USED_IN, name, set.placesUsing()) : name);
+			line(out, level, set.placesUsing() > 1 ? tr.translate(USED_IN, name, set.placesUsing()) : name, new SetTarget(place, set));
 			for (SetEntry entry : set.matched()) {
 				EntryLocation where = new EntryLocation(place, set.setId(), entry.id());
 				line(out, level + 1, tr.translate(ENTRY, entry.pattern().text(), EntrySummary.text(entry, tr)), new EntryTarget(where, entry));

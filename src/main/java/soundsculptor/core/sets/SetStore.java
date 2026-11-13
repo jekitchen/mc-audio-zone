@@ -195,7 +195,12 @@ public final class SetStore {
 
 	/** Saves atomically, keeping the previous file as {@code .bak}. */
 	public void save(SoundSet set) throws IOException {
-		AtomicFiles.write(fileFor(set.id()), SetCodec.toJson(set));
+		save(set, true);
+	}
+
+	/** Like {@link #save(SoundSet)}; see {@link AtomicFiles#write(Path, String, boolean)} for {@code waitOutLock}. */
+	public void save(SoundSet set, boolean waitOutLock) throws IOException {
+		AtomicFiles.write(fileFor(set.id()), SetCodec.toJson(set), waitOutLock);
 	}
 
 	/**

@@ -15,6 +15,7 @@ import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptScreen;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Files;
@@ -30,7 +31,9 @@ import net.minecraft.client.input.KeyEvent;
  * Undo toasts (PRD FR-12.5, M16): quick actions in lists save at once and show a 5-second toast with Undo. Covers
  * Mute/Unmute on Search rows (with the Cue default, FR-7.6), On/Off, Move and Delete on the Rules and Zones tabs,
  * Undo by keyboard (Enter on the focused button, and Ctrl+Z), the toast staying while Undo has focus, and Undo being
- * refused once something else changed the profile.
+ * refused once something else changed the profile. For library Sound Sets: Undo of a set edit, of a set added or
+ * removed, of deleting a set attached to two zones (both attachments come back in place, FR-4.11), and Undo refused
+ * once the library changed some other way.
  */
 public final class UndoClientGameTest implements FabricClientGameTest {
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
@@ -191,12 +194,86 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 				ProfileManager.flushSaves();
 			});
 
+			deleteSetUsedByTwoZonesThenUndo(context, key);
+			staleLibraryUndoIsRefused(context);
+
 			context.setScreen(() -> null);
 			context.runOnClient(mc -> {
 				ProfileManager.update(p -> Profile.empty(p.name()));
 				ProfileManager.flushSaves();
 			});
 		}
+	}
+
+	/**
+	 * FR-4.11 with Undo: Delete (through the warning) removes a set attached to two zones from the library and both zones;
+	 * Undo puts it back in the library, its file and both zones, in the same position in each list and with the same
+	 * On/Off.
+	 */
+	private static void deleteSetUsedByTwoZonesThenUndo(ClientGameTestContext context, String key) {
+		SoundSet shared = new SoundSet("undo-shared", "Shared chickens", List.of(SetEntry.of("e1", "minecraft:entity.chicken.*").withVolume(50)));
+		PlaceSets inBarn = PlaceSets.EMPTY.attach(COWS.id()).attach(shared.id()).attach(PIGS.id());
+		PlaceSets inCoop = PlaceSets.EMPTY.attach(shared.id()).attach(COWS.id()).setEnabled(shared.id(), false);
+		context.runOnClient(mc -> {
+			ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name()).withZones(List.of(
+					new Zone("barn", "Barn", true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), inBarn),
+					new Zone("coop", "Coop", true, key, "minecraft:overworld", new Point(20, -60, 0), new Shape.Sphere(8), inCoop))),
+					ws.library().put(COWS).put(PIGS).put(shared)));
+			ProfileManager.flushSaves();
+			main(mc).selectTab(SoundSculptorScreen.TAB_SETS);
+			main(mc).setsPanel().confirmDelete(shared.id());
+		});
+		context.waitForScreen(SculptDialog.class);
+		String warning = context.computeOnClient(mc -> ((SculptDialog) mc.gui.screen()).message().getString());
+		check(warning.contains("Used here in: Barn, Coop"), "the warning names both zones, was " + warning);
+		context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
+		context.waitForScreen(SoundSculptorScreen.class);
+		check(context.computeOnClient(mc -> !ProfileManager.library().contains(shared.id())
+				&& !ProfileManager.profile().zone("barn").sets().uses(shared.id()) && !ProfileManager.profile().zone("coop").sets().uses(shared.id())),
+				"Delete removes the set from the library and both zones");
+		check(toastText(context).equals("Deleted 'Shared chickens'"), "the delete toast, was " + toastText(context));
+		context.runOnClient(mc -> ProfileManager.flushSaves());
+		check(!context.computeOnClient(mc -> Files.exists(ProfileManager.setStore().fileFor(shared.id()))), "the deleted set's file is gone");
+
+		context.runOnClient(mc -> main(mc).pressUndo());
+		check(toastText(context).equals("Undone"), "Undo confirms, was " + toastText(context));
+		check(context.computeOnClient(mc -> shared.equals(ProfileManager.library().get(shared.id()))), "Undo brings the set back unchanged");
+		check(context.computeOnClient(mc -> ProfileManager.profile().zone("barn").sets()).equals(inBarn),
+				"the Barn has it back between Quiet cows and Pigs muted");
+		check(context.computeOnClient(mc -> ProfileManager.profile().zone("coop").sets()).equals(inCoop),
+				"the Coop has it back first, still off");
+		check(context.computeOnClient(mc -> main(mc).setsPanel().list.findRow(shared.id())) != null, "the set is listed again");
+		context.runOnClient(mc -> ProfileManager.flushSaves());
+		check(context.computeOnClient(mc -> Files.exists(ProfileManager.setStore().fileFor(shared.id()))), "Undo writes the set's file again");
+
+		context.runOnClient(mc -> {
+			ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name()),
+					ws.library().remove(COWS.id()).remove(PIGS.id()).remove(shared.id())));
+			ProfileManager.flushSaves();
+		});
+	}
+
+	/**
+	 * Undo of a library change is refused once the library changed some other way since (here, another set edited from
+	 * its editor in the meantime): it says it can't undo and nothing changes, so neither edit is lost.
+	 */
+	private static void staleLibraryUndoIsRefused(ClientGameTestContext context) {
+		context.runOnClient(mc -> {
+			ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(ws.profile(), ws.library().put(COWS).put(PIGS)));
+			main(mc).selectTab(SoundSculptorScreen.TAB_SETS);
+			main(mc).setsPanel().delete(COWS.id());
+		});
+		check(toastText(context).equals("Deleted 'Quiet cows'"), "the delete toast, was " + toastText(context));
+		SoundSet louderPigs = PIGS.putEntry(PIGS.entry("e1").withMute(null).withVolume(70));
+		context.runOnClient(mc -> ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(ws.profile(), ws.library().put(louderPigs))));
+		context.runOnClient(mc -> main(mc).pressUndo());
+		check(toastText(context).startsWith("Can't undo"), "a stale library Undo says it can't undo, was " + toastText(context));
+		check(context.computeOnClient(mc -> !ProfileManager.library().contains(COWS.id())), "the refused Undo does not bring the deleted set back");
+		check(context.computeOnClient(mc -> louderPigs.equals(ProfileManager.library().get(PIGS.id()))), "the later edit is kept");
+		context.runOnClient(mc -> {
+			ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(ws.profile(), ws.library().remove(PIGS.id())));
+			ProfileManager.flushSaves();
+		});
 	}
 
 	private static int setVolume(ClientGameTestContext context) {

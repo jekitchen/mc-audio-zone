@@ -7,24 +7,44 @@ Each release ships one jar per supported Minecraft version.
 
 ### Changes
 - **New name: Sound Sculptor** (was Audio Zone during development). Settings now live in `config/soundsculptor/`.
+- **Rules are now Sound Sets.** A Sound Set is a named list of entries, each for one sound or a group of sounds
+  (`minecraft:entity.villager.*`), that mutes them or sets their level. Your sets live in a library on the new
+  **Sound Sets** tab (New, Duplicate, Rename, Delete) and work in every world. Attach sets to **Everywhere** or to any
+  zone, as many as you like and in the order you choose: the higher set wins where two disagree, and inside a set the
+  more specific entry wins. A set attached in several places is linked: edit it once and every place changes. The set
+  editor's **Attached to** panel shows and changes where a set is used, and Save says which places it will change.
+  Deleting a set lists every place it is removed from first, other worlds included (by name only).
+- **Quick changes:** Mute and Edit entry on Recently Played and Search go into the place's own **Quick changes**, a set
+  that belongs to Everywhere or to one zone and always comes first there. Save Quick changes to the library to reuse them.
+- **"Why does it sound like this?" in sets:** the trace lists, for Everywhere and each zone, the sets with a matching
+  entry, which entry won and why ("Higher in the list", "Exact sound ID"), and how many places use a linked set.
+  **Add to Quick changes** is offered at every place whose Quick changes has no entry for the sound, so a mute from a
+  library set can be lifted in one place without changing the set.
+- **Profiles, export and import carry Sound Sets:** profile rows count Sound Sets and zones; Copy from copies the sets on
+  Everywhere; an export includes the sets it uses, and importing adds them to your library, asking for a new name
+  when one is taken. Profiles from earlier test builds can't be read and are set aside with a message.
+- Long lists of places in the delete warning and the Save confirmation scroll, so Delete and Save stay on screen.
+- A save that Windows holds back for a moment (a virus scanner or the search indexer reading the file) is retried, and
+  is written at the latest when the game closes.
 
 ### Features
-- **Profiles tab:** every server and world with a profile, with its name, address or world, rule and zone counts and
-  when you last joined. Copy another server's global rules, personal bubbles and settings into this world (fixed zones
-  are never copied), rename, reset or delete a profile. The profile of the world you are in can be reset but not
+- **Profiles tab:** every server and world with a profile, with its name, address or world, Sound Set and zone counts
+  and when you last joined. Copy another server's Sound Sets on Everywhere, personal bubbles and settings into this
+  world (fixed zones are never copied), rename, reset or delete a profile. The profile of the world you are in can be reset but not
   deleted. In singleplayer, "Give this copy its own profile" for a copied world.
 - **Export and import:** Export saves a profile, fixed zones included, to `config/soundsculptor/exports/`. Import a file by
   dropping it on the Profiles tab or from `config/soundsculptor/imports/`. Files are checked first, and a dialog says what
   will change; fixed zones made for another server are skipped. A broken or out-of-range file changes nothing.
-- **Undo:** Mute and Unmute on Recently Played and Search, and On/Off, Move and Delete on the Rules and Zones lists,
-  apply at once and show a 5-second toast with **Undo**. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd>
-  on Mac) or Tab to the button. The toast stays while Undo has focus. A new mute rule starts with the profile's Cue
+- **Undo:** Mute and Unmute on Recently Played and Search, On/Off, Move and Detach in a place's Sound Sets, New,
+  Duplicate, Rename and Delete on the Sound Sets tab, and On/Off and Delete on the Zones list apply at once and show a
+  5-second toast with **Undo**. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd>
+  on Mac) or Tab to the button. The toast stays while Undo has focus. A new mute entry starts with the profile's Cue
   default.
 - **Apply to:** Recently Played and Search have an "Apply to" selector: Everywhere, or a zone you are standing in. With a
-  zone chosen, Mute and Edit work on that zone's rule for the sound, so a zone rule can be made straight from a search.
-- **Edit from "Why?":** every rule line in the sound trace has On/Off, Mute and Volume, every zone line has On/Off,
-  and each opens its full editor. Where no rule matches, "Add rule" adds one for this exact sound, globally or in a
-  zone. Changes save at once, the trace updates straight away ("Predicted for next play") and a toast offers Undo.
+  zone chosen, Mute and Edit entry work on that zone's Quick changes, so a zone entry can be made straight from a search.
+- **Edit from "Why?":** every entry line in the sound trace has On/Off, Mute and Level, every zone line has On/Off,
+  and each opens its full editor. Editing an entry of a linked set changes every place that uses it, and says so.
+  Changes save at once, the trace updates straight away ("Predicted for next play") and a toast offers Undo.
 
 ## 0.1.0-alpha (unreleased)
 

@@ -3,6 +3,7 @@ package soundsculptor.core.sets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -104,8 +105,20 @@ public final class SetLibrary {
 	 * " (copy)"), and only then " (2)", " (3)" and so on after it. The result fits in {@link SoundSet#MAX_NAME_LENGTH}.
 	 */
 	public String uniqueName(String wanted, String exceptId, String firstSuffix) {
+		return uniqueName(wanted, exceptId, firstSuffix, Set.of());
+	}
+
+	/**
+	 * Like {@link #uniqueName(String, String, String)}, but the names in {@code alsoTaken} (ignoring case) clash too, for
+	 * names that are about to be added, such as the other sets of an import.
+	 */
+	public String uniqueName(String wanted, String exceptId, String firstSuffix, Collection<String> alsoTaken) {
+		Set<String> taken = new HashSet<>();
+		for (String name : alsoTaken) {
+			taken.add(key(name));
+		}
 		String candidate = firstSuffix.isEmpty() ? wanted : fit(wanted, firstSuffix) + firstSuffix;
-		for (int n = 2; clashes(candidate, exceptId); n++) {
+		for (int n = 2; clashes(candidate, exceptId) || taken.contains(key(candidate)); n++) {
 			String suffix = firstSuffix + " (" + n + ")";
 			candidate = fit(wanted, suffix) + suffix;
 		}

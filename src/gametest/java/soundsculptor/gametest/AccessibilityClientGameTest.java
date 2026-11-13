@@ -9,6 +9,7 @@ import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.trace.EntryLocation;
+import soundsculptor.core.trace.TraceText;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -21,12 +22,19 @@ import soundsculptor.mc.SetDeleteDialog;
 import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.SetLibraryPanel;
 import soundsculptor.mc.SetNameScreen;
+import soundsculptor.mc.SetRenameOnImportScreen;
+import soundsculptor.mc.ProfileTransfer;
+import soundsculptor.core.Message;
+import soundsculptor.core.sets.SetImportPlan;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
+import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptButton;
+import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -54,7 +62,11 @@ import net.minecraft.util.FormattedCharSequence;
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
  *   <li>A-4 narration: every control on the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
- *   including list row buttons, has a label to read.</li>
+ *   the sound trace (a shared set's line, which reads its places, and Add to Quick changes with its choice), the set
+ *   editor, the delete warning, the linked-save confirmation and the import dialogs, including list row buttons, has a
+ *   label to read.</li>
+ *   <li>Long place lists (FR-4.11): with a set used in {@value #MANY_ZONES} long-named zones, the delete warning and the
+ *   linked-save confirmation keep their buttons on screen and scroll, and every place is still listed and read.</li>
  *   <li>Pseudo-language (PRD 9.3): the same layout check with every Sound Sculptor text about 40% longer, reported.</li>
  * </ul>
  * Grayscale, Sodium, Iris, Sound Physics Remastered and servers stay manual checks.
@@ -66,9 +78,15 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final int BUTTON_PADDING = 8;
 	/** The fixture's second entry in Everywhere's Quick changes, as the trace lists it. */
 	private static final EntryLocation QUICK_R2 = new EntryLocation(PlaceRef.EVERYWHERE, SoundSet.QUICK_ID, "r2");
+	/** A sound SET matches: a shared set's line in the trace. */
+	private static final String COW = "minecraft:entity.cow.ambient";
+	/** A sound nothing on Everywhere matches: the trace's Add to Quick changes line. */
+	private static final String PIG = "minecraft:entity.pig.ambient";
 	/** A library set for the Sound Sets tab, its name screen and its delete warning. */
 	private static final SoundSet SET = new SoundSet("set-a11y", "Animals of the farm and the barn by the river",
 			List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
+	/** Zones using one set, for the long place lists of the delete warning and the linked-save confirmation. */
+	private static final int MANY_ZONES = 40;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -124,6 +142,29 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentTrace.isEmpty(), "controls without a label in the sound trace: " + silentTrace);
+			// FR-14.4: a shared set's line (SET on Everywhere and Trading hall) lists its places in its tooltip, and the
+			// narrator reads them with the line's button; a "No entry matches" line's Add to Quick changes and its choice.
+			List<String> silentSets = context.computeOnClient(mc -> {
+				TraceScreen trace = new TraceScreen(null, COW);
+				mc.gui.setScreen(trace);
+				SculptList.Row line = trace.setRow(PlaceRef.EVERYWHERE, SET.id());
+				check(line != null && line.tooltip() != null && line.tooltip().getString().startsWith("Used in Everywhere and Trading hall."),
+						"the shared set's line lists its places, was " + (line == null || line.tooltip() == null ? null : line.tooltip().getString()));
+				String read = NarrationCompat.collect(line.buttons().get(0)::updateNarration);
+				check(read.contains("Used in Everywhere and Trading hall"), "the narrator reads the places, was " + read);
+				List<String> silent = new ArrayList<>(silentControls(trace));
+				TraceScreen none = new TraceScreen(null, PIG);
+				mc.gui.setScreen(none);
+				silent.addAll(silentControls(none));
+				SculptList.Row add = none.row(new TraceText.NoEntryTarget(PlaceRef.EVERYWHERE));
+				check(add != null && add.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
+						"the no-match line has a labelled Add to Quick changes");
+				none.openAddToQuickChanges(PlaceRef.EVERYWHERE);
+				silent.addAll(silentControls(none));
+				check(none.getFocused() == none.addQuickMute, "the choice takes focus, so Tab, arrows and Enter work in it");
+				return silent;
+			});
+			check(silentSets.isEmpty(), "controls without a label in the sound trace's set and Add to Quick changes lines: " + silentSets);
 			// A-4 for the set editor, its Attach to… menu, the Quick changes editor and the entry editor.
 			List<String> silentEditors = context.computeOnClient(mc -> {
 				SetEditorScreen editor = SetEditorScreen.edit(null, SET.id());
@@ -154,6 +195,61 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentPlaces.isEmpty(), "controls without a label in the Sound Sets of a place: " + silentPlaces);
+			// A-4 for the import's rename screen (FR-11.5a).
+			List<String> silentImport = context.computeOnClient(mc -> {
+				SetRenameOnImportScreen rename = Screens.renameOnImport();
+				mc.gui.setScreen(rename);
+				return silentControls(rename);
+			});
+			check(silentImport.isEmpty(), "controls without a label in the import's rename screen: " + silentImport);
+			// A-4 for the delete warning, the linked-save confirmation and the import's exact-match dialog.
+			List<String> silentDialogs = context.computeOnClient(mc -> {
+				List<String> silent = new ArrayList<>();
+				for (Screens dialog : List.of(Screens.SET_DELETE, Screens.SET_SAVE_CONFIRM_MANY, Screens.IMPORT_EXACT_MATCH)) {
+					Screen opened = dialog.open(mc);
+					mc.gui.setScreen(opened);
+					silent.addAll(silentControls(opened));
+				}
+				return silent;
+			});
+			check(silentDialogs.isEmpty(), "controls without a label in the dialogs: " + silentDialogs);
+
+			// FR-4.11: a set used in 40 long-named zones. The delete warning lists every place; it scrolls so Delete and
+			// Cancel stay on screen; the wheel, Up/Down and Page Up/Down move it; the narrator reads every place.
+			context.runOnClient(mc -> {
+				SculptDialog dialog = (SculptDialog) Screens.SET_DELETE_MANY.open(mc);
+				mc.gui.setScreen(dialog);
+				String message = dialog.message().getString();
+				for (int i = 1; i <= MANY_ZONES; i++) {
+					check(message.contains(manyZoneName(i)), "the warning lists every place, missing " + manyZoneName(i));
+				}
+				check(dialog.isScrollable(), "40 places do not fit at " + dialog.width + "x" + dialog.height + ", so the warning scrolls");
+				for (SculptButton button : dialog.buttons()) {
+					check(button.getY() >= 0 && button.getBottom() <= dialog.height, "the buttons stay on screen: " + button.getMessage().getString());
+				}
+				check(dialog.firstVisibleLine() == 0, "it starts at the top");
+			});
+			context.getInput().pressKey(InputConstants.KEY_PAGEDOWN);
+			context.waitTicks(1);
+			context.runOnClient(mc -> {
+				SculptDialog dialog = (SculptDialog) mc.gui.screen();
+				int last = dialog.lineCount() - dialog.visibleLineCount();
+				check(dialog.firstVisibleLine() == Math.min(dialog.visibleLineCount(), last), "Page Down moves a screenful, at " + dialog.firstVisibleLine());
+				int at = dialog.firstVisibleLine();
+				dialog.mouseScrolled(dialog.width / 2.0, dialog.height / 2.0, 0, -1);
+				check(dialog.firstVisibleLine() == Math.min(last, at + 3), "the wheel scrolls down 3 lines, at " + dialog.firstVisibleLine());
+				dialog.scrollBy(1000);
+				check(dialog.firstVisibleLine() == last, "it scrolls to the last line and stops there");
+			});
+			context.getInput().pressKey(InputConstants.KEY_UP);
+			context.waitTicks(1);
+			context.runOnClient(mc -> {
+				SculptDialog dialog = (SculptDialog) mc.gui.screen();
+				check(dialog.firstVisibleLine() == dialog.lineCount() - dialog.visibleLineCount() - 1, "Up moves one line");
+				check(dialog.getNarrationMessage().getString().contains(manyZoneName(MANY_ZONES)), "the narrator reads every place");
+				check(dialog.getFocused() == dialog.buttons().get(1), "Cancel still has focus");
+			});
+			context.takeScreenshot("a11y-delete-many-places");
 			context.setScreen(() -> null);
 
 			// A-3: every screen at every window size and GUI scale.
@@ -229,10 +325,26 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		SET_DELETE(mc -> SetDeleteDialog.create(null, ProfileManager.profile(), new LibraryOps.DeletePlan(SET.id(), SET.name(),
 				List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("z1"), PlaceRef.zone("z2")), List.of("Hypixel Skyblock", "Creative test world")),
 				true, () -> { }), null),
+		SET_DELETE_MANY(mc -> SetDeleteDialog.create(null, manyZonesProfile(), new LibraryOps.DeletePlan(SET.id(), SET.name(),
+				manyPlaces(), List.of("Hypixel Skyblock", "Creative test world")), true, () -> { }), null),
+		SET_SAVE_CONFIRM_MANY(mc -> {
+			List<String> names = new ArrayList<>();
+			for (int i = 1; i <= MANY_ZONES; i++) {
+				names.add(manyZoneName(i));
+			}
+			return SetEditorScreen.linkedSaveDialog(null, SET.name(), SetEditorScreen.linkedMessage(names, 3, true), () -> { });
+		}, null),
 		ZONES(mc -> tab(SoundSculptorScreen.TAB_ZONES), null),
 		PROFILES(mc -> tab(SoundSculptorScreen.TAB_PROFILES), null),
 		PROFILE_RENAME(mc -> new soundsculptor.mc.ProfileRenameScreen(null, ProfileManager.key(), ProfileManager.profile()), null),
 		PROFILE_IMPORT(mc -> new soundsculptor.mc.ProfileImportScreen(null), null),
+		IMPORT_RENAME(mc -> renameOnImport(), null),
+		IMPORT_RENAME_TAKEN(mc -> renameOnImport(), s -> {
+			((SetRenameOnImportScreen) s).setName(SET.name());
+			return null;
+		}),
+		IMPORT_EXACT_MATCH(mc -> ProfileTransfer.exactMatchDialog(null, "Very long export file name-2026-11-13.json",
+				Message.of(SetImportPlan.EXACT_MATCH_PROBLEM, SET.name())), null),
 		SETTINGS_GENERAL(mc -> settings(SoundSculptorScreen.SettingsPage.GENERAL), null),
 		SETTINGS_ZONES(mc -> settings(SoundSculptorScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(SoundSculptorScreen.SettingsPage.DIAGNOSTICS), null),
@@ -261,6 +373,11 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		TRACE_VOLUME(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), s -> {
 			((TraceScreen) s).openVolume(QUICK_R2, QuickEntries.get(ProfileManager.profile(), "r2"));
 			return null;
+		}),
+		TRACE_SHARED_SET(mc -> new TraceScreen(null, COW), null),
+		TRACE_ADD_TO_QUICK(mc -> new TraceScreen(null, PIG), s -> {
+			((TraceScreen) s).openAddToQuickChanges(PlaceRef.EVERYWHERE);
+			return null;
 		});
 
 		final Function<Minecraft, Screen> opener;
@@ -273,6 +390,12 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 		Screen open(Minecraft mc) {
 			return opener.apply(mc);
+		}
+
+		/** The import's rename screen for SET, the first of two clashes, refusing SET's own name as the library would. */
+		static SetRenameOnImportScreen renameOnImport() {
+			return new SetRenameOnImportScreen(null, SET, 1, 2, SET.name() + " (imported)",
+					name -> name.strip().equalsIgnoreCase(SET.name()) ? Message.of(SetImportPlan.NAME_TAKEN) : null, name -> { });
 		}
 
 		private static Screen tab(int tab) {
@@ -335,7 +458,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Controls with nothing to read: an empty label, including list row buttons. */
-	private static List<String> silentControls(SculptScreen screen) {
+	private static List<String> silentControls(Screen screen) {
 		List<String> silent = new ArrayList<>();
 		for (GuiEventListener child : screen.children()) {
 			if (child instanceof SculptList list) {
@@ -393,6 +516,29 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 	private static Zone attached(Zone zone, String setId) {
 		return zone.withSets(zone.sets().attach(setId));
+	}
+
+	/** A long zone name, like a player's own ("Automatic sugar cane farm by the north river, row 12"). */
+	private static String manyZoneName(int i) {
+		return "Automatic sugar cane farm by the north river, row " + i;
+	}
+
+	/** Everywhere and {@value #MANY_ZONES} long-named zones, all using SET. */
+	private static List<PlaceRef> manyPlaces() {
+		List<PlaceRef> places = new ArrayList<>(List.of(PlaceRef.EVERYWHERE));
+		for (int i = 1; i <= MANY_ZONES; i++) {
+			places.add(PlaceRef.zone("many-" + i));
+		}
+		return places;
+	}
+
+	/** A profile whose zones carry the names {@link #manyPlaces} are shown with. */
+	private static Profile manyZonesProfile() {
+		List<Zone> zones = new ArrayList<>();
+		for (int i = 1; i <= MANY_ZONES; i++) {
+			zones.add(attached(zone("many-" + i, manyZoneName(i), ProfileManager.key()), SET.id()));
+		}
+		return Profile.empty("Many zones").withZones(zones);
 	}
 
 	/** Every Sound Sculptor text through {@link PseudoLocale#pseudo}; everything else unchanged. */

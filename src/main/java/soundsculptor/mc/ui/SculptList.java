@@ -11,6 +11,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.narration.NarratedElementType;
@@ -129,6 +130,15 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 
 	// ---- Focus and keys ----
 
+	/**
+	 * Scrolls {@code row} into view and gives the path to its button {@code buttonIndex}, for
+	 * {@link SculptScreen#focusPath}: e.g. an editor that opens at one of its rows.
+	 */
+	public ComponentPath revealRow(Row row, int buttonIndex) {
+		scrollToEntry(row);
+		return pathTo(row, buttonIndex);
+	}
+
 	/** Moves keyboard focus to the row's first button (or its focus target), e.g. when the list opens in an overlay. */
 	public void focusRow(Row row) {
 		if (Minecraft.getInstance().gui.screen() instanceof SculptScreen screen) {
@@ -227,6 +237,8 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 		private final RowFocus focusTarget;
 		/** Color square at the start of the row (e.g. a zone's color), as 0xRRGGBB; -1 for none. */
 		private int swatch = -1;
+		/** Shown when the mouse is over the row's text, or {@code null}. */
+		private Component tooltip;
 
 		public Row(Object key, List<Column> columns, List<SculptButton> buttons) {
 			this.key = key;
@@ -253,6 +265,19 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 
 		public int swatch() {
 			return swatch;
+		}
+
+		/**
+		 * A tooltip for the row's text, shown on hover (a cut-off column's full text takes precedence). Keyboard and
+		 * narrator users need the same text on one of the row's buttons, e.g. as that button's tooltip.
+		 */
+		public Row tooltip(Component text) {
+			this.tooltip = text;
+			return this;
+		}
+
+		public Component tooltip() {
+			return tooltip;
 		}
 
 		public List<SculptButton> buttons() {
@@ -338,6 +363,7 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 			}
 			int textRight = x + width - buttonsWidth - Theme.GAP;
 			boolean twoLines = columns.stream().anyMatch(column -> column.line() == 1);
+			boolean cutShown = false;
 			for (int line = 0; line <= 1; line++) {
 				int fixed = 0;
 				for (Column column : columns) {
@@ -361,9 +387,13 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 					if (cut && hovered && mouseX >= cx && mouseX < cx + columnWidth
 							&& mouseY >= textY && mouseY < textY + font.lineHeight) {
 						Draw.tooltip(g, font, Component.literal(text), mouseX, mouseY);
+						cutShown = true;
 					}
 					cx += columnWidth + Theme.GAP;
 				}
+			}
+			if (tooltip != null && !cutShown && hovered && mouseX >= textLeft && mouseX < textRight) {
+				g.setTooltipForNextFrame(font, Tooltip.splitTooltip(Minecraft.getInstance(), tooltip), mouseX, mouseY);
 			}
 		}
 

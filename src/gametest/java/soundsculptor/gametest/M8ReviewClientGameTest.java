@@ -53,7 +53,7 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			check(wildcard.get(1).equals("✖ Muted") && wildcard.get(2).startsWith("Matches ") && wildcard.get(2).endsWith(" sounds"),
 					"a group mute row should show ✖ Muted and its match count, was " + wildcard);
 			List<String> exact = rowTexts(context, "r2");
-			check(exact.get(1).equals("▶ Volume 30%") && exact.get(2).equals(AMBIENT), "a single-sound entry has no count, was " + exact);
+			check(exact.get(1).equals("▶ Level 30%") && exact.get(2).equals(AMBIENT), "a single-sound entry has no count, was " + exact);
 			List<String> typo = rowTexts(context, "r3");
 			check(typo.get(2).equals("⚠ No known sound matches"), "a pattern matching nothing is flagged, was " + typo);
 			context.takeScreenshot("m8-review-entries");
@@ -64,7 +64,7 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("minecraft:entity.villager.celebrate");
 			context.waitTicks(1);
-			check(editor(context).equals(List.of("Mute: Unchanged", "Volume: Unchanged")),
+			check(editor(context).equals(List.of("Mute: Unchanged", "Level: Unchanged")),
 					"unset values should read Unchanged, was " + editor(context));
 			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.EntryDraft.Field.VOLUME)).isEmpty(),
 					"showing the current value must not set a volume");
@@ -72,7 +72,7 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 			// A wildcard pattern shows the plain default.
 			context.runOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).patternField.setValue("*:block.*.step"));
 			context.waitTicks(1);
-			check(editor(context).equals(List.of("Mute: Unchanged", "Volume: Unchanged")),
+			check(editor(context).equals(List.of("Mute: Unchanged", "Level: Unchanged")),
 					"a wildcard reads Unchanged too, was " + editor(context));
 			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).draft().text(soundsculptor.core.editor.EntryDraft.Field.VOLUME)).isEmpty(),
 					"changing the pattern must not set a volume");

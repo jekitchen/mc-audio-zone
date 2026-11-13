@@ -62,7 +62,7 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			});
 			context.waitForScreen(TraceScreen.class);
 			String trace = context.computeOnClient(mc -> trace(mc).text());
-			check(trace.contains("Everywhere\n  Quick changes\n    minecraft:entity.villager.ambient: Volume 60%\n      Decides loudness (Exact sound ID)\n"),
+			check(trace.contains("Everywhere\n  Quick changes\n    minecraft:entity.villager.ambient: Level 60%\n      Decides loudness (Exact sound ID)\n"),
 					"the single-sound entry should win:\n" + trace);
 			check(trace.contains("    *:*villager*: Muted\n      loudness overridden by Quick changes: minecraft:entity.villager.ambient\n"),
 					"the wildcard should be shown as overridden:\n" + trace);

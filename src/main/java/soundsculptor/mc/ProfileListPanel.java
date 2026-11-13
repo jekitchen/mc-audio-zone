@@ -20,7 +20,7 @@ import net.minecraft.resources.Identifier;
 
 /**
  * The Profiles tab (PRD FR-11.2, FR-11.3): every server and world with a profile, with its display name, world key,
- * rule and zone counts and last joined date. Actions: Copy (into this world's profile), Rename, Reset and Delete; the
+ * Sound Set and zone counts and last joined date. Actions: Copy (into this world's profile), Rename, Reset and Delete; the
  * profile of the world you are in can be reset but not deleted. In a singleplayer world, "Give this copy its own
  * profile" (FR-11.1). Export on every row and Import for this world (FR-11.4, FR-11.5; files can also be dropped on
  * the tab). Works outside a world too (from Mod Menu), without Copy and Import.
@@ -115,7 +115,7 @@ public final class ProfileListPanel {
 				? Component.translatable("soundsculptor.profiles.never_joined").getString()
 				: Component.translatable("soundsculptor.profiles.joined",
 						LocalDate.ofInstant(summary.lastJoined(), ZoneId.systemDefault()).toString()).getString();
-		String counts = Component.translatable("soundsculptor.profiles.counts", summary.ruleCount(), summary.zoneCount()).getString();
+		String counts = Component.translatable("soundsculptor.profiles.counts", summary.setCount(), summary.zoneCount()).getString();
 		Component rowName = Component.literal(summary.displayName());
 		if (ProfileManager.isLoaded() && !summary.connected() && s.keyKnown()) {
 			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.profiles.copy"), COPY_WIDTH, () -> confirmCopy(s))
@@ -172,7 +172,7 @@ public final class ProfileListPanel {
 		}
 		setScreen(new SculptDialog(host,
 				Component.translatable("soundsculptor.profiles.copy.title", source.profile().name()),
-				Component.translatable("soundsculptor.profiles.copy.message", copy.setCount(), copy.bubbleCount(), copy.fixedKept()),
+				Component.translatable("soundsculptor.profiles.copy.message", setsOnEverywhere(copy.setCount()), bubbles(copy.bubbleCount())),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.copy.confirm"),
 						() -> confirmBoostThen(host, copy.needsBoostConfirm(ProfileManager.library()), () -> copy(source))),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
@@ -199,6 +199,21 @@ public final class ProfileListPanel {
 		host.showToast(Component.translatable("soundsculptor.profiles.copied", source.profile().name()), null);
 	}
 
+	/** "1 Sound Set on Everywhere" or "4 Sound Sets on Everywhere" (Copy from… and Import). */
+	static Component setsOnEverywhere(int count) {
+		return plural("soundsculptor.profiles.count.sets_everywhere", count);
+	}
+
+	/** "1 bubble zone" or "2 bubble zones" (Copy from… and Import). */
+	static Component bubbles(int count) {
+		return plural("soundsculptor.profiles.count.bubbles", count);
+	}
+
+	/** The text {@code key + ".one"} for 1, else {@code key} with the count. */
+	static Component plural(String key, int count) {
+		return count == 1 ? Component.translatable(key + ".one") : Component.translatable(key, count);
+	}
+
 	/**
 	 * Runs {@code then}, first asking the boost question (FR-5.4) if the change brings rules above 100% into a profile
 	 * that has not confirmed boost yet. Used by Copy from… and Import.
@@ -216,7 +231,7 @@ public final class ProfileListPanel {
 				1, 1));
 	}
 
-	// ---- Reset and delete (FR-11.3) ----
+	// ---- Reset and delete (FR-11.3); library Sound Sets are never deleted ----
 
 	public void confirmReset(ProfileManager.Stored s) {
 		setScreen(new SculptDialog(host,

@@ -1,8 +1,11 @@
 package soundsculptor.gametest;
 
+import com.sun.nio.file.ExtendedOpenOption;
 import java.io.IOException;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -22,7 +25,10 @@ import soundsculptor.mc.SetUsageIndex;
 
 /**
  * Where Sound Sets are used (FR-4.9, FR-4.11): the background index sees other worlds' profiles, the loaded profile
- * always comes from the live snapshot, and a set whose save keeps failing shows its toast once until a save works.
+ * always comes from the live snapshot, and a set whose save keeps failing shows its toast once until a save works. A
+ * profile whose save failed is kept and written by the next flush once the file is free, as at exit (PRD 9.2: no data
+ * loss); rejoining the world meanwhile keeps it instead of reading the older file; and on Windows, 40 changes to a held
+ * file cost about one wait, so the flush stays within its bound.
  */
 public final class SetUsageClientGameTest implements FabricClientGameTest {
 	private static final String OTHER = "other.example.net";
@@ -87,6 +93,66 @@ public final class SetUsageClientGameTest implements FabricClientGameTest {
 			check(toasts(context) == before + 2, "it toasts again after a save worked");
 
 			unblockFile(context, file);
+
+			// A profile whose save fails is not lost: the latest one is written by the next flush (as when the game exits)
+			// once the file is free. It toasts once, like a set.
+			Path profileFile = context.computeOnClient(mc -> ProfileManager.store().fileFor(key));
+			String name = context.computeOnClient(mc -> ProfileManager.profile().name());
+			blockFile(context, profileFile);
+			int beforeProfile = toasts(context);
+			context.runOnClient(mc -> {
+				ProfileManager.update(p -> p.withName("Usage renamed"));
+				ProfileManager.update(p -> p.withName("Usage renamed again"));
+				ProfileManager.flushSaves();
+			});
+			context.waitTicks(5);
+			check(toasts(context) == beforeProfile + 1, "a failing profile toasts once; was " + (toasts(context) - beforeProfile));
+			unblockFile(context, profileFile);
+			context.runOnClient(mc -> ProfileManager.flushSaves());
+			String saved = context.computeOnClient(mc -> read(profileFile));
+			check(saved.contains("\"Usage renamed again\""), "the flush writes the latest profile once the file is free:\n" + saved);
+
+			// Leaving and joining the world again while its save still fails keeps the newer profile: join uses it instead
+			// of the older file, and it is written once the file is free.
+			blockFile(context, profileFile);
+			String rejoined = context.computeOnClient(mc -> {
+				ProfileManager.update(p -> p.withName("Usage pending"));
+				ProfileManager.flushSaves();
+				ProfileManager.leave();
+				ProfileManager.join(key, "Usage fallback");
+				return ProfileManager.profile().name();
+			});
+			check(rejoined.equals("Usage pending"), "rejoining keeps the profile whose save failed, was " + rejoined);
+			check(context.computeOnClient(mc -> ProfileManager.storedProfile(key).name()).equals("Usage pending"),
+					"the Profiles tab shows it too");
+			unblockFile(context, profileFile);
+			context.runOnClient(mc -> ProfileManager.flushSaves());
+			String afterRejoin = context.computeOnClient(mc -> read(profileFile));
+			check(afterRejoin.contains("\"Usage pending\""), "the kept profile is written once the file is free:\n" + afterRejoin);
+
+			// Windows: a file held open (as a virus scanner does) while 40 changes queue up, e.g. a dragged level slider.
+			// Only the first save waits out the lock, so the flush finishes in time and the newest profile is written.
+			if (System.getProperty("os.name", "").startsWith("Windows")) {
+				long millis = context.computeOnClient(mc -> {
+					try (SeekableByteChannel held = Files.newByteChannel(profileFile, StandardOpenOption.READ, ExtendedOpenOption.NOSHARE_DELETE)) {
+						long start = System.nanoTime();
+						for (int step = 1; step <= 40; step++) {
+							int n = step;
+							ProfileManager.update(p -> p.withName("Usage step " + n));
+						}
+						check(ProfileManager.flushSaves(), "the flush finishes within its bound");
+						return (System.nanoTime() - start) / 1_000_000;
+					} catch (IOException e) {
+						throw new IllegalStateException(e);
+					}
+				});
+				check(millis < 3000, "40 changes to a held file and a flush should take about one wait (0.3 s), took " + millis + " ms");
+				context.runOnClient(mc -> ProfileManager.flushSaves());
+				String stepped = context.computeOnClient(mc -> read(profileFile));
+				check(stepped.contains("\"Usage step 40\""), "the newest profile is written once the file is free:\n" + stepped);
+			}
+			context.runOnClient(mc -> ProfileManager.update(p -> p.withName(name)));
+
 			context.runOnClient(mc -> {
 				ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().remove("usage-fail").remove(farm.id())));
 				ProfileManager.flushSaves();
@@ -111,6 +177,14 @@ public final class SetUsageClientGameTest implements FabricClientGameTest {
 				throw new IllegalStateException(e);
 			}
 		});
+	}
+
+	private static String read(Path file) {
+		try {
+			return Files.readString(file);
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	private static void unblockFile(ClientGameTestContext context, Path file) {
