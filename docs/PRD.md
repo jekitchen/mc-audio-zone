@@ -523,7 +523,7 @@ A player who is confused by what they hear can see every Sound Set entry and zon
 - [ ] In the trace for a villager sound, drag the winning entry's level from 50% to 20%: the final result updates at once, marked "Predicted for next play", and the next villager sound plays at 20%. Undo restores 50%.
 - [ ] An entry from a set attached to two zones says "used in 2 places" in the trace.
 - [ ] Copy trace pastes readable text into a text editor.
-- [ ] Diagnostics per-sound cost stays under 5 µs with the trace feature on (noisy-farm test).
+- [ ] Diagnostics per-sound cost stays within the 9.1 budgets with the trace feature on: under 5 µs with the typical profile and under 10 µs in the noisy-farm worst case.
 - [ ] Turn off the winning entry from the trace: the next entry in line becomes the winner in the panel immediately.
 - [ ] On a sound with no matching entry, use "Add to Quick changes" on Everywhere and set Mute: the sound is muted on its next play and Everywhere's Quick changes set has the new entry, listed first under Everywhere.
 - [ ] On a cow muted by a library set, press Unmute on Everywhere's Quick changes line: the next cow plays, the trace shows the Quick changes "Not muted" entry winning loudness, and the library set is unchanged.
@@ -876,7 +876,7 @@ Every test runs in game without reading code. Use a dedicated creative test worl
 1. Build a 9 × 9 pen with 40 villagers, 40 chickens and 20 cows, plus 8 hoppers on a fast redstone clock, and 4 iron golems. Aim for 300 or more sounds per second (diagnostics readout).
 2. Load the "stress" profile: Sound Sets on Everywhere with 50 entries (mix of single sounds and groups), 64 zones overlapping the pen (spheres, boxes, cylinders, some fade, some Outside), each with sets attached, some sets shared by several zones.
 3. Record FPS (F3) with Sound Sculptor bypassed, then active, then active with Recently Played open.
-4. **Pass:** average cost under 5 µs per sound; added frame time under 1 ms; FPS with list open within 5% of closed; no stutters visible in the F3 frame graph beyond those present when bypassed.
+4. **Pass:** average cost under 10 µs per sound in this worst case (under 5 µs with the typical profile, 9.1); added frame time under 1 ms; FPS with list open within 5% of closed; no stutters visible in the F3 frame graph beyond those present when bypassed.
 5. **Soak:** leave it running 30 minutes. **Pass:** no crash, memory readout stable (under 8 MB for Sound Sculptor data), no "AL error" lines in the log.
 
 ### 11.3 "Boost does not increase range" test
@@ -1126,3 +1126,4 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-13 | Sets on import (FR-11.5a): a file set whose entries exactly match a library set under another ID cancels the whole import with a message; a set with the same ID and the same entries is the player's own set and is attached; a name clash opens a rename dialog with "\<name> (imported)" filled in, which refuses a name already in use. Keep both, Use mine and Replace are dropped | Project owner |
 | 2026-11-13 | Sets on import, details settled while building M8c: only sets the imported places attach are compared and added; entries are compared by on/off, target and settings in order, not by entry ID; an empty set is never an exact match (FR-11.5a) | Builder's call |
 | 2026-11-13 | Set editor Save repeats the list of places (FR-4.9) only when the set's name or entries changed; a Save that only attaches or detaches applies without it, since no other place changes. While other worlds are still being counted, a changed set always asks | Builder's call |
+| 2026-11-13 | The noisy-farm stress test is the worst case of 9.1, so it is checked against 10 µs per sound; the typical profile stays under 5 µs. FR-14's criterion and step 4 of 11.2 now say so (they still said 5 µs from before the 2026-11-09 split). M8c measured 4.18 µs typical and 5.49 µs stress | Project owner |
