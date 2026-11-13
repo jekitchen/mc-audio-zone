@@ -8,6 +8,7 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundsPanel;
+import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.SetEditorScreen;
@@ -35,39 +36,7 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 
-			// Words in the pattern field: matching sounds, no pattern error, Save off until a sound is picked.
-			addEntry(context, PlaceRef.EVERYWHERE);
-			context.getInput().typeChars("villager hurt");
-			context.waitTicks(1);
-			check(editor(context, e -> e.searching() && !e.patternField.isErrorShown() && !e.saveButton.active),
-					"words should search, without a pattern error, and Save stays off");
-			List<String> row = editor(context, e -> e.matchList.findRow(HURT).columnTexts());
-			check(row.get(0).equals("Villager hurts") && row.get(1).equals(HURT), "the villager hurt sound should be listed by name, was " + row);
-			check(editor(context, e -> e.searchResults().stream().allMatch(s -> (s.subtitle() + " " + s.id()).toLowerCase().contains("hurt"))),
-					"every result should match the words");
-			context.takeScreenshot("find-sound-results");
-
-			// This sound: the exact ID; the editor then previews it as a pattern.
-			context.runOnClient(mc -> editorScreen(mc).matchList.findRow(HURT).buttons().get(0).onPress(null));
-			context.waitTicks(1);
-			check(editor(context, e -> e.patternField.getValue().equals(HURT) && !e.searching() && e.saveButton.active),
-					"This sound should fill in the exact ID and allow Save");
-			check(editor(context, e -> e.preview().count() == 1), "the exact ID matches 1 sound");
-
-			// Like this: the sound's families; the first is the closest (all cow sounds).
-			context.runOnClient(mc -> editorScreen(mc).patternField.setValue("cow"));
-			context.waitTicks(1);
-			String cow = "minecraft:entity.cow.ambient";
-			context.runOnClient(mc -> editorScreen(mc).matchList.findRow(cow).buttons().get(1).onPress(null));
-			context.waitTicks(1);
-			List<String> families = editor(context, e -> e.familyButtons().stream().map(b -> b.getMessage().getString()).toList());
-			check(!families.isEmpty() && families.get(0).startsWith("minecraft:entity.cow.* · "), "the closest family comes first, was " + families);
-			context.takeScreenshot("find-sound-families");
-			context.runOnClient(mc -> ((soundsculptor.mc.ui.SculptButton) editorScreen(mc).familyButtons().get(0)).onPress(null));
-			context.waitTicks(1);
-			check(editor(context, e -> e.patternField.getValue().equals("minecraft:entity.cow.*")), "picking a family fills in its pattern");
-			check(editor(context, e -> !e.preview().matches().isEmpty() && e.preview().matches().stream().allMatch(id -> id.startsWith("minecraft:entity.cow."))),
-					"the preview lists only cow sounds");
+			villagerHurtThisSoundAndCowLikeThis(context);
 			context.runOnClient(mc -> {
 				editorScreen(mc).setMute(EntryEditorScreen.MuteChoice.MUTE);
 				editorScreen(mc).save();
@@ -123,6 +92,49 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 				ProfileManager.flushSaves();
 			});
 		}
+	}
+
+	/** The FR-4.8 acceptance criterion: villager hurt, This sound; then Like this on a cow sound. Leaves the cow entry in the editor. */
+	private static void villagerHurtThisSoundAndCowLikeThis(ClientGameTestContext context) {
+		// Words in the pattern field: matching sounds, no pattern error, Save off until a sound is picked.
+		addEntry(context, PlaceRef.EVERYWHERE);
+		context.getInput().typeChars("villager hurt");
+		context.waitTicks(1);
+		check(editor(context, e -> e.searching() && !e.patternField.isErrorShown() && !e.saveButton.active),
+				"words should search, without a pattern error, and Save stays off");
+		List<String> row = editor(context, e -> e.matchList.findRow(HURT).columnTexts());
+		check(row.get(0).equals("Villager hurts") && row.get(1).equals(HURT), "the villager hurt sound should be listed by name, was " + row);
+		check(editor(context, e -> e.searchResults().stream().allMatch(s -> (s.subtitle() + " " + s.id()).toLowerCase().contains("hurt"))),
+				"every result should match the words");
+		check(editor(context, e -> e.matchList.findRow(HURT).buttons().stream()
+				.allMatch(b -> NarrationCompat.collect(b::updateNarration).contains("Villager hurts"))), "the buttons are narrated with the sound");
+		context.takeScreenshot("find-sound-results");
+
+		// This sound: the exact ID; the editor then previews it as a pattern.
+		context.runOnClient(mc -> editorScreen(mc).matchList.findRow(HURT).buttons().get(0).onPress(null));
+		context.waitTicks(1);
+		check(editor(context, e -> e.patternField.getValue().equals(HURT) && !e.searching() && e.saveButton.active),
+				"This sound should fill in the exact ID and allow Save");
+		check(editor(context, e -> e.preview().count() == 1), "the exact ID matches 1 sound");
+		check(editor(context, e -> e.previewLine().getString().equals("Matches 1 sound")), "the preview should say Matches 1 sound");
+		// FR-4.8 acceptance: villager hurt, This sound gives the exact ID; the buttons are narrated with the sound.
+
+		// Like this: the sound's families; the first is the closest (all cow sounds).
+		context.runOnClient(mc -> editorScreen(mc).patternField.setValue("cow"));
+		context.waitTicks(1);
+		String cow = "minecraft:entity.cow.ambient";
+		context.runOnClient(mc -> editorScreen(mc).matchList.findRow(cow).buttons().get(1).onPress(null));
+		context.waitTicks(1);
+		List<String> families = editor(context, e -> e.familyButtons().stream().map(b -> b.getMessage().getString()).toList());
+		check(!families.isEmpty() && families.get(0).startsWith("minecraft:entity.cow.* · "), "the closest family comes first, was " + families);
+		check(families.stream().allMatch(f -> f.matches(".* · \\d+ sounds?")), "every group shows its count, was " + families);
+		context.takeScreenshot("find-sound-families");
+		context.runOnClient(mc -> ((soundsculptor.mc.ui.SculptButton) editorScreen(mc).familyButtons().get(0)).onPress(null));
+		context.waitTicks(1);
+		check(editor(context, e -> e.patternField.getValue().equals("minecraft:entity.cow.*")), "picking a family fills in its pattern");
+		check(editor(context, e -> e.previewLine().getString().matches("Matches \\d+ sounds")), "the preview counts the group's sounds");
+		check(editor(context, e -> !e.preview().matches().isEmpty() && e.preview().matches().stream().allMatch(id -> id.startsWith("minecraft:entity.cow."))),
+				"the preview lists only cow sounds");
 	}
 
 	/** Opens the place's Quick changes in the set editor, then Type a pattern…: the entry editor for a new entry. */

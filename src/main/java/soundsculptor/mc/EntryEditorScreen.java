@@ -1,9 +1,8 @@
 package soundsculptor.mc;
 
 import soundsculptor.core.editor.FieldError;
+import soundsculptor.core.browser.LikeThis;
 import soundsculptor.core.editor.PatternPreview;
-import soundsculptor.core.editor.PatternSuggestions;
-import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.search.SearchQuery;
 import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundSearch;
@@ -307,6 +306,11 @@ public final class EntryEditorScreen extends SculptScreen {
 				});
 	}
 
+	/** The preview line under the field ("Matches N sounds" or the search summary), for tests. */
+	public Component previewLine() {
+		return previewText();
+	}
+
 	private Component previewText() {
 		if (searching()) {
 			String words = draft.text(Field.TARGET).strip();
@@ -444,10 +448,12 @@ public final class EntryEditorScreen extends SculptScreen {
 			String id = entry.id();
 			String name = entry.subtitle() == null ? id : entry.subtitle();
 			SculptButton exact = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.rule_editor.this_sound"), PICK_WIDTH,
-					() -> usePattern(id)), Component.translatable("soundsculptor.rule_editor.this_sound.tip"));
+					() -> usePattern(id)).narrationContext(() -> Component.literal(name)),
+					Component.translatable("soundsculptor.rule_editor.this_sound.tip"));
 			SculptButton[] like = new SculptButton[1];
 			like[0] = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.rule_editor.like_this"), PICK_WIDTH,
-					() -> showFamilies(id, like[0])), Component.translatable("soundsculptor.rule_editor.like_this.tip"));
+					() -> showFamilies(id, like[0])).narrationContext(() -> Component.literal(name)),
+					Component.translatable("soundsculptor.rule_editor.like_this.tip"));
 			rows.add(new SculptList.Row(id, List.of(new SculptList.Row.Column(() -> name, 0, 0), new SculptList.Row.Column(() -> id, 0, 1)),
 					List.of(exact, like[0])));
 		}
@@ -463,18 +469,12 @@ public final class EntryEditorScreen extends SculptScreen {
 
 	/** "Like this": the sound's families, closest first (FR-1.5 "Make pattern…"), each with how many sounds it matches. */
 	public void showFamilies(String soundId, AbstractWidget below) {
-		List<String> families = PatternSuggestions.suggest(soundId);
 		List<SculptButton> buttons = new ArrayList<>();
 		int width = 0;
-		for (String family : families) {
-			SoundPattern pattern = SoundPattern.of(family);
-			int count = 0;
-			for (String id : KnownSounds.ids()) {
-				if (pattern.matches(id)) {
-					count++;
-				}
-			}
-			Component label = Component.translatable("soundsculptor.rule_editor.family", family, count);
+		for (LikeThis.Group group : LikeThis.groups(soundId, KnownSounds.ids())) {
+			String family = group.pattern();
+			Component label = Component.translatable(group.count() == 1 ? "soundsculptor.rule_editor.family.one"
+					: "soundsculptor.rule_editor.family", family, group.count());
 			width = Math.max(width, font.width(label) + 16);
 			buttons.add(SculptButton.text(label, () -> usePattern(family)));
 		}

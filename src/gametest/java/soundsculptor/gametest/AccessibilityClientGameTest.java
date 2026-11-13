@@ -237,6 +237,45 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentEditors.isEmpty(), "controls without a label in the set and entry editors: " + silentEditors);
+			// FR-4.8: plain words in the entry editor list sounds with This sound and Like this; the Like this groups show
+			// their counts. Everything is narrated with the sound or group, keeps to the window, and takes focus.
+			List<String> findProblems = context.computeOnClient(mc -> {
+				List<String> problems = new ArrayList<>();
+				EntryEditorScreen entry = EntryEditorScreen.edit(null, SetDraft.of(SET), "e1");
+				mc.gui.setScreen(entry);
+				entry.patternField.setValue("cow");
+				if (!entry.searching() || entry.matchList.findRow(COW) == null) {
+					problems.add("the words should list " + COW);
+					return problems;
+				}
+				SculptList.Row row = entry.matchList.findRow(COW);
+				problems.addAll(silentControls(entry));
+				problems.addAll(check(mc, entry, "entry editor search results"));
+				for (SculptButton button : row.buttons()) {
+					String said = NarrationCompat.collect(button::updateNarration);
+					if (!said.contains("Cow") || !said.contains(button.getMessage().getString())) {
+						problems.add("the " + button.getMessage().getString() + " button is not narrated with the sound: " + said);
+					}
+				}
+				entry.showFamilies(COW, row.buttons().get(1));
+				if (entry.familyButtons().isEmpty()) {
+					problems.add("Like this should list groups");
+				}
+				for (AbstractWidget group : entry.familyButtons()) {
+					String said = NarrationCompat.collect(group::updateNarration);
+					if (!group.getMessage().getString().matches("minecraft:.* · \\d+ sounds?") || !said.contains(group.getMessage().getString())) {
+						problems.add("a group is not narrated with its pattern and count: " + said);
+					}
+					if (group.getX() < 0 || group.getY() < 0 || group.getRight() > entry.width || group.getBottom() > entry.height) {
+						problems.add("a Like this group is outside the window: " + describe(group));
+					}
+				}
+				if (!entry.familyButtons().isEmpty() && entry.getFocused() == null) {
+					problems.add("the Like this list should take focus, so Tab, arrows and Enter work");
+				}
+				return problems;
+			});
+			check(findProblems.isEmpty(), "finding a sound in the entry editor: " + findProblems);
 			// A-4 for a place's Sound Sets (FR-8.6) and Attach set….
 			List<String> silentPlaces = context.computeOnClient(mc -> {
 				List<String> silent = new ArrayList<>();

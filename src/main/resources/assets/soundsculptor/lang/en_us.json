@@ -495,6 +495,7 @@
 	"soundsculptor.rule_editor.like_this": "Like this",
 	"soundsculptor.rule_editor.like_this.tip": "Make the entry for a family of sounds like this one; choose how wide",
 	"soundsculptor.rule_editor.family": "%1$s · %2$s sounds",
+	"soundsculptor.rule_editor.family.one": "%1$s · 1 sound",
 	"soundsculptor.profiles.hint": "Each server and world has its own profile.",
 	"soundsculptor.profiles.list": "Profiles",
 	"soundsculptor.profiles.empty": "No profiles yet. Join a server or world to make one.",
