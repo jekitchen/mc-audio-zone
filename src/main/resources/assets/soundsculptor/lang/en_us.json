@@ -370,7 +370,6 @@
 	"soundsculptor.add_to_set.this_sound": "This sound",
 	"soundsculptor.add_to_set.matches": "Matches %s sounds",
 	"soundsculptor.add_to_set.matches.one": "Matches 1 sound",
-	"soundsculptor.add_to_set.in_set": "✔ In this set",
 	"soundsculptor.add_to_set.add": "Add",
 	"soundsculptor.add_to_set.add.tip": "Add an entry with no settings yet. Set its mute and level in the set editor.",
 	"soundsculptor.add_to_set.back": "Back",

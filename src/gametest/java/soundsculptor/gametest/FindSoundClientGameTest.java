@@ -117,7 +117,6 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 				"This sound should fill in the exact ID and allow Save");
 		check(editor(context, e -> e.preview().count() == 1), "the exact ID matches 1 sound");
 		check(editor(context, e -> e.previewLine().getString().equals("Matches 1 sound")), "the preview should say Matches 1 sound");
-		// FR-4.8 acceptance: villager hurt, This sound gives the exact ID; the buttons are narrated with the sound.
 
 		// Like this: the sound's families; the first is the closest (all cow sounds).
 		context.runOnClient(mc -> editorScreen(mc).patternField.setValue("cow"));

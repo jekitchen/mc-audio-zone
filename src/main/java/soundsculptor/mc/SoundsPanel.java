@@ -12,6 +12,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 import soundsculptor.core.browser.BrowserRow;
@@ -84,26 +85,22 @@ public final class SoundsPanel {
 
 	private static final int MAX_APPLY_TO_WIDTH = 200;
 	private static final int MIN_APPLY_TO_WIDTH = 120;
-	private static final int STATUS_WIDTH = 70;
-	private static final int CATEGORY_WIDTH = 95;
-	private static final int PLAYS_WIDTH = 75;
-	private static final int BAND_WIDTH = 60;
+	/** The most a recent row's "Zone: <name>" gets; a long zone name is cut, and gives way in a narrow row. */
 	private static final int ZONE_WIDTH = 110;
-	private static final int SEEN_WIDTH = 150;
+	/** The play count the plays column is measured for ("×999 · 59s ago"). */
+	private static final int PLAYS_MEASURED = 999;
 	private static final int HELP_WIDTH = 360;
-	/** Room around a toggle's or dropdown's text (the dropdown also draws its arrow). */
-	private static final int TEXT_PADDING = 12;
+	/** Room around a dropdown's text and its arrow. */
 	private static final int DROPDOWN_PADDING = 28;
 	private static final int HELP_LINES = 7;
-	/** Room for "✔ In this set" where a picker row's play status would be. */
-	private static final int IN_SET_WIDTH = 80;
-	private static final int LIKE_THIS_PADDING = 16;
 	private static final Identifier MUTE_ICON = icon("mute");
 	private static final Identifier VOLUME_ICON = icon("volume");
 	private static final Identifier LEVEL_ICON = icon("level");
 	private static final Identifier EDIT_ICON = icon("edit");
 	private static final Identifier ADD_ICON = icon("add");
 	private static final Identifier HELP_ICON = icon("help");
+	/** "✔ In this set", for what the set already has (FR-1.7); Add to set… uses the same text. */
+	static final Component IN_SET = Component.translatable("soundsculptor.picker.in_set");
 
 	/** The Sounds tab's remembered state; the picker has its own, so opening it changes nothing on the tab. */
 	private static final Remembered TAB_STATE = new Remembered();
@@ -163,8 +160,8 @@ public final class SoundsPanel {
 	/** The Like this… pop-up's sound and its groups (counted once when it opens). */
 	private String likeThisSound;
 	private List<LikeThis.Group> likeThisGroups = List.of();
-	/** The Like this… button's width, measured once per panel rather than for each of up to 2,000 rows. */
-	private int likeThisWidth;
+	/** The row columns' and Like this…'s widths, measured once per panel rather than for each of up to 2,000 rows. */
+	private Widths widths;
 	/** Built rows by sound ID; cleared when the workspace, Apply to or Show distance changes. */
 	private final Map<String, CachedRow> rowCache = new HashMap<>();
 
@@ -231,7 +228,7 @@ public final class SoundsPanel {
 
 	public void build(SculptScreen.Body body) {
 		Font font = Minecraft.getInstance().font;
-		recentToggle = Tooltips.describe(new SculptToggle(toggleWidth(font, "soundsculptor.sounds.recent_only"),
+		recentToggle = Tooltips.describe(new SculptToggle(SculptToggle.widthFor(Component.translatable("soundsculptor.sounds.recent_only")),
 				Component.translatable("soundsculptor.sounds.recent_only"), state.recentOnly, this::setRecentOnly),
 				Component.translatable("soundsculptor.sounds.recent_only.tip"));
 		helpButton = SculptButton.icon(HELP_ICON, Component.translatable("soundsculptor.sounds.help.show"), this::openHelp);
@@ -265,7 +262,7 @@ public final class SoundsPanel {
 
 	/** Apply to, Pause and Sort (the Sounds tab only). */
 	private void buildPlaceRow(SculptScreen.Body body, Font font) {
-		pauseToggle = Tooltips.describe(new SculptToggle(toggleWidth(font, "soundsculptor.sounds.pause"),
+		pauseToggle = Tooltips.describe(new SculptToggle(SculptToggle.widthFor(Component.translatable("soundsculptor.sounds.pause")),
 				Component.translatable("soundsculptor.sounds.pause"), state.paused, this::setPaused),
 				Component.translatable("soundsculptor.sounds.pause.tip"));
 		sortDropdown = Tooltips.describe(new SculptDropdown<>(sortWidth(font), Component.translatable("soundsculptor.sounds.sort"),
@@ -280,13 +277,6 @@ public final class SoundsPanel {
 		// Pause and Sort keep their place while hidden, so turning the filter on or off moves nothing else.
 		body.row(applyToDropdown, pauseToggle, sortDropdown);
 		showFilterControls();
-	}
-
-	private static int toggleWidth(Font font, String labelKey) {
-		Component label = Component.translatable(labelKey);
-		int on = font.width(Component.translatable("soundsculptor.ui.toggle", label, SculptToggle.stateText(true)));
-		int off = font.width(Component.translatable("soundsculptor.ui.toggle", label, SculptToggle.stateText(false)));
-		return Math.max(on, off) + TEXT_PADDING;
 	}
 
 	private static int sortWidth(Font font) {
@@ -506,19 +496,17 @@ public final class SoundsPanel {
 		String name = row.subtitle() == null ? SoundNames.readable(id) : row.subtitle();
 		boolean inSet = picker != null && picker.inSet(id);
 		// Picker mode (FR-1.7): a sound the set has says so where its status would be.
-		String mark = inSet ? Component.translatable("soundsculptor.picker.in_set").getString() : null;
+		String mark = inSet ? IN_SET.getString() : null;
+		Widths widths = widths();
 		List<SculptList.Row.Column> columns = new ArrayList<>();
 		columns.add(new SculptList.Row.Column(() -> name, 0, 0));
 		RecentRow recent = row.recent();
 		if (recent == null) {
-			// FR-3.2: "Seen as" when the sound played this session, outside the last 3 minutes.
-			String category = RecentLog.get().sounds().seenCategory(id);
-			String seen = mark != null ? mark : category == null ? "" : Component.translatable("soundsculptor.sounds.seen_as",
-					Component.translatable("soundCategory." + category)).getString();
-			columns.add(new SculptList.Row.Column(() -> seen, SEEN_WIDTH, 0));
+			String seen = mark != null ? mark : seenText(id);
+			columns.add(new SculptList.Row.Column(() -> seen, widths.seen(), 0));
 			columns.add(new SculptList.Row.Column(() -> id, 0, 1));
 		} else {
-			recentColumns(columns, recent, now, mark);
+			recentColumns(columns, recent, now, mark, widths);
 		}
 		if (picker != null) {
 			return new SculptList.Row(id, columns, pickButtons(id, inSet));
@@ -532,25 +520,89 @@ public final class SoundsPanel {
 	 * FR-1.2: subtitle, category and status (text plus an icon character, never color alone) on top; ID, the zone that
 	 * decided the latest play (FR-9), plays with time since the last, and the distance band (unless hidden) below.
 	 *
+	 * <p>The zone name may be long: its column is at most {@value #ZONE_WIDTH} px, cut with "…", and gives way in a
+	 * narrow row so the ID stays readable.
+	 *
 	 * @param mark shown instead of the status in picker mode ("In this set"), or {@code null}
 	 */
-	private static void recentColumns(List<SculptList.Row.Column> columns, RecentRow row, long now, String mark) {
-		String category = row.category() == null ? "?" : Component.translatable("soundCategory." + row.category()).getString();
-		String status = mark != null ? mark : Component.translatable("soundsculptor.sounds.status_line." + row.status().name().toLowerCase(Locale.ROOT),
-				Component.translatable(row.status().translationKey())).getString();
+	private static void recentColumns(List<SculptList.Row.Column> columns, RecentRow row, long now, String mark, Widths widths) {
+		String category = row.category() == null ? "?" : categoryName(row.category()).getString();
+		String status = mark != null ? mark : statusText(row.status()).getString();
 		String plays = Component.translatable("soundsculptor.sounds.plays", row.count(), ago(now - row.lastPlayedMs())).getString();
-		columns.add(new SculptList.Row.Column(() -> category, CATEGORY_WIDTH, 0));
-		columns.add(new SculptList.Row.Column(() -> status, mark != null ? IN_SET_WIDTH : STATUS_WIDTH, 0));
+		columns.add(new SculptList.Row.Column(() -> category, widths.category(), 0));
+		columns.add(new SculptList.Row.Column(() -> status, widths.status(), 0));
 		columns.add(new SculptList.Row.Column(row::id, 0, 1));
 		if (row.zoneName() != null) {
-			String zone = Component.translatable("soundsculptor.sounds.zone", row.zoneName()).getString();
-			columns.add(new SculptList.Row.Column(() -> zone, ZONE_WIDTH, 1));
+			Component zone = Component.translatable("soundsculptor.sounds.zone", row.zoneName());
+			String zoneText = zone.getString();
+			columns.add(new SculptList.Row.Column(() -> zoneText, Math.min(ZONE_WIDTH, SculptList.Row.Column.widthFor(zone)), 1, true));
 		}
-		columns.add(new SculptList.Row.Column(() -> plays, PLAYS_WIDTH, 1));
+		columns.add(new SculptList.Row.Column(() -> plays, widths.plays(), 1));
 		if (SoundSculptorSettings.showDistance()) {
 			String band = Component.translatable(row.band().translationKey()).getString();
-			columns.add(new SculptList.Row.Column(() -> band, BAND_WIDTH, 1));
+			columns.add(new SculptList.Row.Column(() -> band, widths.band(), 1));
 		}
+	}
+
+	/** FR-3.2: "Seen as: Friendly Creatures" when the sound played this session outside the last 3 minutes, else "". */
+	private static String seenText(String soundId) {
+		String category = RecentLog.get().sounds().seenCategory(soundId);
+		return category == null ? "" : seenAs(category).getString();
+	}
+
+	private static Component seenAs(String category) {
+		return Component.translatable("soundsculptor.sounds.seen_as", categoryName(category));
+	}
+
+	private static Component categoryName(String category) {
+		return Component.translatable("soundCategory." + category);
+	}
+
+	/** The status with its icon character, e.g. "▶ Playing" (FR-1.2: text and an icon, never color alone). */
+	private static Component statusText(PlayStatus status) {
+		return Component.translatable("soundsculptor.sounds.status_line." + status.name().toLowerCase(Locale.ROOT),
+				Component.translatable(status.translationKey()));
+	}
+
+	/**
+	 * The fixed row columns' widths, each fitting every text the column can show, so rows line up and nothing is cut;
+	 * and the Like this… button's.
+	 */
+	private record Widths(int category, int status, int seen, int plays, int band, int likeThis) {
+	}
+
+	/** Measured the first time a row is built, in the language shown now. */
+	private Widths widths() {
+		if (widths != null) {
+			return widths;
+		}
+		List<Component> categories = new ArrayList<>();
+		List<Component> seen = new ArrayList<>();
+		for (SoundSource source : SoundSource.values()) {
+			categories.add(categoryName(source.getName()));
+			seen.add(seenAs(source.getName()));
+		}
+		List<Component> statuses = new ArrayList<>();
+		for (PlayStatus status : PlayStatus.values()) {
+			statuses.add(statusText(status));
+		}
+		List<Component> bands = new ArrayList<>();
+		for (DistanceBand band : DistanceBand.values()) {
+			bands.add(Component.translatable(band.translationKey()));
+		}
+		if (picker != null) {
+			statuses.add(IN_SET);
+			seen.add(IN_SET);
+		}
+		Component plays = Component.translatable("soundsculptor.sounds.plays", PLAYS_MEASURED,
+				Component.translatable("soundsculptor.sounds.ago.seconds", 59));
+		widths = new Widths(widthFor(categories), widthFor(statuses), widthFor(seen), SculptList.Row.Column.widthFor(plays),
+				widthFor(bands), SculptButton.widthFor(Component.translatable("soundsculptor.picker.like_this")));
+		return widths;
+	}
+
+	private static int widthFor(List<Component> texts) {
+		return SculptList.Row.Column.widthFor(texts.toArray(Component[]::new));
 	}
 
 	private static String ago(long millis) {
@@ -711,10 +763,7 @@ public final class SoundsPanel {
 	/** A picker row's buttons: the checkbox (none when the set has the sound), then Like this…. */
 	private List<SculptButton> pickButtons(String soundId, boolean inSet) {
 		Component likeLabel = Component.translatable("soundsculptor.picker.like_this");
-		if (likeThisWidth == 0) {
-			likeThisWidth = Minecraft.getInstance().font.width(likeLabel) + LIKE_THIS_PADDING;
-		}
-		SculptButton likeThis = Tooltips.describe(SculptButton.text(likeLabel, likeThisWidth, () -> openLikeThis(soundId)),
+		SculptButton likeThis = Tooltips.describe(SculptButton.text(likeLabel, widths().likeThis(), () -> openLikeThis(soundId)),
 				Component.translatable("soundsculptor.picker.like_this.tip"));
 		if (inSet) {
 			return List.of(likeThis);
@@ -770,7 +819,7 @@ public final class SoundsPanel {
 			}
 		});
 		if (!groups.children().isEmpty()) {
-			groups.focusRow(groups.children().get(0));
+			groups.focusRow(host, groups.children().get(0));
 		}
 	}
 
@@ -789,12 +838,11 @@ public final class SoundsPanel {
 		for (LikeThis.Group group : likeThisGroups) {
 			String pattern = group.pattern();
 			boolean inSet = picker.groupInSet(pattern);
-			String mark = inSet ? Component.translatable("soundsculptor.picker.in_set").getString() : "";
-			String matches = Component.translatable(group.count() == 1 ? "soundsculptor.add_to_set.matches.one" : "soundsculptor.add_to_set.matches",
-					group.count()).getString();
+			String mark = inSet ? IN_SET.getString() : "";
+			String matches = ProfileManager.component(group.matches()).getString();
 			List<SculptList.Row.Column> columns = List.of(
 					new SculptList.Row.Column(() -> pattern, 0, 0),
-					new SculptList.Row.Column(() -> mark, IN_SET_WIDTH, 0),
+					new SculptList.Row.Column(() -> mark, SculptList.Row.Column.widthFor(IN_SET), 0),
 					new SculptList.Row.Column(() -> matches, 0, 1));
 			List<SculptButton> buttons = inSet ? List.of() : List.of(new SculptCheckbox(Component.translatable("soundsculptor.picker.pick"),
 					Component.translatable("soundsculptor.picker.pick_group.tip"), picker.groupPicked(pattern), () -> toggleGroup(pattern)));
@@ -867,7 +915,7 @@ public final class SoundsPanel {
 			helpList = null;
 			host.setFocused(helpButton);
 		});
-		examples.focusRow(rows.get(0));
+		examples.focusRow(host, rows.get(0));
 	}
 
 	public boolean isHelpShown() {

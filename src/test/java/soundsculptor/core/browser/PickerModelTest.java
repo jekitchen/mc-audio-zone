@@ -33,6 +33,18 @@ class PickerModelTest {
 		assertFalse(picker.groupInSet("minecraft:entity.zombie.*"));
 	}
 
+	/** An entry turned off (FR-4.1) is still in the set: adding the sound again would duplicate it. */
+	@Test
+	void disabledEntryStillCountsAsInTheSet() {
+		PickerModel picker = new PickerModel(set(SetEntry.of("e1", COW).withEnabled(false),
+				SetEntry.of("e2", "minecraft:entity.villager.*").withEnabled(false)));
+		assertTrue(picker.inSet(COW));
+		assertTrue(picker.groupInSet("minecraft:entity.villager.*"));
+		picker.toggleSound(COW);
+		picker.toggleGroup("minecraft:entity.villager.*");
+		assertEquals(0, picker.pickedCount());
+	}
+
 	@Test
 	void soundsInTheSetCannotBePicked() {
 		PickerModel picker = new PickerModel(set(SetEntry.of("e1", COW)));

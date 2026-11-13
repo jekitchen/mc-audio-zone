@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.gametest.v1.context.TestSingleplayerContext;
 import net.minecraft.client.Minecraft;
 import soundsculptor.core.profile.Profile;
+import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SoundSet;
@@ -17,6 +18,7 @@ import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RecentLog;
 import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.SoundPickerScreen;
+import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptButton;
@@ -36,6 +38,8 @@ import soundsculptor.mc.ui.SculptList;
  *   <li>{@code likeThisAddsGroupEntry}: Like this… lists the sound's groups with counts; a ticked group becomes a group
  *   entry, and a group the set has is marked "In this set".</li>
  *   <li>{@code overLimitShowsMessage}: picks that would pass 512 entries show the limit and the picker stays.</li>
+ *   <li>{@code pickerLeavesTheTabAlone}: the picker's filter and search are its own, so the Sounds tab keeps its own;
+ *   its header names the set as the set editor does.</li>
  * </ul>
  */
 public final class PickerClientGameTest implements FabricClientGameTest {
@@ -54,6 +58,7 @@ public final class PickerClientGameTest implements FabricClientGameTest {
 			reopenMarksThemInThisSet(context);
 			likeThisAddsGroupEntry(context);
 			overLimitShowsMessage(context);
+			pickerLeavesTheTabAlone(context);
 		}
 	}
 
@@ -74,7 +79,7 @@ public final class PickerClientGameTest implements FabricClientGameTest {
 			}), "a row has a checkbox and Like this…, and no quick actions");
 
 			// The first tick with the keyboard: Space on the focused checkbox.
-			context.runOnClient(mc -> sounds(mc).list.focusRow(sounds(mc).list.findRow(COW)));
+			context.runOnClient(mc -> sounds(mc).list.focusRow(picker(mc), sounds(mc).list.findRow(COW)));
 			check(context.computeOnClient(mc -> mc.gui.screen().getFocused() == sounds(mc).list), "the cow row has focus");
 			String unchecked = narration(context, COW);
 			check(unchecked.contains(rowName(context, COW)) && unchecked.contains("not checked"),
@@ -219,6 +224,60 @@ public final class PickerClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Picks that would pass 512 entries show the limit; the picker stays open and the draft is unchanged. */
+	/**
+	 * The picker remembers its own filter and search, so using it leaves the Sounds tab as the player left it. Its header
+	 * names the set as the set editor does: the saved name while a new one is only typed, and the place for Quick changes.
+	 */
+	private static void pickerLeavesTheTabAlone(ClientGameTestContext context) {
+		Snapshot before = Snapshot.take(context);
+		try {
+			putSet(context, FARM);
+			context.runOnClient(mc -> {
+				SoundSculptorScreen main = new SoundSculptorScreen();
+				mc.gui.setScreen(main);
+				main.selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				main.sounds().setRecentOnly(false);
+				main.sounds().searchField.setValue("pig");
+				mc.gui.setScreen(null);
+			});
+			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.edit(null, FARM.id())));
+			context.waitForScreen(SetEditorScreen.class);
+			context.runOnClient(mc -> {
+				editor(mc).nameField.setValue("Farm animals, not saved yet");
+				editor(mc).addSounds();
+			});
+			context.waitForScreen(SoundPickerScreen.class);
+			check(context.computeOnClient(mc -> picker(mc).subtitle().getString()).equals("Farm"),
+					"the picker names the set by its saved name, as the set editor's header does");
+			check(context.computeOnClient(mc -> sounds(mc).isRecentOnly() && sounds(mc).searchText().isEmpty()),
+					"the picker starts with its own filter on and no search text");
+			context.runOnClient(mc -> {
+				sounds(mc).setRecentOnly(true);
+				sounds(mc).searchField.setValue("cow");
+				picker(mc).onClose();
+			});
+			context.waitForScreen(SetEditorScreen.class);
+			context.runOnClient(mc -> {
+				mc.gui.setScreen(SetEditorScreen.forQuickChanges(null, PlaceRef.EVERYWHERE));
+				editor(mc).addSounds();
+			});
+			context.waitForScreen(SoundPickerScreen.class);
+			check(context.computeOnClient(mc -> picker(mc).subtitle().getString()).equals("Place: Everywhere"),
+					"for Quick changes the picker names the place");
+			context.runOnClient(mc -> {
+				mc.gui.setScreen(null);
+				SoundSculptorScreen main = new SoundSculptorScreen();
+				mc.gui.setScreen(main);
+				main.selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				check(!main.sounds().isRecentOnly() && main.sounds().searchText().equals("pig"),
+						"the Sounds tab keeps its filter off and its search \"pig\", was " + main.sounds().isRecentOnly() + " \""
+								+ main.sounds().searchText() + "\"");
+			});
+		} finally {
+			before.restore(context);
+		}
+	}
+
 	private static void overLimitShowsMessage(ClientGameTestContext context) {
 		List<SetEntry> many = new ArrayList<>();
 		for (int i = 1; i <= SoundSet.MAX_ENTRIES - 2; i++) {

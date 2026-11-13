@@ -30,9 +30,6 @@ import net.minecraft.world.phys.Vec3;
  * show a 5-second toast with Undo (FR-12.5).
  */
 public final class ZoneListPanel {
-	private static final int WHERE_WIDTH = 90;
-	private static final int RULE_COUNT_WIDTH = 45;
-	private static final int ON_OFF_WIDTH = 30;
 	private static final int SETS_PADDING = 12;
 	/** The key of the "No zones yet" row; not a zone ID, so it can never clash with one. */
 	public static final Object NO_ZONES_ROW = new Object();
@@ -72,27 +69,40 @@ public final class ZoneListPanel {
 		Point player = new Point(feet.x, feet.y, feet.z);
 		List<Zone> zones = profile.zones();
 		List<SculptList.Row> rows = new ArrayList<>(zones.size() + 1);
-		rows.add(everywhereRow(profile));
+		int setsWidth = SculptList.Row.Column.widthFor(Component.literal(setCount(1)), Component.literal(setCount(PlaceSets.MAX_SETS + 1)));
+		rows.add(everywhereRow(profile, setsWidth));
 		if (zones.isEmpty()) {
 			rows.add(noZonesRow());
 		}
+		// Name and where it is (with "Off" for a zone that is off) on the first line; shape and Sound Set count below.
+		// The where column is as wide as the widest, so the rows line up.
+		List<String> places = new ArrayList<>(zones.size());
+		List<List<SummaryPart>> summaries = new ArrayList<>(zones.size());
+		int placeWidth = 0;
+		for (Zone zone : zones) {
+			List<SummaryPart> parts = ZoneSummary.parts(zone, key, dimension, player, profile.settings().defaultEdge());
+			String where = parts.get(parts.size() - 1).text(TRANSLATOR);
+			String place = zone.enabled() ? where
+					: Component.translatable("soundsculptor.summary.rule.disabled").getString() + ", " + where;
+			summaries.add(parts);
+			places.add(place);
+			placeWidth = Math.max(placeWidth, SculptList.Row.Column.widthFor(Component.literal(place)));
+		}
+		int onOffWidth = PlaceSetsPanel.onOffWidth();
 		for (int i = 0; i < zones.size(); i++) {
 			Zone zone = zones.get(i);
 			String name = zone.name() == null || zone.name().isBlank() ? zone.id() : zone.name();
-			List<SummaryPart> parts = ZoneSummary.parts(zone, key, dimension, player, profile.settings().defaultEdge());
+			List<SummaryPart> parts = summaries.get(i);
 			String shape = joinParts(parts.subList(0, parts.size() - 1));
-			String where = parts.get(parts.size() - 1).text(TRANSLATOR);
+			String place = places.get(i);
 			String sets = setCount(zone.sets());
-			String state = zone.enabled() ? "" : Component.translatable("soundsculptor.summary.rule.disabled").getString();
-			// Name and where it is (with "Off" for a zone that is off) on the first line; shape and Sound Set count below.
-			String place = zone.enabled() ? where : state + ", " + where;
 			List<SculptList.Row.Column> columns = List.of(
 					new SculptList.Row.Column(() -> name, 0, 0),
-					new SculptList.Row.Column(() -> place, WHERE_WIDTH, 0),
+					new SculptList.Row.Column(() -> place, placeWidth, 0),
 					new SculptList.Row.Column(() -> shape, 0, 1),
-					new SculptList.Row.Column(() -> sets, RULE_COUNT_WIDTH, 1));
+					new SculptList.Row.Column(() -> sets, setsWidth, 1));
 			List<SculptButton> buttons = new ArrayList<>();
-			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), ON_OFF_WIDTH, () -> setEnabled(zone.id(), !zone.enabled()))
+			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), onOffWidth, () -> setEnabled(zone.id(), !zone.enabled()))
 					.narrationContext(() -> Component.translatable("soundsculptor.zones.enabled")),
 					Component.translatable(zone.enabled() ? "soundsculptor.zones.turn_off" : "soundsculptor.zones.turn_on")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.zones.edit"), () -> setScreen(ZoneEditorScreen.edit(host, zone))));
@@ -115,7 +125,7 @@ public final class ZoneListPanel {
 	}
 
 	/** Everywhere (FR-8.10): its name, what it applies to, and its Sound Set count; its only button opens its sets. */
-	private SculptList.Row everywhereRow(Profile profile) {
+	private SculptList.Row everywhereRow(Profile profile, int setsWidth) {
 		Component name = Component.translatable("soundsculptor.profile.place.everywhere");
 		String nameText = name.getString();
 		String scope = Component.translatable("soundsculptor.zones.everywhere.scope").getString();
@@ -123,7 +133,7 @@ public final class ZoneListPanel {
 		return new SculptList.Row(PlaceRef.EVERYWHERE, List.of(
 				new SculptList.Row.Column(() -> nameText, 0, 0),
 				new SculptList.Row.Column(() -> scope, 0, 1),
-				new SculptList.Row.Column(() -> sets, RULE_COUNT_WIDTH, 1)), List.of(setsButton(PlaceRef.EVERYWHERE, name)));
+				new SculptList.Row.Column(() -> sets, setsWidth, 1)), List.of(setsButton(PlaceRef.EVERYWHERE, name)));
 	}
 
 	/**
@@ -150,7 +160,10 @@ public final class ZoneListPanel {
 
 	/** "1 Sound Set", "3 Sound Sets": the place's library sets plus its Quick changes. */
 	private static String setCount(PlaceSets sets) {
-		int count = sets.librarySetCount() + (sets.quickChanges() != null ? 1 : 0);
+		return setCount(sets.librarySetCount() + (sets.quickChanges() != null ? 1 : 0));
+	}
+
+	private static String setCount(int count) {
 		return Component.translatable(count == 1 ? "soundsculptor.zones.set_count.one" : "soundsculptor.zones.set_count", count).getString();
 	}
 

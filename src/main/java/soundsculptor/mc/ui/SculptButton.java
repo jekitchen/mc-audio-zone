@@ -34,6 +34,19 @@ public class SculptButton extends AbstractButton {
 		return new SculptButton(width, Theme.WIDGET_HEIGHT, label, null, onPress);
 	}
 
+	/**
+	 * The width of a text button that fits the widest of {@code labels} (no 60-pixel minimum): for list rows, where
+	 * buttons share one width so rows line up, or switch labels (On and Off) without changing size.
+	 */
+	public static int widthFor(Component... labels) {
+		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
+		int widest = 0;
+		for (Component label : labels) {
+			widest = Math.max(widest, font.width(label));
+		}
+		return widest + 16;
+	}
+
 	public static SculptButton text(Component label, int width, Runnable onPress) {
 		return new SculptButton(width, Theme.WIDGET_HEIGHT, label, null, onPress);
 	}

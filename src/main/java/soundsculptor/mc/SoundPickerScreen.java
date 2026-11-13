@@ -29,6 +29,7 @@ import soundsculptor.mc.ui.Tooltips;
  */
 public final class SoundPickerScreen extends SculptScreen {
 	private final SetDraft draft;
+	private final Component subtitle;
 	private final PickerModel picker;
 	private SoundsPanel panel;
 
@@ -36,12 +37,14 @@ public final class SoundPickerScreen extends SculptScreen {
 	public SculptButton cancelButton;
 
 	/**
-	 * @param parent the set editor, where Add and Cancel return to
-	 * @param draft  the set editor's draft: what it holds now is "In this set", and Add adds to it
+	 * @param parent   the set editor, where Add and Cancel return to
+	 * @param draft    the set editor's draft: what it holds now is "In this set", and Add adds to it
+	 * @param subtitle the set as the set editor's header names it (its saved name, or "Quick changes in Pen")
 	 */
-	public SoundPickerScreen(Screen parent, SetDraft draft) {
+	public SoundPickerScreen(Screen parent, SetDraft draft, Component subtitle) {
 		super(Component.translatable("soundsculptor.picker.title"), parent);
 		this.draft = draft;
+		this.subtitle = subtitle;
 		this.picker = new PickerModel(draft.build());
 	}
 
@@ -65,9 +68,14 @@ public final class SoundPickerScreen extends SculptScreen {
 		return List.of(new Tab(getTitle(), false));
 	}
 
+	/** The set as the header names it. */
+	public Component subtitle() {
+		return subtitle;
+	}
+
 	@Override
 	protected Component headerSubtitle() {
-		return Component.literal(draft.name());
+		return subtitle;
 	}
 
 	@Override
@@ -107,8 +115,10 @@ public final class SoundPickerScreen extends SculptScreen {
 		}
 		SoundSet added = picker.addTo(draft.build());
 		for (SetEntry entry : added.entries()) {
-			if (draft.entry(entry.id()) == null) {
-				draft.putEntry(entry);
+			if (draft.entry(entry.id()) == null && !draft.putEntry(entry)) {
+				// The draft refused it (full): say why and stay, as when the picks pass the limit.
+				showToast(ProfileManager.component(draft.canPut(entry)), null);
+				return;
 			}
 		}
 		closeNow();

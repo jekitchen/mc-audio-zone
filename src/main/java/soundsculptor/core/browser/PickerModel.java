@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import soundsculptor.core.Message;
+import soundsculptor.core.sets.InvalidPatternException;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SoundPattern;
 import soundsculptor.core.sets.SoundSet;
@@ -14,7 +15,9 @@ import soundsculptor.core.sets.SoundSet;
  * set cannot be picked. Add creates one entry per pick with no settings, in the order they were ticked.
  *
  * <p>A single-sound entry's target is the sound ID and a group's target is its pattern, so both are compared as
- * normalized pattern text, as the entry editor stores them.
+ * normalized pattern text, as the entry editor stores them. An entry that is turned off is still in the set. Every
+ * method that takes a sound ID or a pattern parses it, so text that is not a valid pattern throws
+ * {@link InvalidPatternException}; the picker only passes known sound IDs and {@link LikeThis} patterns.
  */
 public final class PickerModel {
 	private final SoundSet target;
@@ -39,12 +42,20 @@ public final class PickerModel {
 		return inTarget.contains(normalize(pattern));
 	}
 
-	/** Ticks or unticks a sound. Does nothing for a sound already in the set. */
+	/**
+	 * Ticks or unticks a sound. Does nothing for a sound already in the set.
+	 *
+	 * @throws InvalidPatternException if {@code soundId} is not a valid sound ID
+	 */
 	public void toggleSound(String soundId) {
 		toggle(normalize(soundId));
 	}
 
-	/** Ticks or unticks a group. Does nothing for a group already in the set. */
+	/**
+	 * Ticks or unticks a group. Does nothing for a group already in the set.
+	 *
+	 * @throws InvalidPatternException if {@code pattern} is not a valid pattern
+	 */
 	public void toggleGroup(String pattern) {
 		toggle(normalize(pattern));
 	}

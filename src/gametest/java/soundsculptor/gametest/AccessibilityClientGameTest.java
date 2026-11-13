@@ -15,6 +15,9 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundsPanel;
+import soundsculptor.mc.RecentLog;
+import soundsculptor.core.recent.PlayStatus;
+import soundsculptor.core.recent.RecentSounds;
 import soundsculptor.mc.AddToSetScreen;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.AttachSetScreen;
@@ -54,8 +57,10 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.locale.Language;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Util;
 
 /**
  * The automatable part of the release checklist (PRD 11.5) and FR-12.3:
@@ -63,7 +68,10 @@ import net.minecraft.util.FormattedCharSequence;
  *   <li>Opened outside a world (the title screen, or Mod Menu's config button when Mod Menu is installed:
  *   {@code -Pmodmenu=true}), the screen says to join a world instead of offering settings that would go nowhere.</li>
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
- *   inside the window, no two controls overlapping, no button or label text cut off.</li>
+ *   inside the window, no two controls overlapping, no button or label text cut off. Inside lists too: each row's
+ *   buttons fit beside its text, no row button or fixed column cuts its text, and a row's long text (a name, an ID)
+ *   keeps enough room to tell rows apart. The Sounds tab and the picker are checked with the Recently played filter on
+ *   and off, with recently played rows (one in a long-named zone) and "In this set" marks.</li>
  *   <li>A-4 narration: every control on the Sounds tab (the Recently played filter on and off, its search help, its
  *   Level pop-up and Add to set…), the Sounds picker (the filter on and off, and Like this…), the Sound Sets, Zones and
  *   Profiles tabs, a place's Sound Sets and Attach set…,
@@ -92,6 +100,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	/** A library set for the Sound Sets tab, its name screen and its delete warning. */
 	private static final SoundSet SET = new SoundSet("set-a11y", "Animals of the farm and the barn by the river",
 			List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
+	/** The picker's header for SET, as the set editor names it. */
+	private static final Component PICKER_SUBTITLE = Component.literal(SET.name());
 	/** Zones using one set, for the long place lists of the delete warning and the linked-save confirmation. */
 	private static final int MANY_ZONES = 40;
 
@@ -128,6 +138,10 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))).attach(SET.id()))
 					.withZones(List.of(attached(zone("z1", "Trading hall", key), SET.id()),
 							zone("z2", "Very long zone name for the bee farm by the river", key))), ws.library().put(SET))));
+			// Recently played rows (FR-1.2), so the Sounds tab and the picker show their two-line rows: in a zone with a short
+			// name and one with a long name (cut, and giving way to the ID in a narrow window), heard around the player, and
+			// one heard earlier in the session ("Seen as", FR-3.2).
+			context.runOnClient(mc -> recordRecentPlays());
 
 			// A-4: every control on the Sounds tab, with the Recently played filter on and off, has something to read out,
 			// and so do its search help, its Level pop-up and both steps of Add to set….
@@ -163,7 +177,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			List<String> silentPicker = context.computeOnClient(mc -> {
 				List<String> silent = new ArrayList<>();
 				for (boolean recentOnly : new boolean[] {true, false}) {
-					SoundPickerScreen picker = new SoundPickerScreen(null, SetDraft.of(SET));
+					SoundPickerScreen picker = new SoundPickerScreen(null, pickerDraft(), PICKER_SUBTITLE);
 					mc.gui.setScreen(picker);
 					picker.sounds().setRecentOnly(recentOnly);
 					silent.addAll(silentControls(picker));
@@ -209,6 +223,20 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				String read = NarrationCompat.collect(line.buttons().get(0)::updateNarration);
 				check(read.contains("Used in Everywhere and Trading hall"), "the narrator reads the places, was " + read);
 				List<String> silent = new ArrayList<>(silentControls(trace));
+				// SET matches the cow on Everywhere and Quick changes does not: Everywhere's own line offers Add to Quick
+				// changes, read with the line; its choice is labelled, and Esc returns focus to that button.
+				SculptList.Row placeLine = trace.row(new TraceText.PlaceTarget(PlaceRef.EVERYWHERE));
+				check(placeLine != null && placeLine.buttons().size() == 1
+						&& placeLine.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
+						"Everywhere's line offers Add to Quick changes when only a library set matches");
+				String placeSaid = NarrationCompat.collect(placeLine.buttons().get(0)::updateNarration);
+				check(placeSaid.contains(placeLine.narrationText().getString()) && placeSaid.contains("Add to Quick changes"),
+						"Add to Quick changes on Everywhere's line is read with the line, was " + placeSaid);
+				trace.openAddToQuickChanges(PlaceRef.EVERYWHERE);
+				silent.addAll(silentControls(trace));
+				trace.closeOverlay();
+				check(trace.lines.getFocused() == placeLine && placeLine.getFocused() == placeLine.buttons().get(0),
+						"closing the choice returns focus to Everywhere's Add to Quick changes");
 				TraceScreen none = new TraceScreen(null, PIG);
 				mc.gui.setScreen(none);
 				silent.addAll(silentControls(none));
@@ -365,6 +393,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 			context.runOnClient(mc -> {
 				SoundsPanel.resetRememberedState();
+				RecentLog.get().sounds().clear();
 				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().remove(SET.id())));
 				ProfileManager.flushSaves();
 			});
@@ -430,15 +459,15 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			((AddToSetScreen) s).chooseSet(SET.id());
 			return null;
 		}),
-		PICKER_RECENT(mc -> new SoundPickerScreen(null, SetDraft.of(SET)), s -> {
+		PICKER_RECENT(mc -> new SoundPickerScreen(null, pickerDraft(), PICKER_SUBTITLE), s -> {
 			((SoundPickerScreen) s).sounds().setRecentOnly(true);
 			return null;
 		}),
-		PICKER_ALL(mc -> new SoundPickerScreen(null, SetDraft.of(SET)), s -> {
+		PICKER_ALL(mc -> new SoundPickerScreen(null, pickerDraft(), PICKER_SUBTITLE), s -> {
 			((SoundPickerScreen) s).sounds().setRecentOnly(false);
 			return null;
 		}),
-		PICKER_LIKE_THIS(mc -> new SoundPickerScreen(null, SetDraft.of(SET)), s -> {
+		PICKER_LIKE_THIS(mc -> new SoundPickerScreen(null, pickerDraft(), PICKER_SUBTITLE), s -> {
 			((SoundPickerScreen) s).sounds().setRecentOnly(false);
 			((SoundPickerScreen) s).sounds().openLikeThis(VILLAGER);
 			return null;
@@ -564,6 +593,9 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			if (textControl && font.width(w.getMessage()) + BUTTON_PADDING > w.getWidth()) {
 				problems.add(where + ": text cut off in " + name);
 			}
+			if (w instanceof SculptList list) {
+				problems.addAll(rowProblems(font, list, where));
+			}
 		}
 		if (screen instanceof SculptScreen az && az.body() != null) {
 			for (SculptScreen.Body.Label label : az.body().labels()) {
@@ -574,6 +606,53 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			}
 		}
 		return problems;
+	}
+
+	/**
+	 * The controls and text inside a list's rows, placed as {@link SculptList.Row#layout} draws them: buttons that do not
+	 * fit in the row or leave no room for text, button text cut off, a fixed-width column squeezed narrower than asked or
+	 * too narrow for its text, and the rest column (a name, an ID, a pattern) cut while narrower than
+	 * {@link SculptList.Row#REST_MIN_WIDTH}, too little to tell rows apart. Each problem is reported once per list and
+	 * column, with the first row that shows it.
+	 */
+	private static List<String> rowProblems(Font font, SculptList list, String where) {
+		java.util.Map<String, String> found = new java.util.LinkedHashMap<>();
+		String in = where + ": list \"" + list.getMessage().getString() + "\"";
+		for (SculptList.Row row : list.children()) {
+			SculptList.Row.Layout layout = list.layout(row);
+			String rowName = String.valueOf(row.key());
+			List<SculptButton> buttons = row.buttons();
+			int contentLeft = list.getRowLeft() + 2;
+			if (!buttons.isEmpty() && layout.buttonX().get(0) < contentLeft) {
+				found.putIfAbsent("buttons", in + ": row buttons do not fit (row " + rowName + ")");
+			} else if (layout.textRight() < layout.textLeft()) {
+				found.putIfAbsent("buttons", in + ": row buttons leave no room for text (row " + rowName + ")");
+			}
+			for (int i = 0; i < buttons.size(); i++) {
+				SculptButton button = buttons.get(i);
+				boolean text = !button.isIconButton();
+				if (text && font.width(button.getMessage()) + BUTTON_PADDING > button.getWidth()) {
+					found.putIfAbsent("button " + i, in + ": text cut off in row button \"" + button.getMessage().getString() + "\"");
+				}
+			}
+			for (int i = 0; i < layout.columns().size(); i++) {
+				SculptList.Row.Placed placed = layout.columns().get(i);
+				String text = placed.column().text().get();
+				int asked = placed.column().width();
+				// A shrinking column (a zone's name) may be cut, and may give way down to its minimum.
+				boolean shrinks = placed.column().shrinks();
+				int least = shrinks ? Math.min(asked, SculptList.Row.SHRINK_MIN_WIDTH) : asked;
+				boolean cut = font.width(text) > placed.width();
+				if (asked > 0 && placed.width() < least) {
+					found.putIfAbsent("squeezed " + i, in + ": column " + i + " gets " + placed.width() + " of its " + asked + " px (row " + rowName + ")");
+				} else if (asked > 0 && cut && !shrinks) {
+					found.putIfAbsent("cut " + i, in + ": column " + i + " cut off \"" + text + "\"");
+				} else if (asked == 0 && cut && placed.width() < SculptList.Row.REST_MIN_WIDTH) {
+					found.putIfAbsent("narrow " + i, in + ": column " + i + " only " + placed.width() + " px for \"" + text + "\"");
+				}
+			}
+		}
+		return new ArrayList<>(found.values());
 	}
 
 	private static String describe(AbstractWidget widget) {
@@ -631,6 +710,25 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 			texts.add(label.text().get().getString());
 		}
 		return texts;
+	}
+
+	/** The villager in Trading hall, the cow in the long-named zone, the pig around the player; the stone step earlier. */
+	private static void recordRecentPlays() {
+		RecentSounds log = RecentLog.get().sounds();
+		log.clear();
+		long now = Util.getMillis();
+		log.record("minecraft:block.stone.step", "block", true, 2.0, true, PlayStatus.PLAYING, null, now - RecentSounds.WINDOW_MS - 1000);
+		log.record(VILLAGER, "neutral", true, 3.0, true, PlayStatus.PLAYING, "Trading hall", now);
+		log.record(COW, "neutral", true, 10.0, true, PlayStatus.MUTED, "Very long zone name for the bee farm by the river", now);
+		log.record(PIG, "neutral", false, 0.0, true, PlayStatus.BOOSTED, null, now);
+	}
+
+	/** SET with the villager and its group too, so the picker marks a row and a Like this group "In this set". */
+	private static SetDraft pickerDraft() {
+		List<SetEntry> entries = new ArrayList<>(SET.entries());
+		entries.add(SetEntry.of("e2", VILLAGER));
+		entries.add(SetEntry.of("e3", "minecraft:entity.villager.*"));
+		return SetDraft.of(new SoundSet(SET.id(), SET.name(), entries));
 	}
 
 	private static Zone zone(String id, String name, String key) {

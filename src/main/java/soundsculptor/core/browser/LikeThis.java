@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import soundsculptor.core.Message;
 import soundsculptor.core.editor.PatternSuggestions;
 import soundsculptor.core.sets.SoundPattern;
 
@@ -14,6 +15,15 @@ public final class LikeThis {
 
 	/** One group: a wildcard pattern and how many known sounds it matches. */
 	public record Group(String pattern, int count) {
+		/** The entry editor's button: "minecraft:entity.villager.* · 3 sounds", or "· 1 sound" for one. */
+		public Message label() {
+			return Message.of(count == 1 ? "soundsculptor.rule_editor.family.one" : "soundsculptor.rule_editor.family", pattern, count);
+		}
+
+		/** The Add to set… and picker lists' second line: "Matches 3 sounds", or "Matches 1 sound" for one. */
+		public Message matches() {
+			return Message.of(count == 1 ? "soundsculptor.add_to_set.matches.one" : "soundsculptor.add_to_set.matches", count);
+		}
 	}
 
 	/**

@@ -26,11 +26,10 @@ import soundsculptor.mc.ui.Tooltips;
  * Delete asks first ({@link SetDeleteDialog}, FR-4.11). A limit (library full, a bad name) is shown, never thrown.
  */
 public final class SetLibraryPanel {
-	private static final int ENTRIES_WIDTH = 80;
-	private static final int DUPLICATE_WIDTH = 60;
-	private static final int RENAME_WIDTH = 50;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/edit");
 	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/delete");
+	private static final Component DUPLICATE = Component.translatable("soundsculptor.sets.duplicate");
+	private static final Component RENAME = Component.translatable("soundsculptor.sets.rename");
 
 	private final SculptScreen host;
 	public SculptList list;
@@ -85,15 +84,15 @@ public final class SetLibraryPanel {
 		List<SculptButton> buttons = List.of(
 				SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.sets.edit"), () -> openEditor(id))
 						.narrationContext(() -> rowName),
-				Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.sets.duplicate"), DUPLICATE_WIDTH, () -> duplicate(id))
+				Tooltips.describe(SculptButton.text(DUPLICATE, SculptButton.widthFor(DUPLICATE), () -> duplicate(id))
 						.narrationContext(() -> rowName), Component.translatable("soundsculptor.sets.duplicate.tip")),
-				Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.sets.rename"), RENAME_WIDTH, () -> openRename(id))
+				Tooltips.describe(SculptButton.text(RENAME, SculptButton.widthFor(RENAME), () -> openRename(id))
 						.narrationContext(() -> rowName), Component.translatable("soundsculptor.sets.rename.tip")),
 				SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.sets.delete"), () -> confirmDelete(id))
 						.narrationContext(() -> rowName));
 		return new SculptList.Row(id, List.of(
 				new SculptList.Row.Column(() -> name, 0, 0),
-				new SculptList.Row.Column(() -> entries, ENTRIES_WIDTH, 0),
+				new SculptList.Row.Column(() -> entries, PlaceSetsPanel.entriesWidth(), 0),
 				new SculptList.Row.Column(() -> usage, 0, 1)), buttons);
 	}
 

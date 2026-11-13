@@ -28,11 +28,6 @@ import soundsculptor.mc.ui.Tooltips;
  * nothing.
  */
 public final class AddToSetScreen extends SculptScreen {
-	private static final int ENTRIES_WIDTH = 80;
-	private static final int CHOOSE_WIDTH = 60;
-	private static final int ADD_WIDTH = 50;
-	private static final int IN_SET_WIDTH = 90;
-
 	/** The screen the toast shows on, and where Add and Cancel return to. */
 	private final SculptScreen host;
 	private final String soundId;
@@ -105,18 +100,20 @@ public final class AddToSetScreen extends SculptScreen {
 		list = new SculptList(body.width(), 100, Component.translatable("soundsculptor.add_to_set.sets"));
 		list.setEmptyText(() -> Component.translatable("soundsculptor.add_to_set.sets.empty"));
 		body.fill(list);
+		Component chooseLabel = Component.translatable("soundsculptor.add_to_set.choose");
+		int chooseWidth = SculptButton.widthFor(chooseLabel);
+		int entriesWidth = PlaceSetsPanel.entriesWidth();
 		List<SculptList.Row> rows = new ArrayList<>();
 		for (SoundSet set : ProfileManager.library().sets()) {
 			String id = set.id();
 			String name = set.name();
 			String entries = PlaceSetsPanel.entriesText(set.entries().size());
 			String has = new PickerModel(set).inSet(soundId) ? Component.translatable("soundsculptor.add_to_set.has_sound").getString() : "";
-			Component rowName = Component.literal(name);
-			SculptButton choose = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.add_to_set.choose"), CHOOSE_WIDTH,
-					() -> chooseSet(id)).narrationContext(() -> rowName), Component.translatable("soundsculptor.add_to_set.choose.tip"));
+			SculptButton choose = Tooltips.describe(SculptButton.text(chooseLabel, chooseWidth, () -> chooseSet(id)),
+					Component.translatable("soundsculptor.add_to_set.choose.tip"));
 			rows.add(new SculptList.Row(id, List.of(
 					new SculptList.Row.Column(() -> name, 0, 0),
-					new SculptList.Row.Column(() -> entries, ENTRIES_WIDTH, 0),
+					new SculptList.Row.Column(() -> entries, entriesWidth, 0),
 					new SculptList.Row.Column(() -> has, 0, 1)), List.of(choose)));
 		}
 		list.setRows(rows);
@@ -174,8 +171,7 @@ public final class AddToSetScreen extends SculptScreen {
 		rows.add(targetRow(soundId, thisSound, soundId, picker != null && picker.inSet(soundId), () -> addSound()));
 		for (LikeThis.Group group : LikeThis.groups(soundId, KnownSounds.ids())) {
 			String pattern = group.pattern();
-			String matches = Component.translatable(group.count() == 1 ? "soundsculptor.add_to_set.matches.one" : "soundsculptor.add_to_set.matches",
-					group.count()).getString();
+			String matches = ProfileManager.component(group.matches()).getString();
 			rows.add(targetRow(pattern, pattern, matches, picker != null && picker.groupInSet(pattern), () -> addGroup(pattern)));
 		}
 		list.setRows(rows);
@@ -183,17 +179,17 @@ public final class AddToSetScreen extends SculptScreen {
 
 	/** A row with Add, or marked "In this set" with no button (the narrator still reads it). */
 	private SculptList.Row targetRow(String key, String title, String detail, boolean inSet, Runnable add) {
-		String mark = inSet ? Component.translatable("soundsculptor.add_to_set.in_set").getString() : "";
+		String mark = inSet ? SoundsPanel.IN_SET.getString() : "";
 		List<SculptList.Row.Column> columns = List.of(
 				new SculptList.Row.Column(() -> title, 0, 0),
-				new SculptList.Row.Column(() -> mark, IN_SET_WIDTH, 0),
+				new SculptList.Row.Column(() -> mark, SculptList.Row.Column.widthFor(SoundsPanel.IN_SET), 0),
 				new SculptList.Row.Column(() -> detail, 0, 1));
 		if (inSet) {
 			return new SculptList.Row(key, columns, List.of());
 		}
-		Component rowName = Component.literal(title);
-		SculptButton button = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.add_to_set.add"), ADD_WIDTH, add)
-				.narrationContext(() -> rowName), Component.translatable("soundsculptor.add_to_set.add.tip"));
+		Component addLabel = Component.translatable("soundsculptor.add_to_set.add");
+		SculptButton button = Tooltips.describe(SculptButton.text(addLabel, SculptButton.widthFor(addLabel), add),
+				Component.translatable("soundsculptor.add_to_set.add.tip"));
 		return new SculptList.Row(key, columns, List.of(button));
 	}
 

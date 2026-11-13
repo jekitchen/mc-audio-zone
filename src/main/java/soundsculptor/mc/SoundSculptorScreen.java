@@ -86,8 +86,9 @@ public final class SoundSculptorScreen extends SculptScreen {
 
 	@Override
 	protected void addHeaderWidgets(List<AbstractWidget> header) {
-		bypassToggle = Tooltips.describe(new SculptToggle(100, Component.translatable("soundsculptor.bypass"), ProfileManager.isBypassed(),
-				ProfileManager::setBypass), Component.translatable("soundsculptor.bypass.tip", bypassKeyName()));
+		Component label = Component.translatable("soundsculptor.bypass");
+		bypassToggle = Tooltips.describe(new SculptToggle(SculptToggle.widthFor(label), label, ProfileManager.isBypassed(), ProfileManager::setBypass),
+				Component.translatable("soundsculptor.bypass.tip", bypassKeyName()));
 		header.add(bypassToggle);
 	}
 

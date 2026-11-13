@@ -473,8 +473,7 @@ public final class EntryEditorScreen extends SculptScreen {
 		int width = 0;
 		for (LikeThis.Group group : LikeThis.groups(soundId, KnownSounds.ids())) {
 			String family = group.pattern();
-			Component label = Component.translatable(group.count() == 1 ? "soundsculptor.rule_editor.family.one"
-					: "soundsculptor.rule_editor.family", family, group.count());
+			Component label = ProfileManager.component(group.label());
 			width = Math.max(width, font.width(label) + 16);
 			buttons.add(SculptButton.text(label, () -> usePattern(family)));
 		}

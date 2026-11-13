@@ -309,7 +309,7 @@ public final class SetEditorScreen extends SculptScreen {
 	/** Add sounds…: the Sounds picker, which adds its picks to the draft (FR-1.7); refused when the set is full. */
 	public void addSounds() {
 		if (!refuseWhenFull()) {
-			minecraft.gui.setScreen(new SoundPickerScreen(this, draft));
+			minecraft.gui.setScreen(new SoundPickerScreen(this, draft, headerSubtitle()));
 		}
 	}
 

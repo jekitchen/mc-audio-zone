@@ -32,7 +32,9 @@ import soundsculptor.mc.ui.SculptToggle;
 import soundsculptor.mc.ui.Theme;
 import soundsculptor.mc.ui.Tooltips;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import net.minecraft.client.gui.ComponentPath;
@@ -67,10 +69,8 @@ import net.minecraft.resources.Identifier;
 public final class TraceScreen extends SculptScreen {
 	private static final Translator TRANSLATOR = (key, args) -> Component.translatable(key, args).getString();
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/edit");
-	private static final int ON_OFF_WIDTH = 30;
-	private static final int MUTE_WIDTH = 50;
-	private static final int VOLUME_WIDTH = 60;
 	private static final String ADD_QUICK_KEY = "soundsculptor.trace.edit.add_quick";
+	private static final Component LEVEL = Component.translatable("soundsculptor.trace.edit.volume");
 
 	private final String soundId;
 	private final boolean vanillaCovered;
@@ -85,6 +85,8 @@ public final class TraceScreen extends SculptScreen {
 	public SculptList lines;
 	public SculptButton copyButton;
 
+	/** Each place's Add to Quick changes button in the shown rows, so closing its choice returns focus to it. */
+	private final Map<PlaceRef, SculptButton> addQuickButtons = new HashMap<>();
 	// The Add to Quick changes choice, while it is open.
 	public SculptButton addQuickMute;
 	public SculptButton addQuickLevel;
@@ -210,6 +212,7 @@ public final class TraceScreen extends SculptScreen {
 			return;
 		}
 		List<SculptList.Row> rows = new ArrayList<>(traceLines.size());
+		addQuickButtons.clear();
 		for (int i = 0; i < traceLines.size(); i++) {
 			TraceText.Line line = traceLines.get(i);
 			String lineText = line.text();
@@ -257,18 +260,18 @@ public final class TraceScreen extends SculptScreen {
 			SetEntry entry = entryTarget.entry();
 			EntryLocation where = entryTarget.where();
 			String setName = where.isQuick() ? null : setName(where.setId());
-			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(entry.enabled()), ON_OFF_WIDTH,
+			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(entry.enabled()), PlaceSetsPanel.onOffWidth(),
 					() -> edit(where, new EntryEdit.Enabled(!entry.enabled()))),
 					Component.translatable(entry.enabled() ? "soundsculptor.trace.edit.turn_off" : "soundsculptor.trace.edit.turn_on")));
 			buttons.add(muteButton(where, entry, setName));
-			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.trace.edit.volume"), VOLUME_WIDTH,
+			buttons.add(Tooltips.describe(SculptButton.text(LEVEL, SculptButton.widthFor(LEVEL),
 					() -> openVolume(where, entry)), setName == null ? Component.translatable("soundsculptor.trace.edit.volume.tip")
 							: Component.translatable("soundsculptor.trace.edit.volume.linked_tip", setName)));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable(where.isQuick() ? "soundsculptor.trace.edit.open_quick_entry"
 					: "soundsculptor.trace.edit.open_entry"), () -> openSetEditor(where.place(), where.setId(), where.entryId())));
 		} else if (target instanceof TraceText.ZoneTarget zoneTarget) {
 			Zone zone = zoneTarget.zone();
-			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), ON_OFF_WIDTH,
+			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), PlaceSetsPanel.onOffWidth(),
 					() -> setZoneEnabled(zone.id(), !zone.enabled())),
 					Component.translatable(zone.enabled() ? "soundsculptor.zones.turn_off" : "soundsculptor.zones.turn_on")));
 			if (offersAddOnPlaceLine(zonePlace(zone.id()))) {
@@ -285,10 +288,17 @@ public final class TraceScreen extends SculptScreen {
 		return buttons;
 	}
 
-	/** Add to Quick changes for {@code place}: opens the Mute / Level… choice. */
+	/** Add to Quick changes for {@code place}: opens the Mute / Level… choice. A place has one such line at most. */
 	private SculptButton addToQuickButton(PlaceRef place) {
-		return Tooltips.describe(SculptButton.text(Component.translatable(ADD_QUICK_KEY), () -> openAddToQuickChanges(place)),
+		SculptButton button = Tooltips.describe(SculptButton.text(Component.translatable(ADD_QUICK_KEY), () -> openAddToQuickChanges(place)),
 				Component.translatable("soundsculptor.trace.edit.add_quick.tip"));
+		addQuickButtons.put(place, button);
+		return button;
+	}
+
+	/** Mute and Unmute share a width, so the button keeps its size when pressed. */
+	private static int muteWidth() {
+		return SculptButton.widthFor(muteLabel(true), muteLabel(false));
 	}
 
 	/**
@@ -334,11 +344,11 @@ public final class TraceScreen extends SculptScreen {
 		PlaceRef place = where.place();
 		if (where.isQuick() && isSingleSoundEntry(place, entry)) {
 			boolean muted = QuickActions.isMuted(ProfileManager.workspace(), place, soundId);
-			return SculptButton.text(muteLabel(muted), MUTE_WIDTH,
+			return SculptButton.text(muteLabel(muted), muteWidth(),
 					() -> addToQuickChanges(place, QuickActions.toggleMute(ProfileManager.workspace(), place, soundId, cueDefault())));
 		}
 		boolean muted = Boolean.TRUE.equals(entry.mute());
-		SculptButton button = SculptButton.text(muteLabel(muted), MUTE_WIDTH,
+		SculptButton button = SculptButton.text(muteLabel(muted), muteWidth(),
 				() -> edit(where, muted ? new EntryEdit.UnmuteWithCue(cueDefault()) : new EntryEdit.MuteWithCue(cueDefault())));
 		return setName == null ? button : Tooltips.describe(button, Component.translatable("soundsculptor.trace.edit.mute.linked_tip", setName));
 	}
@@ -496,19 +506,19 @@ public final class TraceScreen extends SculptScreen {
 		});
 	}
 
-	/** The path to the place's Add to Quick changes button, on its "No entry matches" line or its own line, if shown. */
+	/**
+	 * The path to the place's Add to Quick changes button (on its "No entry matches" line or its own line), if the shown
+	 * rows have one. The rows are not rebuilt while the choice is open, so the button is the one that opened it.
+	 */
 	private ComponentPath addToQuickButtonPath(PlaceRef where) {
-		if (lines == null) {
+		SculptButton button = addQuickButtons.get(where);
+		if (lines == null || button == null) {
 			return null;
 		}
-		Object placeLine = where.isEverywhere() ? key(new TraceText.PlaceTarget(where), -1) : "zone:" + where.zoneId();
-		String label = Component.translatable(ADD_QUICK_KEY).getString();
-		for (Object rowKey : List.of(key(new TraceText.NoEntryTarget(where), -1), placeLine)) {
-			SculptList.Row row = lines.findRow(rowKey);
-			for (int i = 0; row != null && i < row.buttons().size(); i++) {
-				if (row.buttons().get(i).getMessage().getString().equals(label)) {
-					return lines.revealRow(row, i);
-				}
+		for (SculptList.Row row : lines.children()) {
+			int index = row.buttons().indexOf(button);
+			if (index >= 0) {
+				return lines.revealRow(row, index);
 			}
 		}
 		return null;
@@ -535,7 +545,7 @@ public final class TraceScreen extends SculptScreen {
 		volumeApply = apply;
 		volumeBefore = ProfileManager.workspace();
 		volumeLast = null;
-		// Checked exactly like the entry editor's Level field (FR-12.7), e.g. "250" is refused and nothing changes.
+		// LevelPopup checks typed values like the entry editor's Level field (FR-12.7) before calling applyVolume.
 		LevelPopup popup = LevelPopup.open(this, entry, this::applyVolume, this::finishVolume);
 		volumeSlider = popup.slider;
 		volumeField = popup.field;

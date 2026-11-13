@@ -242,7 +242,7 @@ public final class AttachedToPanel {
 			attachMenu = null;
 			host.setFocused(attachButton);
 		});
-		attachMenu.focusRow(attachMenu.children().get(0));
+		attachMenu.focusRow(host, attachMenu.children().get(0));
 	}
 
 	private static String key(PlaceRef where) {

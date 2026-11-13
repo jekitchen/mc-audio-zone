@@ -6,6 +6,10 @@ Each release ships one jar per supported Minecraft version.
 ## Unreleased (1.0)
 
 ### Changes
+- **One Sounds tab** replaces Recently Played and Search. It lists every sound the game knows and narrows as you
+  type; turn on **Recently played** to see only what played in the last 3 minutes, with Pause and Sort. Every row has
+  Mute, Level…, Edit entry, **Add to set…** and Why?, and the filter, search and "Apply to" choice are kept while the
+  game runs.
 - **New name: Sound Sculptor** (was Audio Zone during development). Settings now live in `config/soundsculptor/`.
 - **Rules are now Sound Sets.** A Sound Set is a named list of entries, each for one sound or a group of sounds
   (`minecraft:entity.villager.*`), that mutes them or sets their level. Your sets live in a library on the new
@@ -14,7 +18,7 @@ Each release ships one jar per supported Minecraft version.
   more specific entry wins. A set attached in several places is linked: edit it once and every place changes. The set
   editor's **Attached to** panel shows and changes where a set is used, and Save says which places it will change.
   Deleting a set lists every place it is removed from first, other worlds included (by name only).
-- **Quick changes:** Mute and Edit entry on Recently Played and Search go into the place's own **Quick changes**, a set
+- **Quick changes:** Mute, Level… and Edit entry on the Sounds tab go into the place's own **Quick changes**, a set
   that belongs to Everywhere or to one zone and always comes first there. Save Quick changes to the library to reuse them.
 - **"Why does it sound like this?" in sets:** the trace lists, for Everywhere and each zone, the sets with a matching
   entry, which entry won and why ("Higher in the list", "Exact sound ID"), and how many places use a linked set.
@@ -35,16 +39,25 @@ Each release ships one jar per supported Minecraft version.
 - **Export and import:** Export saves a profile, fixed zones included, to `config/soundsculptor/exports/`. Import a file by
   dropping it on the Profiles tab or from `config/soundsculptor/imports/`. Files are checked first, and a dialog says what
   will change; fixed zones made for another server are skipped. A broken or out-of-range file changes nothing.
-- **Undo:** Mute and Unmute on Recently Played and Search, On/Off, Move and Detach in a place's Sound Sets, New,
+- **Undo:** Mute, Unmute, Level… and Add to set… on the Sounds tab, On/Off, Move and Detach in a place's Sound Sets, New,
   Duplicate, Rename and Delete on the Sound Sets tab, and On/Off and Delete on the Zones list apply at once and show a
   5-second toast with **Undo**. Press <kbd>Ctrl</kbd>+<kbd>Z</kbd> (<kbd>Cmd</kbd>+<kbd>Z</kbd>
   on Mac) or Tab to the button. The toast stays while Undo has focus. A new mute entry starts with the profile's Cue
   default.
-- **Apply to:** Recently Played and Search have an "Apply to" selector: Everywhere, or a zone you are standing in. With a
+- **Apply to:** the Sounds tab has an "Apply to" selector: Everywhere, or a zone you are standing in. With a
   zone chosen, Mute and Edit entry work on that zone's Quick changes, so a zone entry can be made straight from a search.
 - **Edit from "Why?":** every entry line in the sound trace has On/Off, Mute and Level, every zone line has On/Off,
   and each opens its full editor. Editing an entry of a linked set changes every place that uses it, and says so.
   Changes save at once, the trace updates straight away ("Predicted for next play") and a toast offers Undo.
+- **Add to set…** on a Sounds row adds the sound, or one of its **Like this** groups (`minecraft:entity.villager.*`,
+  with how many sounds each matches), to a library Sound Set or a new one, with Undo.
+- **Add sounds…** in the set editor opens the Sounds picker: the same list and search with a checkbox on each row and
+  **Like this…** for groups. What the set already has is marked "In this set"; Add puts one entry per pick into the set,
+  and the set editor's Save decides.
+- **This sound / Like this** in the entry editor: plain words in the pattern field list the matching sounds; This sound
+  uses the sound's exact ID, and Like this lists its groups, closest first, each with how many sounds it matches.
+- Lists fit at 854 × 480 and GUI scales 1 to 4: columns and row buttons are sized from their text, and a long zone
+  name gives way so a sound's ID stays readable.
 
 ## 0.1.0-alpha (unreleased)
 
