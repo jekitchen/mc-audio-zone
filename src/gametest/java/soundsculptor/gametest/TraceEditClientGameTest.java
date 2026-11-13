@@ -21,6 +21,7 @@ import soundsculptor.mc.ZoneEditorScreen;
 import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;
 import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
@@ -39,8 +40,10 @@ import net.minecraft.world.phys.Vec3;
  * dragging its winning entry's level changes the library set (linked, FR-4.9) with "Predicted for next play" and Undo;
  * "Open full editor" on a library entry opens the set editor at that entry and returning refreshes the trace; two sets
  * on Everywhere name the higher one ("Higher in the list"); turning off the winning Quick changes entry; Add to Quick
- * changes on a "No entry matches" line; Unmute on a Quick changes line over a library set's mute (FR-1.5); a Quick
- * changes group line's Mute edits its own entry; a level of 250 refused; and "Open full editor" on a zone line.
+ * changes on a "No entry matches" line, and Esc on its choice returning focus to the button; Add to Quick changes on a
+ * place's own line, overriding a library set's mute in that place only (FR-4.10); Unmute on a Quick changes line over a
+ * library set's mute (FR-1.5); a Quick changes group line's Mute edits its own entry; a level of 250 refused; and "Open
+ * full editor" on a zone line.
  */
 public final class TraceEditClientGameTest implements FabricClientGameTest {
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
@@ -69,6 +72,8 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			twoSetsOnEverywhereNamesHigherSet(context, spot);
 			turnOffWinningEntry(context, spot);
 			addToQuickChangesMutesNextPlay(context, spot);
+			escOnAddChoiceReturnsFocus(context, spot);
+			placeLineOverridesLibraryMute(context, spot, penZone);
 			unmuteOnQuickLineOverLibraryMute(context, spot);
 			groupQuickLineMuteEditsItsOwnEntry(context, spot);
 			levelOf250RefusedAndZoneLineOpensZoneEditor(context, spot, penZone);
@@ -282,6 +287,102 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 	}
 
 	/**
+	 * Keyboard: Enter on Add to Quick changes opens the choice with focus on Mute; Esc closes it without changing
+	 * anything and puts focus back on the Add to Quick changes button, so the player can carry on from there.
+	 */
+	private static void escOnAddChoiceReturnsFocus(ClientGameTestContext context, Point spot) {
+		Snapshot before = Snapshot.take(context);
+		try {
+			setQuick(context, List.of());
+			play(context, spot);
+			openTrace(context);
+			context.runOnClient(mc -> {
+				TraceScreen t = trace(mc);
+				SculptList.Row none = t.row(new TraceText.NoEntryTarget(PlaceRef.EVERYWHERE));
+				t.focusPath(t.lines.revealRow(none, 0));
+				check(t.lines.getFocused() == none && none.getFocused() == none.buttons().get(0), "Add to Quick changes has focus");
+			});
+			context.getInput().pressKey(InputConstants.KEY_RETURN);
+			context.waitTicks(SETTLE);
+			context.runOnClient(mc -> {
+				TraceScreen t = trace(mc);
+				check(t.hasOverlay() && t.getFocused() == t.addQuickMute, "Enter opens the choice with focus on Mute");
+			});
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(SETTLE);
+			context.runOnClient(mc -> {
+				TraceScreen t = trace(mc);
+				check(!t.hasOverlay() && t.addQuickMute == null && t.addQuickLevel == null, "Esc closes the choice");
+				SculptList.Row none = t.row(new TraceText.NoEntryTarget(PlaceRef.EVERYWHERE));
+				check(t.getFocused() == t.lines && t.lines.getFocused() == none && none.getFocused() == none.buttons().get(0),
+						"focus is back on Add to Quick changes, was " + t.getFocused());
+				check(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER) == null, "Esc changes nothing");
+				check(t.toast() == null, "nothing changed, so there is nothing to undo");
+			});
+			closeTrace(context);
+		} finally {
+			before.restore(context);
+		}
+	}
+
+	/**
+	 * The controller's ruling on FR-4.10: Add to Quick changes is offered at every place whose Quick changes has no entry
+	 * for the sound, also where a library set matches. A library set attached to Everywhere and the Pen mutes the
+	 * villager: the Everywhere heading and the Pen's line each offer Add to Quick changes, whose Mute reads Unmute (the
+	 * actual state). Unmute on the Pen's line writes "Not muted" into the Pen's Quick changes only: the villager is heard
+	 * in the Pen, the library set still mutes, and Everywhere is unchanged. Esc on the choice returns focus to the line's
+	 * button.
+	 */
+	private static void placeLineOverridesLibraryMute(ClientGameTestContext context, Point spot, Zone penZone) {
+		SoundSet hush = new SoundSet("trace-hush-all", "Hush villagers", List.of(SetEntry.of("e1", "*villager*").withMute(true)));
+		Snapshot before = Snapshot.take(context);
+		try {
+			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
+					.withEverywhere(PlaceSets.EMPTY.attach(hush.id())).withZones(List.of(penZone.withSets(PlaceSets.EMPTY.attach(hush.id())))),
+					ws.library().put(hush))));
+			// With a zone around it, a muted sound starts silently, since a zone could unmute it while it plays.
+			check(play(context, spot) <= 1.0E-6F, "the library set mutes the villager");
+			openTrace(context);
+			context.runOnClient(mc -> {
+				TraceScreen t = trace(mc);
+				SculptList.Row heading = t.row(new TraceText.PlaceTarget(PlaceRef.EVERYWHERE));
+				check(heading != null && heading.buttons().size() == 1 && heading.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
+						"the Everywhere heading offers Add to Quick changes over the library set");
+				SculptList.Row zone = t.row(new TraceText.ZoneTarget(ProfileManager.profile().zone("pen")));
+				check(zone != null && zone.buttons().size() == 3 && zone.buttons().get(1).getMessage().getString().equals("Add to Quick changes"),
+						"the Pen's line offers Add to Quick changes over the library set");
+				t.focusPath(t.lines.revealRow(zone, 1));
+				zone.buttons().get(1).onPress(null);
+				check(t.hasOverlay() && t.addQuickMute.getMessage().getString().equals("Unmute"), "the choice shows the actual state, Unmute");
+				String narration = NarrationCompat.collect(t.addQuickMute::updateNarration);
+				check(narration.contains("Add to Quick changes in Pen"), "the choice reads where it goes, was " + narration);
+			});
+			context.getInput().pressKey(InputConstants.KEY_ESCAPE);
+			context.waitTicks(SETTLE);
+			context.runOnClient(mc -> {
+				TraceScreen t = trace(mc);
+				SculptList.Row zone = t.row(new TraceText.ZoneTarget(ProfileManager.profile().zone("pen")));
+				check(!t.hasOverlay() && t.lines.getFocused() == zone && zone.getFocused() == zone.buttons().get(1),
+						"Esc returns focus to the Pen line's Add to Quick changes");
+				t.openAddToQuickChanges(PEN);
+				t.addQuickMute.onPress(null);
+				SetEntry added = QuickActions.quickEntry(ProfileManager.workspace(), PEN, VILLAGER);
+				check(added != null && Boolean.FALSE.equals(added.mute()), "Unmute writes Not muted into the Pen's Quick changes: " + added);
+				check(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER) == null, "Everywhere is unchanged");
+				check(Boolean.TRUE.equals(ProfileManager.library().get(hush.id()).entry("e1").mute()), "the library set still mutes");
+				check(t.trace().volumePercent() == 100, "the trace shows it heard in the Pen, was " + t.trace().volumePercent());
+				check(t.text().contains("    Quick changes\n      " + VILLAGER + ": Not muted"), "the Pen lists its Quick changes first:\n" + t.text());
+				SculptList.Row now = t.row(new TraceText.ZoneTarget(ProfileManager.profile().zone("pen")));
+				check(now.buttons().size() == 2, "with a matching Quick changes entry the Pen's line no longer offers Add to Quick changes");
+			});
+			closeTrace(context);
+			check(play(context, spot) == 1.0F, "the villager is heard in the Pen on its next play");
+		} finally {
+			before.restore(context);
+		}
+	}
+
+	/**
 	 * FR-1.5 in the trace: a library set mutes the villager, and Everywhere's Quick changes has its single-sound entry
 	 * (Cue only). The Quick changes line comes first and its Mute shows the actual state, Unmute; pressing it writes "Not
 	 * muted" into Quick changes, which wins there, so the next play is heard. The library set is not changed.
@@ -369,8 +470,10 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				TraceScreen t = trace(mc);
 				SculptList.Row row = t.row(new TraceText.ZoneTarget(ProfileManager.profile().zone("pen")));
-				check(row != null && row.buttons().size() == 2, "the zone line should have On/Off and Open full editor");
-				row.buttons().get(1).onPress(null);
+				// The zone's library set matches and its Quick changes does not, so the line offers Add to Quick changes too.
+				check(row != null && row.buttons().size() == 3 && row.buttons().get(1).getMessage().getString().equals("Add to Quick changes"),
+						"the zone line should have On/Off, Add to Quick changes and Open full editor");
+				row.buttons().get(2).onPress(null);
 			});
 			context.waitForScreen(ZoneEditorScreen.class);
 			context.runOnClient(mc -> {

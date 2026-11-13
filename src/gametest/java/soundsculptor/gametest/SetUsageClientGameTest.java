@@ -22,7 +22,9 @@ import soundsculptor.mc.SetUsageIndex;
 
 /**
  * Where Sound Sets are used (FR-4.9, FR-4.11): the background index sees other worlds' profiles, the loaded profile
- * always comes from the live snapshot, and a set whose save keeps failing shows its toast once until a save works.
+ * always comes from the live snapshot, and a set whose save keeps failing shows its toast once until a save works. A
+ * profile whose save failed is kept and written by the next flush once the file is free, as at exit (PRD 9.2: no data
+ * loss).
  */
 public final class SetUsageClientGameTest implements FabricClientGameTest {
 	private static final String OTHER = "other.example.net";
@@ -87,6 +89,26 @@ public final class SetUsageClientGameTest implements FabricClientGameTest {
 			check(toasts(context) == before + 2, "it toasts again after a save worked");
 
 			unblockFile(context, file);
+
+			// A profile whose save fails is not lost: the latest one is written by the next flush (as when the game exits)
+			// once the file is free. It toasts once, like a set.
+			Path profileFile = context.computeOnClient(mc -> ProfileManager.store().fileFor(key));
+			String name = context.computeOnClient(mc -> ProfileManager.profile().name());
+			blockFile(context, profileFile);
+			int beforeProfile = toasts(context);
+			context.runOnClient(mc -> {
+				ProfileManager.update(p -> p.withName("Usage renamed"));
+				ProfileManager.update(p -> p.withName("Usage renamed again"));
+				ProfileManager.flushSaves();
+			});
+			context.waitTicks(5);
+			check(toasts(context) == beforeProfile + 1, "a failing profile toasts once; was " + (toasts(context) - beforeProfile));
+			unblockFile(context, profileFile);
+			context.runOnClient(mc -> ProfileManager.flushSaves());
+			String saved = context.computeOnClient(mc -> read(profileFile));
+			check(saved.contains("\"Usage renamed again\""), "the flush writes the latest profile once the file is free:\n" + saved);
+			context.runOnClient(mc -> ProfileManager.update(p -> p.withName(name)));
+
 			context.runOnClient(mc -> {
 				ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().remove("usage-fail").remove(farm.id())));
 				ProfileManager.flushSaves();
@@ -111,6 +133,14 @@ public final class SetUsageClientGameTest implements FabricClientGameTest {
 				throw new IllegalStateException(e);
 			}
 		});
+	}
+
+	private static String read(Path file) {
+		try {
+			return Files.readString(file);
+		} catch (IOException e) {
+			throw new IllegalStateException(e);
+		}
 	}
 
 	private static void unblockFile(ClientGameTestContext context, Path file) {

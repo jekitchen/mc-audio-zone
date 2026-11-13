@@ -31,8 +31,10 @@ import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
 import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptButton;
+import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
+import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -60,8 +62,11 @@ import net.minecraft.util.FormattedCharSequence;
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
  *   <li>A-4 narration: every control on the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
- *   and the sound trace (a shared set's line, which reads its places, and Add to Quick changes with its choice),
- *   including list row buttons, has a label to read.</li>
+ *   the sound trace (a shared set's line, which reads its places, and Add to Quick changes with its choice), the set
+ *   editor, the delete warning, the linked-save confirmation and the import dialogs, including list row buttons, has a
+ *   label to read.</li>
+ *   <li>Long place lists (FR-4.11): with a set used in {@value #MANY_ZONES} long-named zones, the delete warning and the
+ *   linked-save confirmation keep their buttons on screen and scroll, and every place is still listed and read.</li>
  *   <li>Pseudo-language (PRD 9.3): the same layout check with every Sound Sculptor text about 40% longer, reported.</li>
  * </ul>
  * Grayscale, Sodium, Iris, Sound Physics Remastered and servers stay manual checks.
@@ -80,6 +85,8 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	/** A library set for the Sound Sets tab, its name screen and its delete warning. */
 	private static final SoundSet SET = new SoundSet("set-a11y", "Animals of the farm and the barn by the river",
 			List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
+	/** Zones using one set, for the long place lists of the delete warning and the linked-save confirmation. */
+	private static final int MANY_ZONES = 40;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -195,6 +202,54 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silentControls(rename);
 			});
 			check(silentImport.isEmpty(), "controls without a label in the import's rename screen: " + silentImport);
+			// A-4 for the delete warning, the linked-save confirmation and the import's exact-match dialog.
+			List<String> silentDialogs = context.computeOnClient(mc -> {
+				List<String> silent = new ArrayList<>();
+				for (Screens dialog : List.of(Screens.SET_DELETE, Screens.SET_SAVE_CONFIRM_MANY, Screens.IMPORT_EXACT_MATCH)) {
+					Screen opened = dialog.open(mc);
+					mc.gui.setScreen(opened);
+					silent.addAll(silentControls(opened));
+				}
+				return silent;
+			});
+			check(silentDialogs.isEmpty(), "controls without a label in the dialogs: " + silentDialogs);
+
+			// FR-4.11: a set used in 40 long-named zones. The delete warning lists every place; it scrolls so Delete and
+			// Cancel stay on screen; the wheel, Up/Down and Page Up/Down move it; the narrator reads every place.
+			context.runOnClient(mc -> {
+				SculptDialog dialog = (SculptDialog) Screens.SET_DELETE_MANY.open(mc);
+				mc.gui.setScreen(dialog);
+				String message = dialog.message().getString();
+				for (int i = 1; i <= MANY_ZONES; i++) {
+					check(message.contains(manyZoneName(i)), "the warning lists every place, missing " + manyZoneName(i));
+				}
+				check(dialog.isScrollable(), "40 places do not fit at " + dialog.width + "x" + dialog.height + ", so the warning scrolls");
+				for (SculptButton button : dialog.buttons()) {
+					check(button.getY() >= 0 && button.getBottom() <= dialog.height, "the buttons stay on screen: " + button.getMessage().getString());
+				}
+				check(dialog.firstVisibleLine() == 0, "it starts at the top");
+			});
+			context.getInput().pressKey(InputConstants.KEY_PAGEDOWN);
+			context.waitTicks(1);
+			context.runOnClient(mc -> {
+				SculptDialog dialog = (SculptDialog) mc.gui.screen();
+				int last = dialog.lineCount() - dialog.visibleLineCount();
+				check(dialog.firstVisibleLine() == Math.min(dialog.visibleLineCount(), last), "Page Down moves a screenful, at " + dialog.firstVisibleLine());
+				int at = dialog.firstVisibleLine();
+				dialog.mouseScrolled(dialog.width / 2.0, dialog.height / 2.0, 0, -1);
+				check(dialog.firstVisibleLine() == Math.min(last, at + 3), "the wheel scrolls down 3 lines, at " + dialog.firstVisibleLine());
+				dialog.scrollBy(1000);
+				check(dialog.firstVisibleLine() == last, "it scrolls to the last line and stops there");
+			});
+			context.getInput().pressKey(InputConstants.KEY_UP);
+			context.waitTicks(1);
+			context.runOnClient(mc -> {
+				SculptDialog dialog = (SculptDialog) mc.gui.screen();
+				check(dialog.firstVisibleLine() == dialog.lineCount() - dialog.visibleLineCount() - 1, "Up moves one line");
+				check(dialog.getNarrationMessage().getString().contains(manyZoneName(MANY_ZONES)), "the narrator reads every place");
+				check(dialog.getFocused() == dialog.buttons().get(1), "Cancel still has focus");
+			});
+			context.takeScreenshot("a11y-delete-many-places");
 			context.setScreen(() -> null);
 
 			// A-3: every screen at every window size and GUI scale.
@@ -270,6 +325,15 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		SET_DELETE(mc -> SetDeleteDialog.create(null, ProfileManager.profile(), new LibraryOps.DeletePlan(SET.id(), SET.name(),
 				List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("z1"), PlaceRef.zone("z2")), List.of("Hypixel Skyblock", "Creative test world")),
 				true, () -> { }), null),
+		SET_DELETE_MANY(mc -> SetDeleteDialog.create(null, manyZonesProfile(), new LibraryOps.DeletePlan(SET.id(), SET.name(),
+				manyPlaces(), List.of("Hypixel Skyblock", "Creative test world")), true, () -> { }), null),
+		SET_SAVE_CONFIRM_MANY(mc -> {
+			List<String> names = new ArrayList<>();
+			for (int i = 1; i <= MANY_ZONES; i++) {
+				names.add(manyZoneName(i));
+			}
+			return SetEditorScreen.linkedSaveDialog(null, SET.name(), SetEditorScreen.linkedMessage(names, 3, true), () -> { });
+		}, null),
 		ZONES(mc -> tab(SoundSculptorScreen.TAB_ZONES), null),
 		PROFILES(mc -> tab(SoundSculptorScreen.TAB_PROFILES), null),
 		PROFILE_RENAME(mc -> new soundsculptor.mc.ProfileRenameScreen(null, ProfileManager.key(), ProfileManager.profile()), null),
@@ -394,7 +458,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	}
 
 	/** Controls with nothing to read: an empty label, including list row buttons. */
-	private static List<String> silentControls(SculptScreen screen) {
+	private static List<String> silentControls(Screen screen) {
 		List<String> silent = new ArrayList<>();
 		for (GuiEventListener child : screen.children()) {
 			if (child instanceof SculptList list) {
@@ -452,6 +516,29 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 	private static Zone attached(Zone zone, String setId) {
 		return zone.withSets(zone.sets().attach(setId));
+	}
+
+	/** A long zone name, like a player's own ("Automatic sugar cane farm by the north river, row 12"). */
+	private static String manyZoneName(int i) {
+		return "Automatic sugar cane farm by the north river, row " + i;
+	}
+
+	/** Everywhere and {@value #MANY_ZONES} long-named zones, all using SET. */
+	private static List<PlaceRef> manyPlaces() {
+		List<PlaceRef> places = new ArrayList<>(List.of(PlaceRef.EVERYWHERE));
+		for (int i = 1; i <= MANY_ZONES; i++) {
+			places.add(PlaceRef.zone("many-" + i));
+		}
+		return places;
+	}
+
+	/** A profile whose zones carry the names {@link #manyPlaces} are shown with. */
+	private static Profile manyZonesProfile() {
+		List<Zone> zones = new ArrayList<>();
+		for (int i = 1; i <= MANY_ZONES; i++) {
+			zones.add(attached(zone("many-" + i, manyZoneName(i), ProfileManager.key()), SET.id()));
+		}
+		return Profile.empty("Many zones").withZones(zones);
 	}
 
 	/** Every Sound Sculptor text through {@link PseudoLocale#pseudo}; everything else unchanged. */
