@@ -54,7 +54,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("m5-quick-empty");
 
 			// FR-4 AC 1: entry minecraft:entity.villager.* set to Mute, made with the keyboard in Everywhere's Quick changes.
-			context.runOnClient(mc -> setEditor(mc).setFocused(setEditor(mc).addButton));
+			context.runOnClient(mc -> setEditor(mc).setFocused(setEditor(mc).typeButton));
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitForScreen(EntryEditorScreen.class);
 			// 6.2: a fresh editor shows no error yet, but Save is disabled until the pattern is valid.
@@ -98,7 +98,7 @@ public final class M5ClientGameTest implements FabricClientGameTest {
 			// FR-4 AC 3: an exact entry at 100% below the mute entry wins for that one sound.
 			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.forQuickChanges(main(mc), PlaceRef.EVERYWHERE)));
 			context.waitForScreen(SetEditorScreen.class);
-			context.runOnClient(mc -> setEditor(mc).addSounds());
+			context.runOnClient(mc -> setEditor(mc).typePattern());
 			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars(VILLAGER_AMBIENT);
 			context.runOnClient(mc -> editor(mc).setFocused(editor(mc).volumeField));

@@ -36,7 +36,8 @@
 			"soundsculptor.gametest.SoundSetsTabClientGameTest",
 			"soundsculptor.gametest.SetEditorClientGameTest",
 			"soundsculptor.gametest.PlaceSetsClientGameTest",
-			"soundsculptor.gametest.PrecedenceSetsClientGameTest"
+			"soundsculptor.gametest.PrecedenceSetsClientGameTest",
+			"soundsculptor.gametest.PickerClientGameTest"
 		]
 	},
 	"depends": {

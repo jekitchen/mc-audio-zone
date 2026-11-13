@@ -24,6 +24,7 @@ import soundsculptor.mc.SetDeleteDialog;
 import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.SetLibraryPanel;
 import soundsculptor.mc.SetNameScreen;
+import soundsculptor.mc.SoundPickerScreen;
 import soundsculptor.mc.SetRenameOnImportScreen;
 import soundsculptor.mc.ProfileTransfer;
 import soundsculptor.core.Message;
@@ -64,7 +65,8 @@ import net.minecraft.util.FormattedCharSequence;
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
  *   <li>A-4 narration: every control on the Sounds tab (the Recently played filter on and off, its search help, its
- *   Level pop-up and Add to set…), the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
+ *   Level pop-up and Add to set…), the Sounds picker (the filter on and off, and Like this…), the Sound Sets, Zones and
+ *   Profiles tabs, a place's Sound Sets and Attach set…,
  *   the sound trace (a shared set's line, which reads its places, and Add to Quick changes with its choice), the set
  *   editor, the delete warning, the linked-save confirmation and the import dialogs, including list row buttons, has a
  *   label to read.</li>
@@ -155,6 +157,25 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentSounds.isEmpty(), "controls without a label on the Sounds tab: " + silentSounds);
+			context.runOnClient(mc -> SoundsPanel.resetRememberedState());
+
+			// A-4 for the Sounds picker (FR-1.7): its checkboxes and Like this… in both filter modes, and the groups pop-up.
+			List<String> silentPicker = context.computeOnClient(mc -> {
+				List<String> silent = new ArrayList<>();
+				for (boolean recentOnly : new boolean[] {true, false}) {
+					SoundPickerScreen picker = new SoundPickerScreen(null, SetDraft.of(SET));
+					mc.gui.setScreen(picker);
+					picker.sounds().setRecentOnly(recentOnly);
+					silent.addAll(silentControls(picker));
+				}
+				SoundPickerScreen picker = (SoundPickerScreen) mc.gui.screen();
+				check(!picker.sounds().list.children().isEmpty(), "with the filter off, the picker lists every known sound");
+				picker.sounds().openLikeThis(VILLAGER);
+				silent.addAll(silentControls(picker));
+				check(picker.sounds().likeThisList.getFocused() != null, "Like this… takes focus, so arrows, Space and Esc work in it");
+				return silent;
+			});
+			check(silentPicker.isEmpty(), "controls without a label in the Sounds picker: " + silentPicker);
 			context.runOnClient(mc -> SoundsPanel.resetRememberedState());
 
 			// A-4: every control on the Sound Sets, Zones and Profiles tabs has something to read out.
@@ -368,6 +389,19 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		ADD_TO_SET(mc -> new AddToSetScreen((SculptScreen) tab(SoundSculptorScreen.TAB_SOUNDS), VILLAGER, "Villager mumbles", () -> { }), null),
 		ADD_TO_SET_TARGETS(mc -> new AddToSetScreen((SculptScreen) tab(SoundSculptorScreen.TAB_SOUNDS), VILLAGER, "Villager mumbles", () -> { }), s -> {
 			((AddToSetScreen) s).chooseSet(SET.id());
+			return null;
+		}),
+		PICKER_RECENT(mc -> new SoundPickerScreen(null, SetDraft.of(SET)), s -> {
+			((SoundPickerScreen) s).sounds().setRecentOnly(true);
+			return null;
+		}),
+		PICKER_ALL(mc -> new SoundPickerScreen(null, SetDraft.of(SET)), s -> {
+			((SoundPickerScreen) s).sounds().setRecentOnly(false);
+			return null;
+		}),
+		PICKER_LIKE_THIS(mc -> new SoundPickerScreen(null, SetDraft.of(SET)), s -> {
+			((SoundPickerScreen) s).sounds().setRecentOnly(false);
+			((SoundPickerScreen) s).sounds().openLikeThis(VILLAGER);
 			return null;
 		}),
 		SETS(mc -> tab(SoundSculptorScreen.TAB_SETS), null),

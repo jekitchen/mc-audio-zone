@@ -256,8 +256,9 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * FR-4.2 and FR-12.7 through Add sounds…: uppercase is lowercased as typed; a character a pattern can't have shows an
-	 * error and disables Save. Also the 512-entry limit: Add sounds… on a full set says so and opens nothing.
+	 * FR-4.2 and FR-12.7 through Type a pattern…: uppercase is lowercased as typed; a character a pattern can't have shows
+	 * an error and disables Save. Also the 512-entry limit: Add sounds… and Type a pattern… on a full set say so and open
+	 * nothing.
 	 */
 	private static void uppercaseGroupLowercasedAndBadCharBlocksSave(ClientGameTestContext context) {
 		SoundSet typing = new SoundSet("set-editor-typing", "Typing", List.of());
@@ -271,7 +272,7 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().put(typing).put(full))));
 			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.edit(null, typing.id())));
 			context.waitForScreen(SetEditorScreen.class);
-			context.runOnClient(mc -> editor(mc).addButton.onPress(null));
+			context.runOnClient(mc -> editor(mc).typeButton.onPress(null));
 			context.waitForScreen(EntryEditorScreen.class);
 			check(context.computeOnClient(mc -> ((EntryEditorScreen) mc.gui.screen()).getTitle().getString()).equals("New entry"), "a new entry");
 			context.getInput().typeChars("*:ENTITY.COW.*");
@@ -298,13 +299,19 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> editor(mc).save());
 			check(context.computeOnClient(mc -> ProfileManager.library().get(typing.id()).entries().size()) == 1, "Save adds it to the set");
 
-			// A full set: Add sounds… shows the limit and stays in the set editor.
+			// A full set: Add sounds… and Type a pattern… show the limit and stay in the set editor.
 			context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.edit(null, full.id())));
 			context.waitForScreen(SetEditorScreen.class);
 			context.runOnClient(mc -> editor(mc).addSounds());
-			check(context.computeOnClient(mc -> mc.gui.screen() instanceof SetEditorScreen), "a full set opens no entry editor");
+			check(context.computeOnClient(mc -> mc.gui.screen() instanceof SetEditorScreen), "a full set opens no picker");
 			check(context.computeOnClient(mc -> editor(mc).toast().message().getString()).equals("A Sound Set can have up to 512 entries."),
 					"the toast names the limit");
+			context.runOnClient(mc -> {
+				editor(mc).dismissToast();
+				editor(mc).typePattern();
+			});
+			check(context.computeOnClient(mc -> mc.gui.screen() instanceof SetEditorScreen && editor(mc).toast() != null),
+					"a full set opens no entry editor either, and says why");
 			check(!context.computeOnClient(mc -> editor(mc).draft().changed()), "and nothing changed");
 		} finally {
 			before.restore(context);
@@ -322,7 +329,7 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> editor(mc).attachedPanel() == null && editor(mc).nameField == null),
 					"Quick changes has no Attached to panel and no name");
 			context.takeScreenshot("set-editor-quick");
-			context.runOnClient(mc -> editor(mc).addSounds());
+			context.runOnClient(mc -> editor(mc).typePattern());
 			context.waitForScreen(EntryEditorScreen.class);
 			context.runOnClient(mc -> {
 				entryEditor(mc).patternField.setValue(COW);

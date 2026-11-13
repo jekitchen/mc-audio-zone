@@ -57,8 +57,13 @@ public class SculptButton extends AbstractButton {
 
 	@Override
 	protected MutableComponent createNarrationMessage() {
-		MutableComponent own = super.createNarrationMessage();
+		MutableComponent own = ownNarration();
 		return narrationContext == null ? own : Component.translatable("soundsculptor.ui.in_context", narrationContext.get(), own);
+	}
+
+	/** What the button itself reads, after its context: vanilla's "Label button". */
+	protected MutableComponent ownNarration() {
+		return super.createNarrationMessage();
 	}
 
 	public boolean isIconButton() {

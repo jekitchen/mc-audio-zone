@@ -15,6 +15,8 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
 import soundsculptor.core.browser.BrowserRow;
+import soundsculptor.core.browser.LikeThis;
+import soundsculptor.core.browser.PickerModel;
 import soundsculptor.core.browser.SoundBrowser;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.ApplyTo;
@@ -36,6 +38,7 @@ import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.zones.Point;
 import soundsculptor.mc.ui.SculptButton;
+import soundsculptor.mc.ui.SculptCheckbox;
 import soundsculptor.mc.ui.SculptDropdown;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
@@ -57,8 +60,13 @@ import soundsculptor.mc.ui.Tooltips;
  * change the sound's single-sound entry in the Quick changes of the place "Apply to" chose (FR-4.10), at once with a
  * 5-second Undo toast (FR-12.5).
  *
- * <p>The filter, search text, sort, pause and Apply to choice are remembered while the game runs: the filter starts on
- * the first time the tab opens and then stays as the player left it. The list refreshes at most 4 times a second
+ * <p>In picker mode ({@link #picker}, FR-1.7) the same browser serves {@link SoundPickerScreen}: each row has a checkbox
+ * (or "✔ In this set" and no checkbox) and Like this… instead of the quick actions, and there is no Apply to, Pause or
+ * Sort.
+ *
+ * <p>The filter, search text, sort, pause and Apply to choice are remembered while the game runs, apart for the tab and
+ * the picker, so the picker never changes the tab's filter: the filter starts on the first time each opens and then
+ * stays as the player left it. The list refreshes at most 4 times a second
  * (FR-1.6), each refresh building one recent snapshot and one mute predicate for every row; search waits 150 ms after
  * typing stops (FR-3.4).
  */
@@ -87,6 +95,9 @@ public final class SoundsPanel {
 	private static final int TEXT_PADDING = 12;
 	private static final int DROPDOWN_PADDING = 28;
 	private static final int HELP_LINES = 7;
+	/** Room for "✔ In this set" where a picker row's play status would be. */
+	private static final int IN_SET_WIDTH = 80;
+	private static final int LIKE_THIS_PADDING = 16;
 	private static final Identifier MUTE_ICON = icon("mute");
 	private static final Identifier VOLUME_ICON = icon("volume");
 	private static final Identifier LEVEL_ICON = icon("level");
@@ -94,15 +105,16 @@ public final class SoundsPanel {
 	private static final Identifier ADD_ICON = icon("add");
 	private static final Identifier HELP_ICON = icon("help");
 
-	// Remembered while the game runs (FR-1.0, FR-1.3, FR-1.5).
-	private static boolean recentOnly = true;
-	private static String searchText = "";
-	private static SortOrder sort = SortOrder.MOST_RECENT;
-	private static boolean paused;
-	/** The zone "Apply to" chose last, or null for Everywhere. */
-	private static String applyZoneId;
+	/** The Sounds tab's remembered state; the picker has its own, so opening it changes nothing on the tab. */
+	private static final Remembered TAB_STATE = new Remembered();
+	private static final Remembered PICKER_STATE = new Remembered();
 
 	private final SculptScreen host;
+	private final Remembered state;
+	/** Picker mode (FR-1.7): what the rows tick, or {@code null} on the Sounds tab. */
+	private final PickerModel picker;
+	/** Told after every tick or untick, so the picker's footer follows. */
+	private final Runnable picksChanged;
 	public SculptTextField searchField;
 	public SculptButton helpButton;
 	public SculptToggle recentToggle;
@@ -115,6 +127,8 @@ public final class SoundsPanel {
 	public SculptList list;
 	/** The search examples, while the "?" pop-up is open. */
 	public SculptList helpList;
+	/** The Like this… groups (FR-4.8), while the pop-up is open (picker mode). */
+	public SculptList likeThisList;
 	/** The Level pop-up, while it is open. */
 	public SculptSlider levelSlider;
 	public SculptTextField levelField;
@@ -143,6 +157,14 @@ public final class SoundsPanel {
 	private SortOrder shownSort;
 	private long shownSecond;
 	private boolean shownAnyRecent;
+	private int shownPickVersion;
+	/** Counts ticks and unticks in picker mode, so a refresh after one is not skipped. */
+	private int pickVersion;
+	/** The Like this… pop-up's sound and its groups (counted once when it opens). */
+	private String likeThisSound;
+	private List<LikeThis.Group> likeThisGroups = List.of();
+	/** The Like this… button's width, measured once per panel rather than for each of up to 2,000 rows. */
+	private int likeThisWidth;
 	/** Built rows by sound ID; cleared when the workspace, Apply to or Show distance changes. */
 	private final Map<String, CachedRow> rowCache = new HashMap<>();
 
@@ -151,17 +173,58 @@ public final class SoundsPanel {
 	private ApplyTarget levelTarget;
 	private Workspace levelBefore;
 
+	/** The Sounds tab. */
 	public SoundsPanel(SculptScreen host) {
-		this.host = host;
+		this(host, TAB_STATE, null, null);
 	}
 
-	/** Back to how a new game run starts: the filter on, no search text, most recent first, Everywhere. For tests. */
+	private SoundsPanel(SculptScreen host, Remembered state, PickerModel picker, Runnable picksChanged) {
+		this.host = host;
+		this.state = state;
+		this.picker = picker;
+		this.picksChanged = picksChanged;
+	}
+
+	/**
+	 * The browser in picker mode (FR-1.7): a checkbox on each row (or "In this set" when the set has the sound) and Like
+	 * this…, instead of the quick actions; no Apply to, Pause or Sort, which act on places. Its filter and search text
+	 * are remembered apart from the Sounds tab's.
+	 *
+	 * @param picksChanged runs after every tick or untick
+	 */
+	public static SoundsPanel picker(SculptScreen host, PickerModel picker, Runnable picksChanged) {
+		return new SoundsPanel(host, PICKER_STATE, picker, picksChanged);
+	}
+
+	/**
+	 * Back to how a new game run starts, for the tab and the picker: the filter on, no search text, most recent first,
+	 * Everywhere. For tests.
+	 */
 	public static void resetRememberedState() {
-		recentOnly = true;
-		searchText = "";
-		sort = SortOrder.MOST_RECENT;
-		paused = false;
-		applyZoneId = null;
+		TAB_STATE.reset();
+		PICKER_STATE.reset();
+	}
+
+	/** Remembered while the game runs (FR-1.0, FR-1.3, FR-1.5). */
+	private static final class Remembered {
+		boolean recentOnly;
+		String searchText;
+		SortOrder sort;
+		boolean paused;
+		/** The zone "Apply to" chose last, or null for Everywhere. */
+		String applyZoneId;
+
+		Remembered() {
+			reset();
+		}
+
+		void reset() {
+			recentOnly = true;
+			searchText = "";
+			sort = SortOrder.MOST_RECENT;
+			paused = false;
+			applyZoneId = null;
+		}
 	}
 
 	// ---- Building ----
@@ -169,26 +232,44 @@ public final class SoundsPanel {
 	public void build(SculptScreen.Body body) {
 		Font font = Minecraft.getInstance().font;
 		recentToggle = Tooltips.describe(new SculptToggle(toggleWidth(font, "soundsculptor.sounds.recent_only"),
-				Component.translatable("soundsculptor.sounds.recent_only"), recentOnly, this::setRecentOnly),
+				Component.translatable("soundsculptor.sounds.recent_only"), state.recentOnly, this::setRecentOnly),
 				Component.translatable("soundsculptor.sounds.recent_only.tip"));
 		helpButton = SculptButton.icon(HELP_ICON, Component.translatable("soundsculptor.sounds.help.show"), this::openHelp);
 		searchField = new SculptTextField(font, Math.max(60, body.width() - Theme.ICON_BUTTON_SIZE - recentToggle.getWidth() - 2 * Theme.GAP),
 				Component.translatable("soundsculptor.sounds.field"))
 				.placeholder(Component.translatable("soundsculptor.sounds.hint"));
 		searchField.setMaxLength(200);
-		searchField.setValue(searchText);
+		searchField.setValue(state.searchText);
 		searchField.onChange(text -> {
-			searchText = text;
+			state.searchText = text;
 			searchPending = true;
 			searchChangedAt = Util.getMillis();
 		});
 		body.row(searchField, helpButton, recentToggle);
 
+		// The picker has no Apply to, Pause or Sort: they act on places, and its rows have no quick actions.
+		if (picker == null) {
+			buildPlaceRow(body, font);
+		}
+
+		body.label(() -> Component.translatable(count == 1 ? "soundsculptor.sounds.count.one" : "soundsculptor.sounds.count", count));
+		list = new SculptList(body.width(), 100, Component.translatable("soundsculptor.sounds.list"));
+		list.setEmptyText(() -> Component.translatable(!state.recentOnly ? "soundsculptor.sounds.empty"
+				: query.isEmpty() ? "soundsculptor.sounds.empty_recent" : "soundsculptor.sounds.empty_recent_filtered"));
+		body.fill(list);
+
+		entries = KnownSounds.entries();
+		query = SearchQuery.parse(state.searchText);
+		refresh();
+	}
+
+	/** Apply to, Pause and Sort (the Sounds tab only). */
+	private void buildPlaceRow(SculptScreen.Body body, Font font) {
 		pauseToggle = Tooltips.describe(new SculptToggle(toggleWidth(font, "soundsculptor.sounds.pause"),
-				Component.translatable("soundsculptor.sounds.pause"), paused, this::setPaused),
+				Component.translatable("soundsculptor.sounds.pause"), state.paused, this::setPaused),
 				Component.translatable("soundsculptor.sounds.pause.tip"));
 		sortDropdown = Tooltips.describe(new SculptDropdown<>(sortWidth(font), Component.translatable("soundsculptor.sounds.sort"),
-				List.of(SortOrder.values()), SoundsPanel::sortName, sort, this::setSort),
+				List.of(SortOrder.values()), SoundsPanel::sortName, state.sort, this::setSort),
 				Component.translatable("soundsculptor.sounds.sort.tip"));
 		applyChoices = computeApplyChoices();
 		int applyWidth = Math.max(MIN_APPLY_TO_WIDTH,
@@ -199,16 +280,6 @@ public final class SoundsPanel {
 		// Pause and Sort keep their place while hidden, so turning the filter on or off moves nothing else.
 		body.row(applyToDropdown, pauseToggle, sortDropdown);
 		showFilterControls();
-
-		body.label(() -> Component.translatable(count == 1 ? "soundsculptor.sounds.count.one" : "soundsculptor.sounds.count", count));
-		list = new SculptList(body.width(), 100, Component.translatable("soundsculptor.sounds.list"));
-		list.setEmptyText(() -> Component.translatable(!recentOnly ? "soundsculptor.sounds.empty"
-				: query.isEmpty() ? "soundsculptor.sounds.empty_recent" : "soundsculptor.sounds.empty_recent_filtered"));
-		body.fill(list);
-
-		entries = KnownSounds.entries();
-		query = SearchQuery.parse(searchText);
-		refresh();
 	}
 
 	private static int toggleWidth(Font font, String labelKey) {
@@ -232,19 +303,21 @@ public final class SoundsPanel {
 	}
 
 	private void showFilterControls() {
-		pauseToggle.visible = recentOnly;
-		sortDropdown.visible = recentOnly;
+		if (pauseToggle != null) {
+			pauseToggle.visible = state.recentOnly;
+			sortDropdown.visible = state.recentOnly;
+		}
 	}
 
 	// ---- State ----
 
 	public boolean isRecentOnly() {
-		return recentOnly;
+		return state.recentOnly;
 	}
 
 	/** The Recently played filter (FR-1.0); remembered while the game runs. */
 	public void setRecentOnly(boolean value) {
-		recentOnly = value;
+		state.recentOnly = value;
 		if (recentToggle != null) {
 			recentToggle.setValue(value);
 			showFilterControls();
@@ -253,12 +326,12 @@ public final class SoundsPanel {
 	}
 
 	public boolean isPaused() {
-		return paused;
+		return state.paused;
 	}
 
 	/** Pause freezes the recently played list for reading (FR-1.3); actions and search still update it. */
 	public void setPaused(boolean value) {
-		paused = value;
+		state.paused = value;
 		if (pauseToggle != null) {
 			pauseToggle.setValue(value);
 		}
@@ -268,7 +341,7 @@ public final class SoundsPanel {
 	}
 
 	public void setSort(SortOrder value) {
-		sort = value;
+		state.sort = value;
 		if (sortDropdown != null) {
 			sortDropdown.setValue(value);
 		}
@@ -276,7 +349,7 @@ public final class SoundsPanel {
 	}
 
 	public String searchText() {
-		return searchText;
+		return state.searchText;
 	}
 
 	/** How many sounds the list holds ("42 sounds"). */
@@ -291,6 +364,7 @@ public final class SoundsPanel {
 	 * {@value #REFRESH_TICKS} ticks unless the recently played list is paused.
 	 *
 	 * @return whether the player walked into or out of a zone, so "Apply to" needs other choices: the screen rebuilds
+	 *         (never in picker mode, which has no Apply to)
 	 */
 	public boolean tick() {
 		ticks++;
@@ -300,16 +374,16 @@ public final class SoundsPanel {
 		if (ticks % REFRESH_TICKS != 0) {
 			return false;
 		}
-		if (!(recentOnly && paused)) {
+		if (!(state.recentOnly && state.paused)) {
 			refresh();
 		}
-		return !host.hasOverlay() && !computeApplyChoices().equals(applyChoices);
+		return picker == null && !host.hasOverlay() && !computeApplyChoices().equals(applyChoices);
 	}
 
 	/** Runs the search now (normally 150 ms after the last keystroke). */
 	public void runSearch() {
 		searchPending = false;
-		query = SearchQuery.parse(searchText);
+		query = SearchQuery.parse(state.searchText);
 		refresh();
 	}
 
@@ -323,6 +397,9 @@ public final class SoundsPanel {
 	 * values to the "ago" granularity, or its "Seen as" category); the others are reused, and the list is replaced only if
 	 * a row or the order changed. A new workspace, Apply to choice or Show distance setting rebuilds every row, because
 	 * the Mute buttons and the columns depend on them. Does nothing while a pop-up is open, so focus stays in it.
+	 *
+	 * <p>In picker mode a tick or untick also counts as a change, and a row's inputs include whether it is picked and
+	 * whether the set has it, so a tick rebuilds only its own row.
 	 */
 	public void refresh() {
 		if (list == null || host.hasOverlay()) {
@@ -338,8 +415,8 @@ public final class SoundsPanel {
 		// workspace() is a new record each call: compare its parts, which change identity only when changed.
 		if (ws.profile() != shownProfile || ws.library() != shownLibrary || !target.equals(shownTarget) || distance != shownDistance) {
 			rowCache.clear();
-		} else if (log.generation() == shownGeneration && query == shownQuery && recentOnly == shownRecentOnly && sort == shownSort
-				&& (!shownAnyRecent || second == shownSecond)) {
+		} else if (log.generation() == shownGeneration && query == shownQuery && state.recentOnly == shownRecentOnly && state.sort == shownSort
+				&& pickVersion == shownPickVersion && (!shownAnyRecent || second == shownSecond)) {
 			return;
 		}
 		shownProfile = ws.profile();
@@ -347,21 +424,25 @@ public final class SoundsPanel {
 		shownTarget = target;
 		shownDistance = distance;
 		shownQuery = query;
-		shownRecentOnly = recentOnly;
-		shownSort = sort;
+		shownRecentOnly = state.recentOnly;
+		shownSort = state.sort;
+		shownPickVersion = pickVersion;
 		shownSecond = second;
 		List<RecentRow> recent = log.snapshot(now, SortOrder.MOST_RECENT, null);
 		// Read after the snapshot, which drops expired rows.
 		shownGeneration = log.generation();
-		List<BrowserRow> found = SoundBrowser.rows(recent, entries, query, recentOnly, sort, KnownSounds.seenExcluded());
+		List<BrowserRow> found = SoundBrowser.rows(recent, entries, query, state.recentOnly, state.sort, KnownSounds.seenExcluded());
 		Predicate<String> muted = null;
 		boolean anyRecent = false;
 		List<SculptList.Row> rows = new ArrayList<>(found.size());
 		for (BrowserRow row : found) {
 			Object inputs = rowInputs(row, now, log);
+			if (picker != null) {
+				inputs = new PickInputs(inputs, picker.inSet(row.soundId()), picker.picked(row.soundId()));
+			}
 			CachedRow cached = rowCache.get(row.soundId());
 			if (cached == null || !cached.inputs().equals(inputs)) {
-				if (muted == null) {
+				if (muted == null && picker == null) {
 					muted = mutedAtApplyTarget();
 				}
 				cached = new CachedRow(inputs, toListRow(row, now, muted));
@@ -411,25 +492,36 @@ public final class SoundsPanel {
 	private record RecentInputs(String category, int count, long ago, DistanceBand band, PlayStatus status, String zoneName) {
 	}
 
+	/** A picker row's inputs: what it shows, whether the set has the sound, and whether it is ticked. */
+	private record PickInputs(Object shown, boolean inSet, boolean picked) {
+	}
+
 	/** A built row and what it was built from. */
 	private record CachedRow(Object inputs, SculptList.Row row) {
 	}
 
+	/** @param muted which sounds are muted at the Apply to place; {@code null} in picker mode */
 	private SculptList.Row toListRow(BrowserRow row, long now, Predicate<String> muted) {
 		String id = row.soundId();
 		String name = row.subtitle() == null ? SoundNames.readable(id) : row.subtitle();
+		boolean inSet = picker != null && picker.inSet(id);
+		// Picker mode (FR-1.7): a sound the set has says so where its status would be.
+		String mark = inSet ? Component.translatable("soundsculptor.picker.in_set").getString() : null;
 		List<SculptList.Row.Column> columns = new ArrayList<>();
 		columns.add(new SculptList.Row.Column(() -> name, 0, 0));
 		RecentRow recent = row.recent();
 		if (recent == null) {
 			// FR-3.2: "Seen as" when the sound played this session, outside the last 3 minutes.
 			String category = RecentLog.get().sounds().seenCategory(id);
-			String seen = category == null ? "" : Component.translatable("soundsculptor.sounds.seen_as",
+			String seen = mark != null ? mark : category == null ? "" : Component.translatable("soundsculptor.sounds.seen_as",
 					Component.translatable("soundCategory." + category)).getString();
 			columns.add(new SculptList.Row.Column(() -> seen, SEEN_WIDTH, 0));
 			columns.add(new SculptList.Row.Column(() -> id, 0, 1));
 		} else {
-			recentColumns(columns, recent, now);
+			recentColumns(columns, recent, now, mark);
+		}
+		if (picker != null) {
+			return new SculptList.Row(id, columns, pickButtons(id, inSet));
 		}
 		boolean isMuted = muted.test(id);
 		return new SculptList.Row(id, columns, List.of(muteButton(id, isMuted), levelButton(id), editButton(id),
@@ -439,14 +531,16 @@ public final class SoundsPanel {
 	/**
 	 * FR-1.2: subtitle, category and status (text plus an icon character, never color alone) on top; ID, the zone that
 	 * decided the latest play (FR-9), plays with time since the last, and the distance band (unless hidden) below.
+	 *
+	 * @param mark shown instead of the status in picker mode ("In this set"), or {@code null}
 	 */
-	private static void recentColumns(List<SculptList.Row.Column> columns, RecentRow row, long now) {
+	private static void recentColumns(List<SculptList.Row.Column> columns, RecentRow row, long now, String mark) {
 		String category = row.category() == null ? "?" : Component.translatable("soundCategory." + row.category()).getString();
-		String status = Component.translatable("soundsculptor.sounds.status_line." + row.status().name().toLowerCase(Locale.ROOT),
+		String status = mark != null ? mark : Component.translatable("soundsculptor.sounds.status_line." + row.status().name().toLowerCase(Locale.ROOT),
 				Component.translatable(row.status().translationKey())).getString();
 		String plays = Component.translatable("soundsculptor.sounds.plays", row.count(), ago(now - row.lastPlayedMs())).getString();
 		columns.add(new SculptList.Row.Column(() -> category, CATEGORY_WIDTH, 0));
-		columns.add(new SculptList.Row.Column(() -> status, STATUS_WIDTH, 0));
+		columns.add(new SculptList.Row.Column(() -> status, mark != null ? IN_SET_WIDTH : STATUS_WIDTH, 0));
 		columns.add(new SculptList.Row.Column(row::id, 0, 1));
 		if (row.zoneName() != null) {
 			String zone = Component.translatable("soundsculptor.sounds.zone", row.zoneName()).getString();
@@ -612,16 +706,113 @@ public final class SoundsPanel {
 		}
 	}
 
+	// ---- Picker mode (FR-1.7, FR-4.8) ----
+
+	/** A picker row's buttons: the checkbox (none when the set has the sound), then Like this…. */
+	private List<SculptButton> pickButtons(String soundId, boolean inSet) {
+		Component likeLabel = Component.translatable("soundsculptor.picker.like_this");
+		if (likeThisWidth == 0) {
+			likeThisWidth = Minecraft.getInstance().font.width(likeLabel) + LIKE_THIS_PADDING;
+		}
+		SculptButton likeThis = Tooltips.describe(SculptButton.text(likeLabel, likeThisWidth, () -> openLikeThis(soundId)),
+				Component.translatable("soundsculptor.picker.like_this.tip"));
+		if (inSet) {
+			return List.of(likeThis);
+		}
+		SculptCheckbox box = new SculptCheckbox(Component.translatable("soundsculptor.picker.pick"),
+				Component.translatable("soundsculptor.picker.pick.tip"), picker.picked(soundId), () -> togglePick(soundId));
+		return List.of(box, likeThis);
+	}
+
+	/** Ticks or unticks a sound; nothing for a sound the set has. Rebuilds only its row, which keeps keyboard focus. */
+	public void togglePick(String soundId) {
+		if (picker == null) {
+			return;
+		}
+		picker.toggleSound(soundId);
+		pickVersion++;
+		refresh();
+		picksChanged.run();
+	}
+
+	/**
+	 * Like this… (FR-4.8): the sound's groups in a pop-up, closest first, each with how many known sounds it matches and
+	 * a checkbox, or "In this set" when the set has the group. Esc or Done closes it and returns to the row's Like this….
+	 */
+	public void openLikeThis(String soundId) {
+		host.closeOverlay();
+		likeThisSound = soundId;
+		likeThisGroups = LikeThis.groups(soundId, KnownSounds.ids());
+		int x = list.getX();
+		int y = list.getY();
+		// Over the whole list, so no row behind it shows at the side.
+		int width = Math.min(list.getWidth(), host.width - x - Theme.PADDING);
+		int height = Math.max(SculptList.ROW_HEIGHT + Theme.WIDGET_HEIGHT + 3 * Theme.GAP,
+				host.height - SculptScreen.FOOTER_HEIGHT - Theme.PADDING - y);
+		SculptButton done = SculptButton.text(Component.translatable("soundsculptor.ui.done"), host::closeOverlay);
+		int listHeight = height - done.getHeight() - 3 * Theme.GAP;
+		SculptList groups = new SculptList(width - 2 * Theme.GAP, listHeight,
+				Component.translatable("soundsculptor.picker.like_this.list", soundName(soundId)));
+		groups.setPosition(x + Theme.GAP, y + Theme.GAP);
+		groups.setWidth(width - 2 * Theme.GAP);
+		groups.setHeight(listHeight);
+		done.setPosition(x + width - Theme.GAP - done.getWidth(), groups.getBottom() + Theme.GAP);
+		likeThisList = groups;
+		groups.setRows(groupRows());
+		host.openOverlay(x, y, width, height, List.of(groups, done), groups, () -> {
+			String sound = likeThisSound;
+			likeThisList = null;
+			likeThisSound = null;
+			likeThisGroups = List.of();
+			SculptList.Row row = list.findRow(sound);
+			if (row != null) {
+				focusRowButton(sound, row.buttons().size() - 1);
+			}
+		});
+		if (!groups.children().isEmpty()) {
+			groups.focusRow(groups.children().get(0));
+		}
+	}
+
+	/** Ticks or unticks a Like this group; nothing for a group the set has. */
+	public void toggleGroup(String pattern) {
+		if (picker == null || likeThisList == null) {
+			return;
+		}
+		picker.toggleGroup(pattern);
+		likeThisList.setRows(groupRows());
+		picksChanged.run();
+	}
+
+	private List<SculptList.Row> groupRows() {
+		List<SculptList.Row> rows = new ArrayList<>(likeThisGroups.size());
+		for (LikeThis.Group group : likeThisGroups) {
+			String pattern = group.pattern();
+			boolean inSet = picker.groupInSet(pattern);
+			String mark = inSet ? Component.translatable("soundsculptor.picker.in_set").getString() : "";
+			String matches = Component.translatable(group.count() == 1 ? "soundsculptor.add_to_set.matches.one" : "soundsculptor.add_to_set.matches",
+					group.count()).getString();
+			List<SculptList.Row.Column> columns = List.of(
+					new SculptList.Row.Column(() -> pattern, 0, 0),
+					new SculptList.Row.Column(() -> mark, IN_SET_WIDTH, 0),
+					new SculptList.Row.Column(() -> matches, 0, 1));
+			List<SculptButton> buttons = inSet ? List.of() : List.of(new SculptCheckbox(Component.translatable("soundsculptor.picker.pick"),
+					Component.translatable("soundsculptor.picker.pick_group.tip"), picker.groupPicked(pattern), () -> toggleGroup(pattern)));
+			rows.add(new SculptList.Row(pattern, columns, buttons));
+		}
+		return rows;
+	}
+
 	// ---- Apply to ----
 
 	/** Where quick actions put their change (FR-1.5, FR-3.7): Everywhere, or the chosen zone while the player stands in it. */
 	public ApplyTarget applyTarget() {
-		return ApplyTo.select(applyChoices, applyZoneId);
+		return ApplyTo.select(applyChoices, state.applyZoneId);
 	}
 
 	/** Chooses where quick actions put their change; refreshes the rows, whose Mute/Unmute follows the choice. */
 	public void setApplyTarget(ApplyTarget target) {
-		applyZoneId = target.zoneId();
+		state.applyZoneId = target.zoneId();
 		if (applyToDropdown != null && !applyToDropdown.value().equals(target)) {
 			applyToDropdown.setValue(target);
 		}
@@ -687,8 +878,9 @@ public final class SoundsPanel {
 
 	/** P toggles Pause while the list has focus and the Recently played filter is on (FR-1.3). */
 	public boolean keyPressed(KeyEvent event) {
-		if (event.key() == InputConstants.KEY_P && recentOnly && list != null && host.getFocused() == list && !host.hasOverlay()) {
-			setPaused(!paused);
+		if (event.key() == InputConstants.KEY_P && picker == null && state.recentOnly && list != null && host.getFocused() == list
+				&& !host.hasOverlay()) {
+			setPaused(!state.paused);
 			return true;
 		}
 		return false;

@@ -1,5 +1,6 @@
 package soundsculptor.core.browser;
 
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -17,20 +18,25 @@ import soundsculptor.core.sets.SoundSet;
  */
 public final class PickerModel {
 	private final SoundSet target;
+	/** The target set's entry patterns: the picker asks for every row of the full list (about 2,000) on a refresh. */
+	private final Set<String> inTarget = new HashSet<>();
 	private final Set<String> picks = new LinkedHashSet<>();
 
 	public PickerModel(SoundSet target) {
 		this.target = target;
+		for (SetEntry entry : target.entries()) {
+			inTarget.add(entry.pattern().text());
+		}
 	}
 
 	/** Whether a single-sound entry already targets this sound ("In this set"). */
 	public boolean inSet(String soundId) {
-		return inSet(target, normalize(soundId));
+		return inTarget.contains(normalize(soundId));
 	}
 
 	/** Whether a group entry with this pattern is already in the set. */
 	public boolean groupInSet(String pattern) {
-		return inSet(target, normalize(pattern));
+		return inTarget.contains(normalize(pattern));
 	}
 
 	/** Ticks or unticks a sound. Does nothing for a sound already in the set. */
@@ -41,6 +47,16 @@ public final class PickerModel {
 	/** Ticks or unticks a group. Does nothing for a group already in the set. */
 	public void toggleGroup(String pattern) {
 		toggle(normalize(pattern));
+	}
+
+	/** Whether this sound is ticked; never for a sound already in the set. */
+	public boolean picked(String soundId) {
+		return picks.contains(normalize(soundId));
+	}
+
+	/** Whether this group is ticked; never for a group already in the set. */
+	public boolean groupPicked(String pattern) {
+		return picks.contains(normalize(pattern));
 	}
 
 	public int pickedCount() {
@@ -74,7 +90,7 @@ public final class PickerModel {
 	}
 
 	private void toggle(String text) {
-		if (inSet(target, text)) {
+		if (inTarget.contains(text)) {
 			return;
 		}
 		if (!picks.remove(text)) {

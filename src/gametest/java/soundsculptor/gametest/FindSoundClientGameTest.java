@@ -125,11 +125,11 @@ public final class FindSoundClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	/** Opens the place's Quick changes in the set editor, then Add sounds…: the entry editor for a new entry. */
+	/** Opens the place's Quick changes in the set editor, then Type a pattern…: the entry editor for a new entry. */
 	private static void addEntry(ClientGameTestContext context, PlaceRef where) {
 		context.runOnClient(mc -> mc.gui.setScreen(SetEditorScreen.forQuickChanges(mc.gui.screen(), where)));
 		context.waitForScreen(SetEditorScreen.class);
-		context.runOnClient(mc -> ((SetEditorScreen) mc.gui.screen()).addSounds());
+		context.runOnClient(mc -> ((SetEditorScreen) mc.gui.screen()).typePattern());
 		context.waitForScreen(EntryEditorScreen.class);
 	}
 

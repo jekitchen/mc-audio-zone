@@ -62,7 +62,7 @@ public final class M8ReviewClientGameTest implements FabricClientGameTest {
 
 			// Entry editor: a value the entry leaves alone reads "Unchanged" (Task 12 removed the inherited value; the
 			// trace shows what a sound gets).
-			context.runOnClient(mc -> ((SetEditorScreen) mc.gui.screen()).addSounds());
+			context.runOnClient(mc -> ((SetEditorScreen) mc.gui.screen()).typePattern());
 			context.waitForScreen(EntryEditorScreen.class);
 			context.getInput().typeChars("minecraft:entity.villager.celebrate");
 			context.waitTicks(1);

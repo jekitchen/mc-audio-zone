@@ -51,6 +51,21 @@ class PickerModelTest {
 	}
 
 	@Test
+	void pickedFollowsToggles() {
+		PickerModel picker = new PickerModel(set(SetEntry.of("e1", PIG)));
+		assertFalse(picker.picked(COW));
+		picker.toggleSound(COW);
+		assertTrue(picker.picked(COW));
+		assertTrue(picker.picked("Minecraft:Entity.Cow.Ambient"));
+		picker.toggleGroup("minecraft:entity.villager.*");
+		assertTrue(picker.groupPicked("minecraft:entity.villager.*"));
+		picker.toggleSound(COW);
+		assertFalse(picker.picked(COW));
+		picker.toggleSound(PIG);
+		assertFalse(picker.picked(PIG), "a sound already in the set is never picked");
+	}
+
+	@Test
 	void addCreatesOneEntryPerPick() {
 		SoundSet base = set(SetEntry.of("e1", "minecraft:block.stone.*").withMute(true));
 		PickerModel picker = new PickerModel(base);
