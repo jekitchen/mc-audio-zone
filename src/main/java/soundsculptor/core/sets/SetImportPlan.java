@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -15,45 +16,54 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.zones.Zone;
 
 /**
- * What importing a file does with the Sound Sets it carries (PRD FR-11.5a), worked out before anything changes. Each
- * set in the file is matched to the library by ID:
+ * What importing a file does with the Sound Sets it carries (PRD FR-11.5a), worked out before anything changes. Two
+ * sets have the same entries when their entries are identical and in the same order; names are not compared. Each set
+ * in the file is compared with the library:
  *
  * <ul>
- *   <li>{@link Status#NEW}: not in the library; it is added.</li>
- *   <li>{@link Status#SAME}: in the library with the same name and entries; the library set is used.</li>
- *   <li>{@link Status#DIFFERENT}: in the library with other contents; the player's {@link Choice} decides, and
- *       {@link Choice#KEEP_BOTH} is the default.</li>
+ *   <li>{@link Status#SAME}: a library set has the same ID and the same entries. It is the player's own set; the
+ *       library set is used and nothing is duplicated.</li>
+ *   <li>{@link Status#EXACT_MATCH}: a library set with another ID has the same entries. The whole import is refused
+ *       ({@link #canApply}), naming that set. This wins over a name clash.</li>
+ *   <li>{@link Status#NAME_CLASH}: the set's name (ignoring case) is used by a library set with other entries. The
+ *       player chooses a new name ({@link #suggestedName} fills in "name (imported)"); the set is added under that
+ *       name with a new ID.</li>
+ *   <li>{@link Status#NEW}: anything else; the set is added. If a library set with other entries has its ID, it gets a
+ *       new ID.</li>
  * </ul>
  *
- * <p>A place in the file that attaches a set which is neither in the file nor in the library loses that attachment,
- * and it is counted (FR-11.6, "1 Sound Set not found, skipped"). Quick changes travel inline and are never matched.
+ * <p>The imported places attach the sets as added, keeping each attachment's position and on/off. A place in the file
+ * that attaches a set which is neither in the file nor in the library loses that attachment, and it is counted
+ * (FR-11.6, "1 Sound Set not found, skipped"). Quick changes travel inline and are never compared.
  *
- * <p>Limits never throw: {@link #canApply} reports a library that would pass {@link SetLibrary#MAX_SETS}, and
- * {@link #apply} then changes nothing.
+ * <p>Nothing here throws for a player-facing problem: {@link #canApply} reports it, and {@link #apply} then changes
+ * nothing.
  *
+ * @param fileSets    the library sets in the file, in file order
  * @param statusById  the status of each set in the file, by ID, in file order (for the import dialog)
+ * @param matchById   for an {@link Status#EXACT_MATCH} or {@link Status#NAME_CLASH} set, the ID of the library set it
+ *                    matches or clashes with
  * @param missingRefs attachments in the file's places to sets that are neither in the file nor in the library
  */
-public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
-	/** How a set in the file compares with the library set of the same ID. */
-	public enum Status { NEW, SAME, DIFFERENT }
-
-	/** What to do with a {@link Status#DIFFERENT} set. */
-	public enum Choice {
-		/** The default: the file's version is added as "name (imported)" with a new ID, and the imported places attach it. */
-		KEEP_BOTH,
-		/** The library version is kept, and the imported places attach it. */
-		USE_MINE,
-		/** The library version is overwritten by the file's, changing every place that uses it. */
-		REPLACE
-	}
+public record SetImportPlan(List<SoundSet> fileSets, Map<String, Status> statusById, Map<String, String> matchById,
+		int missingRefs) {
+	/** How a set in the file compares with the library (FR-11.5a). */
+	public enum Status { SAME, EXACT_MATCH, NAME_CLASH, NEW }
 
 	/** "The library can hold up to %1$s Sound Sets. This import adds %2$s, and there is room for %3$s." */
 	public static final String LIBRARY_FULL = "soundsculptor.sets.error.import_library_full";
+	/** "The import failed because \"%s\" already has exactly these entries." */
+	public static final String EXACT_MATCH_PROBLEM = "soundsculptor.import.exact_match";
+	/** "That name is already in use. Choose a unique name to import this set." */
+	public static final String NAME_TAKEN = "soundsculptor.import.name_taken";
+	/** "Choose a new name for the Sound Set \"%s\" to import it." */
+	public static final String NAME_MISSING = "soundsculptor.import.name_missing";
 	private static final String IMPORTED_SUFFIX = " (imported)";
 
 	public SetImportPlan {
+		fileSets = List.copyOf(fileSets);
 		statusById = Collections.unmodifiableMap(new LinkedHashMap<>(statusById));
+		matchById = Map.copyOf(matchById);
 	}
 
 	/**
@@ -61,10 +71,9 @@ public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
 	 * @param fileProfile the places that are imported (fixed zones for another server already left out)
 	 */
 	public static SetImportPlan of(List<SoundSet> fileSets, Profile fileProfile, SetLibrary lib) {
-		Map<String, Status> status = new LinkedHashMap<>();
+		Match match = match(fileSets, lib);
 		Set<String> known = new HashSet<>(lib.ids());
 		for (SoundSet set : fileSets) {
-			status.put(set.id(), statusOf(set, lib));
 			known.add(set.id());
 		}
 		int missing = 0;
@@ -75,51 +84,137 @@ public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
 				}
 			}
 		}
-		return new SetImportPlan(status, missing);
+		return new SetImportPlan(fileSets, match.status(), match.libraryId(), missing);
 	}
 
-	/** {@code null} if the import fits in the library with these choices, else the problem to show. */
-	public Message canApply(SetLibrary lib, Map<String, Choice> choices) {
-		int added = 0;
-		for (Map.Entry<String, Status> e : statusById.entrySet()) {
-			if (adds(e.getValue(), choice(choices, e.getKey()))) {
-				added++;
+	/** The file's sets whose name clashes with a library set, in file order: each needs a new name before the import. */
+	public List<SoundSet> nameClashes() {
+		List<SoundSet> out = new ArrayList<>();
+		for (SoundSet set : fileSets) {
+			if (statusById.get(set.id()) == Status.NAME_CLASH) {
+				out.add(set);
 			}
 		}
-		return fits(lib, added);
-	}
-
-	/** Whether a set with this status and choice is added to the library as a new set. */
-	private static boolean adds(Status status, Choice choice) {
-		return status == Status.NEW || status == Status.DIFFERENT && choice == Choice.KEEP_BOTH;
-	}
-
-	private static Message fits(SetLibrary lib, int added) {
-		int room = SetLibrary.MAX_SETS - lib.size();
-		return added > room ? Message.of(LIBRARY_FULL, SetLibrary.MAX_SETS, added, Math.max(0, room)) : null;
+		return out;
 	}
 
 	/**
-	 * The library with the file's sets added (or replaced), and the file's profile attaching them. {@code lib} should be
-	 * the library this plan was made with; if it has changed since, each set is matched again, so the result never
-	 * refers to a set the library lacks. If the sets do not fit in the library, nothing changes and
-	 * {@link Applied#problem()} says why: never a partly imported library.
-	 *
-	 * @param choices what to do with each {@link Status#DIFFERENT} set, by ID; a set not listed uses {@link Choice#KEEP_BOTH}
+	 * Why the import cannot go ahead because a set in the file has exactly the entries of a library set with another ID
+	 * (FR-11.5a), naming that library set; {@code null} if there is no such set.
 	 */
-	public Applied apply(Profile fileProfile, List<SoundSet> fileSets, SetLibrary lib, Map<String, Choice> choices) {
-		int added = 0;
+	public Message exactMatchProblem(SetLibrary lib) {
+		Match match = match(fileSets, lib);
 		for (SoundSet set : fileSets) {
-			if (adds(statusOf(set, lib), choice(choices, set.id()))) {
+			if (match.status().get(set.id()) == Status.EXACT_MATCH) {
+				return Message.of(EXACT_MATCH_PROBLEM, lib.get(match.libraryId().get(set.id())).name());
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The name the rename dialog fills in for the file's set {@code fileSetId}: "name (imported)", or "name (imported)
+	 * (2)" and so on when that is in use in the library, by another set the import adds under its own name, or as a
+	 * name chosen for another set in this import. It fits in {@link SoundSet#MAX_NAME_LENGTH}.
+	 *
+	 * @param chosen the names chosen so far, by file set ID
+	 */
+	public String suggestedName(String fileSetId, SetLibrary lib, Map<String, String> chosen) {
+		SoundSet set = fileSet(fileSetId);
+		return lib.uniqueName(set.name().strip(), null, IMPORTED_SUFFIX, takenNames(match(fileSets, lib), chosen, fileSetId));
+	}
+
+	/** A suggested name for every name clash, each avoiding the ones before it (file order). */
+	public Map<String, String> suggestedNames(SetLibrary lib) {
+		Map<String, String> names = new LinkedHashMap<>();
+		for (SoundSet set : nameClashes()) {
+			names.put(set.id(), suggestedName(set.id(), lib, names));
+		}
+		return names;
+	}
+
+	/**
+	 * Why {@code name} cannot be chosen for the file's set {@code fileSetId}, or {@code null} if it can: it is empty or
+	 * too long (as for any set name), or it is already in use, ignoring case, by a library set, by another set the import
+	 * adds under its own name, or as the name chosen for another set in this import ({@value #NAME_TAKEN}).
+	 *
+	 * @param chosen the names chosen for the other sets, by file set ID (an entry for {@code fileSetId} is ignored)
+	 */
+	public Message nameProblem(String fileSetId, String name, SetLibrary lib, Map<String, String> chosen) {
+		Message problem = LibraryOps.nameProblem(name);
+		if (problem != null) {
+			return problem;
+		}
+		String wanted = key(name);
+		List<String> taken = new ArrayList<>();
+		for (SoundSet mine : lib.sets()) {
+			taken.add(mine.name());
+		}
+		taken.addAll(takenNames(match(fileSets, lib), chosen, fileSetId));
+		for (String other : taken) {
+			if (key(other).equals(wanted)) {
+				return Message.of(NAME_TAKEN);
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * {@code null} if {@link #apply} will import with these names, else the first problem: a set in the file has exactly
+	 * the entries of a library set with another ID; the library would pass {@link SetLibrary#MAX_SETS}; or a name
+	 * clash has no name, or one {@link #nameProblem} refuses. The sets are compared with {@code lib} again, so it may be
+	 * a library that changed since the plan was made.
+	 *
+	 * @param names the new name of each {@link Status#NAME_CLASH} set, by file set ID
+	 */
+	public Message canApply(SetLibrary lib, Map<String, String> names) {
+		Match match = match(fileSets, lib);
+		Message exact = exactMatchProblem(lib);
+		if (exact != null) {
+			return exact;
+		}
+		int added = 0;
+		for (Status status : match.status().values()) {
+			if (status == Status.NEW || status == Status.NAME_CLASH) {
 				added++;
 			}
 		}
-		Message problem = fits(lib, added);
+		int room = SetLibrary.MAX_SETS - lib.size();
+		if (added > room) {
+			return Message.of(LIBRARY_FULL, SetLibrary.MAX_SETS, added, Math.max(0, room));
+		}
+		for (SoundSet set : fileSets) {
+			if (match.status().get(set.id()) != Status.NAME_CLASH) {
+				continue;
+			}
+			String name = names.get(set.id());
+			if (name == null) {
+				return Message.of(NAME_MISSING, set.name());
+			}
+			Message problem = nameProblem(set.id(), name, lib, names);
+			if (problem != null) {
+				return problem;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * The library with the file's sets added, and the file's profile attaching them. {@code lib} should be the library
+	 * this plan was made with; if it has changed since, each set is compared again, so the result never refers to a set
+	 * the library lacks. If {@link #canApply} reports a problem, nothing changes and {@link Applied#problem()} says why:
+	 * never a partly imported library.
+	 *
+	 * @param names the new name of each {@link Status#NAME_CLASH} set, by file set ID; spaces at either end are ignored
+	 */
+	public Applied apply(Profile fileProfile, SetLibrary lib, Map<String, String> names) {
+		Message problem = canApply(lib, names);
 		if (problem != null) {
 			return new Applied(fileProfile, lib, problem);
 		}
-		// New IDs avoid every ID the file uses, so a copy can never be overwritten by a set added after it, nor share an
-		// ID with a missing attachment.
+		Match match = match(fileSets, lib);
+		// New IDs avoid every ID the file uses, so an added set can never be overwritten by one added after it, nor share
+		// an ID with a missing attachment.
 		Set<String> fileIds = new HashSet<>();
 		for (SoundSet set : fileSets) {
 			fileIds.add(set.id());
@@ -132,19 +227,21 @@ public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
 		SetLibrary out = lib;
 		Map<String, String> renamed = new HashMap<>();
 		for (SoundSet set : fileSets) {
-			switch (statusOf(set, lib)) {
-				case NEW -> out = out.put(new SoundSet(set.id(), out.uniqueName(set.name(), null), set.entries()));
-				case SAME -> { }
-				case DIFFERENT -> {
-					switch (choice(choices, set.id())) {
-						case KEEP_BOTH -> {
-							String id = newId(out, fileIds);
-							out = out.put(new SoundSet(id, out.uniqueName(set.name(), null, IMPORTED_SUFFIX), set.entries()));
-							renamed.put(set.id(), id);
-						}
-						case USE_MINE -> { }
-						case REPLACE -> out = out.put(set.withName(out.uniqueName(set.name(), set.id())));
+			switch (match.status().get(set.id())) {
+				case SAME, EXACT_MATCH -> { }
+				case NAME_CLASH -> {
+					String id = newId(out, fileIds);
+					out = out.put(new SoundSet(id, names.get(set.id()).strip(), set.entries()));
+					renamed.put(set.id(), id);
+				}
+				case NEW -> {
+					String id = set.id();
+					if (out.contains(id)) {
+						// A library set with other entries has this ID: the file's set gets its own.
+						id = newId(out, fileIds);
+						renamed.put(set.id(), id);
 					}
+					out = out.put(new SoundSet(id, out.uniqueName(set.name(), null), set.entries()));
 				}
 			}
 		}
@@ -163,7 +260,7 @@ public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
 	 *
 	 * @param profile the file's profile, attaching the library sets (unchanged if there is a problem)
 	 * @param library the library after the import ({@code lib} unchanged if there is a problem)
-	 * @param problem why nothing was imported (the library would be too full), or null
+	 * @param problem why nothing was imported, or null
 	 */
 	public record Applied(Profile profile, SetLibrary library, Message problem) {
 		public Applied {
@@ -172,16 +269,72 @@ public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
 		}
 	}
 
-	private static Status statusOf(SoundSet set, SetLibrary lib) {
-		SoundSet mine = lib.get(set.id());
-		if (mine == null) {
-			return Status.NEW;
-		}
-		return mine.sameContents(set) ? Status.SAME : Status.DIFFERENT;
+	/** Each file set's status, and the library set it matches or clashes with, by file set ID. */
+	private record Match(Map<String, Status> status, Map<String, String> libraryId) {
 	}
 
-	private static Choice choice(Map<String, Choice> choices, String id) {
-		return choices.getOrDefault(id, Choice.KEEP_BOTH);
+	private static Match match(List<SoundSet> fileSets, SetLibrary lib) {
+		Map<String, Status> status = new LinkedHashMap<>();
+		Map<String, String> libraryId = new HashMap<>();
+		for (SoundSet set : fileSets) {
+			SoundSet sameId = lib.get(set.id());
+			if (sameId != null && sameId.entries().equals(set.entries())) {
+				status.put(set.id(), Status.SAME);
+				continue;
+			}
+			SoundSet exact = null;
+			SoundSet clash = null;
+			for (SoundSet mine : lib.sets()) {
+				if (exact == null && mine.entries().equals(set.entries())) {
+					exact = mine;
+				}
+				if (clash == null && key(mine.name()).equals(key(set.name()))) {
+					clash = mine;
+				}
+			}
+			// An exact match wins over a name clash: the import is refused either way the player names it.
+			if (exact != null) {
+				status.put(set.id(), Status.EXACT_MATCH);
+				libraryId.put(set.id(), exact.id());
+			} else if (clash != null) {
+				status.put(set.id(), Status.NAME_CLASH);
+				libraryId.put(set.id(), clash.id());
+			} else {
+				status.put(set.id(), Status.NEW);
+			}
+		}
+		return new Match(status, libraryId);
+	}
+
+	/**
+	 * The names the import will use besides the library's: those of the sets added under their own name, and those
+	 * chosen for the other name clashes.
+	 */
+	private List<String> takenNames(Match match, Map<String, String> chosen, String exceptId) {
+		List<String> taken = new ArrayList<>();
+		for (SoundSet set : fileSets) {
+			Status status = match.status().get(set.id());
+			if (status == Status.NEW) {
+				taken.add(set.name().strip());
+			} else if (status == Status.NAME_CLASH && !set.id().equals(exceptId) && chosen.get(set.id()) != null) {
+				taken.add(chosen.get(set.id()).strip());
+			}
+		}
+		return taken;
+	}
+
+	private SoundSet fileSet(String id) {
+		for (SoundSet set : fileSets) {
+			if (set.id().equals(id)) {
+				return set;
+			}
+		}
+		throw new IllegalArgumentException("no set " + id + " in the file");
+	}
+
+	/** Names compare ignoring case and spaces at either end, as in the library (FR-4.7). */
+	private static String key(String name) {
+		return name.strip().toLowerCase(Locale.ROOT);
 	}
 
 	/** A new library ID that the file does not use either. */
@@ -194,8 +347,8 @@ public record SetImportPlan(Map<String, Status> statusById, int missingRefs) {
 	}
 
 	/**
-	 * Attachments to a Keep both set point at its copy, those to sets the library lacks are dropped, and the rest stay;
-	 * each keeps its position and on/off.
+	 * Attachments to a set added under a new ID point at it, those to sets the library lacks are dropped, and the rest
+	 * stay; each keeps its position and on/off.
 	 */
 	private static PlaceSets rewrite(PlaceSets place, Map<String, String> renamed, SetLibrary lib) {
 		List<Attachment> out = new ArrayList<>(place.attached().size());

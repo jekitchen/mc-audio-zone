@@ -21,6 +21,10 @@ import soundsculptor.mc.SetDeleteDialog;
 import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.SetLibraryPanel;
 import soundsculptor.mc.SetNameScreen;
+import soundsculptor.mc.SetRenameOnImportScreen;
+import soundsculptor.mc.ProfileTransfer;
+import soundsculptor.core.Message;
+import soundsculptor.core.sets.SetImportPlan;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
@@ -154,6 +158,13 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentPlaces.isEmpty(), "controls without a label in the Sound Sets of a place: " + silentPlaces);
+			// A-4 for the import's rename screen (FR-11.5a).
+			List<String> silentImport = context.computeOnClient(mc -> {
+				SetRenameOnImportScreen rename = Screens.renameOnImport();
+				mc.gui.setScreen(rename);
+				return silentControls(rename);
+			});
+			check(silentImport.isEmpty(), "controls without a label in the import's rename screen: " + silentImport);
 			context.setScreen(() -> null);
 
 			// A-3: every screen at every window size and GUI scale.
@@ -233,6 +244,13 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		PROFILES(mc -> tab(SoundSculptorScreen.TAB_PROFILES), null),
 		PROFILE_RENAME(mc -> new soundsculptor.mc.ProfileRenameScreen(null, ProfileManager.key(), ProfileManager.profile()), null),
 		PROFILE_IMPORT(mc -> new soundsculptor.mc.ProfileImportScreen(null), null),
+		IMPORT_RENAME(mc -> renameOnImport(), null),
+		IMPORT_RENAME_TAKEN(mc -> renameOnImport(), s -> {
+			((SetRenameOnImportScreen) s).setName(SET.name());
+			return null;
+		}),
+		IMPORT_EXACT_MATCH(mc -> ProfileTransfer.exactMatchDialog(null, "Very long export file name-2026-11-13.json",
+				Message.of(SetImportPlan.EXACT_MATCH_PROBLEM, SET.name())), null),
 		SETTINGS_GENERAL(mc -> settings(SoundSculptorScreen.SettingsPage.GENERAL), null),
 		SETTINGS_ZONES(mc -> settings(SoundSculptorScreen.SettingsPage.ZONES), null),
 		SETTINGS_DIAGNOSTICS(mc -> settings(SoundSculptorScreen.SettingsPage.DIAGNOSTICS), null),
@@ -273,6 +291,12 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 		Screen open(Minecraft mc) {
 			return opener.apply(mc);
+		}
+
+		/** The import's rename screen for SET, the first of two clashes, refusing SET's own name as the library would. */
+		static SetRenameOnImportScreen renameOnImport() {
+			return new SetRenameOnImportScreen(null, SET, 1, 2, SET.name() + " (imported)",
+					name -> name.strip().equalsIgnoreCase(SET.name()) ? Message.of(SetImportPlan.NAME_TAKEN) : null, name -> { });
 		}
 
 		private static Screen tab(int tab) {

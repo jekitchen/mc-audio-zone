@@ -28,8 +28,9 @@ import java.util.Set;
  *       attach them; an attachment to a set in neither the file nor the library is dropped and counted.</li>
  * </ul>
  *
- * <p>Limits never throw: too many zones, or a library that would pass {@value SetLibrary#MAX_SETS} sets, is a
- * {@link #problem()}, and then the plan changes nothing.
+ * <p>Nothing throws for a player-facing problem: too many zones, a set in the file with exactly the entries of a
+ * library set under another ID, a library that would pass {@value SetLibrary#MAX_SETS} sets, or a name clash without a
+ * unique new name is a {@link #problem()}, and then the plan changes nothing.
  *
  * @param result        the profile after the import (the current profile, unchanged, if there is a problem)
  * @param library       the library after the import (unchanged if there is a problem)
@@ -77,11 +78,12 @@ public record ImportPlan(Profile result, SetLibrary library, SetImportPlan sets,
 	 * @param file            the checked file
 	 * @param lib             the library now
 	 * @param currentWorldKey this server's world key
-	 * @param choices         what to do with each set whose contents differ from the library's, by ID; a set not
-	 *                        listed is kept both (the default)
+	 * @param names           the new name of each set whose name clashes with a library set
+	 *                        ({@link SetImportPlan#nameClashes()}), by file set ID; without them the plan is refused
+	 *                        until they are chosen
 	 */
 	public static ImportPlan of(Profile current, ExportCodec.Read file, SetLibrary lib, String currentWorldKey,
-			Map<String, SetImportPlan.Choice> choices) {
+			Map<String, String> names) {
 		String here = currentWorldKey.toLowerCase(Locale.ROOT);
 		List<Zone> imported = new ArrayList<>();
 		int bubbles = 0;
@@ -122,11 +124,12 @@ public record ImportPlan(Profile result, SetLibrary library, SetImportPlan sets,
 			return refused(current, lib, setPlan, importedPart, bubbles, fixedIn, skipped,
 					Message.of(ProfileText.IMPORT_TOO_MANY_ZONES, keptZones + imported.size(), Precedence.MAX_ZONES));
 		}
-		Message full = setPlan.canApply(lib, choices);
-		if (full != null) {
-			return refused(current, lib, setPlan, importedPart, bubbles, fixedIn, skipped, full);
+		// An exact match, a full library or a missing or taken name: nothing changes (FR-11.5a).
+		Message setProblem = setPlan.canApply(lib, names);
+		if (setProblem != null) {
+			return refused(current, lib, setPlan, importedPart, bubbles, fixedIn, skipped, setProblem);
 		}
-		SetImportPlan.Applied applied = setPlan.apply(importedPart, file.sets(), lib, choices);
+		SetImportPlan.Applied applied = setPlan.apply(importedPart, lib, names);
 		Profile source = applied.profile();
 		for (Zone zone : source.zones()) {
 			String id = freeId(zone.id(), used);

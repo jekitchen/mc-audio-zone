@@ -10,8 +10,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 
 /**
- * Modal dialog with 2 or 3 buttons (PRD 6.2). It is its own screen, so focus cannot leave it. The default button
- * has focus when it opens; Esc picks the safest choice. The narrator reads the title and the message.
+ * Modal dialog with 2 or 3 buttons (PRD 6.2), or a single OK for a message that offers no choice (an import that
+ * cannot go ahead, FR-11.5a). It is its own screen, so focus cannot leave it. The default button has focus when it
+ * opens; Esc picks the safest choice. The narrator reads the title and the message.
  *
  * <p>Choosing a button returns to the parent screen first, then runs the choice's action, so an action may open
  * another screen.
@@ -40,8 +41,8 @@ public final class SculptDialog extends Screen {
 	 */
 	public SculptDialog(Screen parent, Component title, Component message, List<Choice> choices, int defaultChoice, int safeChoice) {
 		super(title);
-		if (choices.size() < 2 || choices.size() > 3) {
-			throw new IllegalArgumentException("a dialog has 2 or 3 choices");
+		if (choices.isEmpty() || choices.size() > 3) {
+			throw new IllegalArgumentException("a dialog has 1 to 3 choices");
 		}
 		this.parent = parent;
 		this.message = message;
