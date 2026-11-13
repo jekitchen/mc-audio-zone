@@ -149,9 +149,6 @@ public final class SetLibraryPanel {
 
 	/** An independent copy named "name (copy)", attached nowhere (FR-4.7). */
 	public boolean duplicate(String setId) {
-		if (ProfileManager.library().get(setId) == null) {
-			return false;
-		}
 		Workspace ws = ProfileManager.workspace();
 		return applyNewSet(ws, LibraryOps.duplicate(ws, setId), "soundsculptor.sets.toast.duplicated");
 	}
