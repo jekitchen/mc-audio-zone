@@ -56,7 +56,7 @@
 1. **The same entries in two layers.** A set and its Duplicate attached to one place share `SetEntry` instances, because records are copied by reference. Each layer must still resolve and trace as its own set. Test: `EntryResolverTest.duplicateAttachedBelowOriginalIsItsOwnLayer` (Task 3).
 2. **A set disappears under a profile.** This covers a set deleted elsewhere, and a set file that failed to load. The profile loads, the reference is dropped, one note names the set if its name is known, and nothing crashes. Tests: `SetStoreTest.brokenSetFileIsSetAsideAndOthersLoad` (Task 4), `ProfilePruneTest.missingSetIsDroppedWithOneNote` (Task 5).
 3. **Unmute when the mute comes from several sets.** Unmute on a sound muted only by Quick changes clears that setting. Unmute on a sound muted by a library set writes "Not muted". Unmute when both mute it writes "Not muted", and Undo restores both. Tests in `QuickChangesTest` (Task 7).
-4. **Import name clashes.** The file's set may be different from the library set with the same ID, and another library set may already be called "\<name> (imported)". Keep both must still give a unique name and a new ID. Test: `SetImportPlanTest.keepBothNameClashGetsNumberSuffix` (Task 9).
+4. **Import name clashes.** The file's set may be different from the library set with the same ID, and another library set may already be called "\<name> (imported)". The import must still end with unique names and new IDs: from Task 14 the player picks the name (FR-11.5a, owner decision 2026-11-13), and a name already in use is refused. Tests: `SetImportPlanTest.keepBothNameClashGetsNumberSuffix` (Task 9), replaced in Task 14 by the rename cases.
 5. **Limits are reached by a player, not by code.** A 33rd attach, a 257th set, a 513th entry, or picker Add going over 512 must show a message and change nothing; none of them may throw. Tests: `PlaceSetsTest.attachBeyond32ReturnsProblem`, `SetLibraryTest.createBeyond256ReturnsProblem` (Task 2), and `PickerModelTest.addOverLimitIsRefused` (Task 17).
 
 ---
@@ -697,25 +697,32 @@ Places:
 
 **Files:**
 - Modify: `mc/ProfileListPanel.java`, `mc/ProfileTransfer.java`, `core/profile/ProfileSummary.java` (`ruleCount` becomes `setCount`).
-- Create: `mc/SetClashScreen.java`.
-- Test: update `ProfilesClientGameTest` and `ImportExportClientGameTest`.
+- Modify (core): `core/sets/SetImportPlan.java`, `core/profile/ImportPlan.java` (owner decision 2026-11-13, FR-11.5a).
+- Create: `mc/SetRenameOnImportScreen.java`.
+- Test: update `SetImportPlanTest`, `ImportPlanTest`, `ProfilesClientGameTest` and `ImportExportClientGameTest`.
 
 Behavior:
 - Profile rows show Sound Set and zone counts.
 - **Copy from** dialog text: "4 Sound Sets on Everywhere, 2 bubble zones, settings. This server's fixed zones are kept."
 - **Reset and Delete** confirmations add: "Library Sound Sets are not deleted."
-- **Import** with any `DIFFERENT` set opens `SetClashScreen`:
-  - One line per set: the name, "Used in N places here and M other worlds", and a choice of Keep both (default), Use mine or Replace with the file's.
-  - Replace adds: "This changes every place that uses '%s'."
+- **Import** follows FR-11.5a as changed by the owner on 2026-11-13. "Same entries" means identical entries in the same order, ignoring the name.
+  - **Same set** (same ID, same entries): attached, nothing duplicated.
+  - **Exact match under another ID:** the whole import is cancelled before anything changes. A dialog says the import failed because "%s" already has exactly these entries.
+  - **Name clash** (name used by a library set with different entries): before applying, `SetRenameOnImportScreen` asks for a new name for each such set, one at a time, prefilled "\<name> (imported)". A name already in the library, or already chosen for another set in this import, is refused with "That name is already in use. Choose a unique name to import this set." Cancel cancels the whole import.
+  - **Otherwise** the set is added; an ID already used by a different library set gets a new ID, and the imported places' references are rewritten.
+  - `SetImportPlan` drops `Choice` (`KEEP_BOTH`, `USE_MINE`, `REPLACE`). Its statuses become `SAME`, `EXACT_MATCH`, `NAME_CLASH`, `NEW`. `apply` takes the chosen names by file set ID, and refuses (with a `Message`, never a throw) when a name is missing or not unique, or when any `EXACT_MATCH` exists.
   - The plan message adds "%s Sound Sets added" and "%s Sound Set not found, skipped".
 
 - [ ] **Step 1: Write the failing game tests:**
   - `exportImportOnEmptyLibraryRestoresSets`
-  - `changedSetOffersThreeChoicesAndKeepBothAddsImported`
+  - `changedSetAsksForNameAndAddsImported`
+  - `takenNameIsRefusedUntilUnique`
+  - `exactMatchUnderOtherIdCancelsImport`
+  - `ownExportIntoOtherWorldLinksSets`
   - `resetKeepsLibrary`
   - `copyFromLinksSets`: after copying, detach a set on A; B still has it.
 - [ ] **Step 2:** Run `CI=1 ./gradlew runClientGameTest`. Expected: FAIL.
-- [ ] **Step 3:** Implement the rows, dialogs and `SetClashScreen` as described above.
+- [ ] **Step 3:** Implement the core changes (with `SetImportPlanTest` cases for each status, the unique-name refusal and the exact-match cancel), then the rows, dialogs and `SetRenameOnImportScreen` as described above. Remove the Task 14 `// M8c shim` in `ProfileTransfer`.
 - [ ] **Step 4:** Run it again. Expected: PASS.
 - [ ] **Step 5:** Commit with the message "Profiles tab and import dialog handle Sound Sets (FR-11)".
 
