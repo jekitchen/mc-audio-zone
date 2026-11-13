@@ -45,6 +45,8 @@ public final class RecentSounds {
 	private final Map<String, Row> rows = new HashMap<>();
 	private final Set<String> seenExcluded = new HashSet<>();
 	private final Map<String, String> seenCategories = new HashMap<>();
+	/** Changes whenever what {@link #snapshot} or the session sets would show changes. */
+	private long generation;
 
 	/**
 	 * Records one sound start.
@@ -62,8 +64,8 @@ public final class RecentSounds {
 	public void record(String soundId, String category, boolean positional, double distance, boolean audible,
 			PlayStatus status, String zoneName, long nowMs) {
 		if (category != null && EXCLUDED_CATEGORIES.contains(category)) {
-			if (seenExcluded.size() < MAX_SEEN_IDS) {
-				seenExcluded.add(soundId);
+			if (seenExcluded.size() < MAX_SEEN_IDS && seenExcluded.add(soundId)) {
+				generation++;
 			}
 			return;
 		}
@@ -80,6 +82,18 @@ public final class RecentSounds {
 			rows.put(soundId, row);
 		}
 		row.add(category, DistanceBand.of(positional, distance), status, zoneName, nowMs);
+		generation++;
+	}
+
+	/**
+	 * A number that changes whenever a play is recorded, a row expires or is dropped, or a sound is first seen in a
+	 * vanilla-covered category; equal values mean {@link #snapshot} rows (apart from the time since the last play) and
+	 * the session sets are unchanged. The Sounds tab uses it to skip a refresh that would change nothing (FR-1.6).
+	 * Expired rows are dropped by {@link #snapshot}, so a caller that skips snapshots must still take one when rows may
+	 * have expired.
+	 */
+	public long generation() {
+		return generation;
 	}
 
 	/** Frees a slot for a new ID: drops expired rows, then the least recently played one. */
@@ -98,6 +112,7 @@ public final class RecentSounds {
 			}
 		}
 		rows.remove(oldest.id);
+		generation++;
 	}
 
 	private void pruneExpired(long nowMs) {
@@ -105,6 +120,7 @@ public final class RecentSounds {
 		while (it.hasNext()) {
 			if (it.next().expired(nowMs)) {
 				it.remove();
+				generation++;
 			}
 		}
 	}
@@ -181,6 +197,7 @@ public final class RecentSounds {
 	/** Empties the list. Session memory for search is kept. */
 	public void clear() {
 		rows.clear();
+		generation++;
 	}
 
 	/** Mutable per-ID state. Counts live in a ring of one-second buckets covering the window. */

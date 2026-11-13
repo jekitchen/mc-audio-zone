@@ -102,6 +102,16 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 		return getWidth() - scrollbarWidth() - 4;
 	}
 
+	/**
+	 * Where the next added row goes. Vanilla adds up the height of every row already in the list, so filling a list of
+	 * n rows took n² steps (about 6 ms for the 2,000 rows of the Sounds tab's full list, PRD 9.1). Every row here is
+	 * {@link #ROW_HEIGHT} tall, so it is one multiplication.
+	 */
+	@Override
+	public int getNextY() {
+		return getY() + 2 - (int) scrollAmount() + children().size() * defaultEntryHeight;
+	}
+
 	@Override
 	protected double scrollRate() {
 		return ROW_HEIGHT;

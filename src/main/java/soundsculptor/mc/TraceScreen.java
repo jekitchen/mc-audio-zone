@@ -2,9 +2,6 @@ package soundsculptor.mc;
 
 import soundsculptor.core.Message;
 import soundsculptor.core.Translator;
-import soundsculptor.core.boost.BoostWarning;
-import soundsculptor.core.editor.FieldError;
-import soundsculptor.core.editor.EntryDraft;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
@@ -25,7 +22,6 @@ import soundsculptor.core.trace.TraceEditResult;
 import soundsculptor.core.trace.TraceEditor;
 import soundsculptor.core.trace.TraceText;
 import soundsculptor.core.trace.ZoneLine;
-import soundsculptor.core.ui.SliderModel;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptList;
@@ -74,8 +70,6 @@ public final class TraceScreen extends SculptScreen {
 	private static final int ON_OFF_WIDTH = 30;
 	private static final int MUTE_WIDTH = 50;
 	private static final int VOLUME_WIDTH = 60;
-	private static final int PANEL_WIDTH = 240;
-	private static final int FIELD_WIDTH = 40;
 	private static final String ADD_QUICK_KEY = "soundsculptor.trace.edit.add_quick";
 
 	private final String soundId;
@@ -541,50 +535,10 @@ public final class TraceScreen extends SculptScreen {
 		volumeApply = apply;
 		volumeBefore = ProfileManager.workspace();
 		volumeLast = null;
-		int max = BoostWarning.sliderMax(false);
-		int panelWidth = Math.min(PANEL_WIDTH, width - 2 * Theme.PADDING);
-		int sliderWidth = panelWidth - FIELD_WIDTH - 3 * Theme.GAP;
-		double initial = entry.volume() != null ? entry.volume() : 100;
-		volumeField = Tooltips.describe(new SculptTextField(font, FIELD_WIDTH, Component.translatable("soundsculptor.rule_editor.volume_typed")),
-				Component.translatable("soundsculptor.trace.edit.volume_typed.tip"));
-		volumeField.setMaxLength(3);
-		volumeField.setValue(entry.volume() == null ? "" : entry.volume().toString());
-		volumeField.placeholder(Component.translatable("soundsculptor.trace.edit.volume_not_set"));
 		// Checked exactly like the entry editor's Level field (FR-12.7), e.g. "250" is refused and nothing changes.
-		EntryDraft check = EntryDraft.of(entry, false);
-		volumeField.validator(value -> {
-			check.set(EntryDraft.Field.VOLUME, value);
-			FieldError error = check.error(EntryDraft.Field.VOLUME);
-			return error == null ? null : Component.translatable(error.translationKey(), error.args().toArray());
-		});
-		volumeSlider = Tooltips.describe(new SculptSlider(sliderWidth, Component.translatable("soundsculptor.rule_editor.volume"),
-				new SliderModel(SetEntry.MIN_VOLUME, max, 5, 1, 100, Math.min(max, initial)),
-				value -> Component.literal((int) value + "%"), null,
-				value -> {
-					if (!volumeField.isFocused()) {
-						volumeField.setValue(Integer.toString((int) value));
-					}
-				}), Component.translatable("soundsculptor.rule_editor.volume.tip"));
-		volumeField.onChange(value -> {
-			if (!volumeField.isValid()) {
-				return;
-			}
-			Integer volume = value.isBlank() ? null : Integer.valueOf(value.trim());
-			if (volume != null && volumeField.isFocused()) {
-				volumeSlider.setTypedValue(volume);
-			}
-			applyVolume(volume);
-		});
-		SculptButton done = SculptButton.text(Component.translatable("soundsculptor.ui.done"), this::closeOverlay);
-
-		int panelHeight = 2 * Theme.WIDGET_HEIGHT + SculptTextField.ERROR_SLOT_HEIGHT + 3 * Theme.GAP;
-		int x = (width - panelWidth) / 2;
-		int y = Math.max(Theme.PADDING, (height - panelHeight) / 2);
-		volumeSlider.setPosition(x + Theme.GAP, y + Theme.GAP);
-		volumeField.setPosition(volumeSlider.getRight() + Theme.GAP, y + Theme.GAP);
-		done.setPosition(x + panelWidth - Theme.GAP - done.getWidth(),
-				y + 2 * Theme.GAP + Theme.WIDGET_HEIGHT + SculptTextField.ERROR_SLOT_HEIGHT);
-		openOverlay(x, y, panelWidth, panelHeight, List.of(volumeSlider, volumeField, done), volumeSlider, this::finishVolume);
+		LevelPopup popup = LevelPopup.open(this, entry, this::applyVolume, this::finishVolume);
+		volumeSlider = popup.slider;
+		volumeField = popup.field;
 	}
 
 	private void applyVolume(Integer volume) {

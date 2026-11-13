@@ -30,6 +30,7 @@ import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RecentLog;
 import soundsculptor.mc.SetNameScreen;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundSculptorSettings;
 import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
@@ -70,7 +71,72 @@ public final class SoundsTabClientGameTest implements FabricClientGameTest {
 			zoneApplyToWritesZoneQuick(context);
 			addToSetCreatesEntryInChosenSet(context);
 			filterStateRememberedAcrossReopen(context);
+			idleRefreshRebuildsNothing(context);
 		}
+	}
+
+	/**
+	 * PRD 9.1, 11.2: with the filter off (every known sound), a refresh with nothing new rebuilds no row and keeps the
+	 * list as it is; a new play rebuilds only the rows that changed. Prints the time of one refresh, for the report.
+	 */
+	private static void idleRefreshRebuildsNothing(ClientGameTestContext context) {
+		open(context);
+		try {
+			context.runOnClient(mc -> sounds(mc).setRecentOnly(false));
+			context.runOnClient(mc -> {
+				SoundsPanel panel = sounds(mc);
+				// Show distance changes the columns, so every row is rebuilt: the cost of a full rebuild.
+				SoundSculptorSettings.setShowDistance(false);
+				int before = panel.rowsBuilt;
+				long start = System.nanoTime();
+				panel.refresh();
+				long full = (System.nanoTime() - start) / 1000;
+				check(panel.rowsBuilt - before == panel.count(), "a Show distance change rebuilds every row");
+				SoundSculptorSettings.setShowDistance(true);
+				panel.refresh();
+				System.out.println("SOUNDS refresh, filter off, " + panel.count() + " rows: full rebuild " + full + " us");
+
+				List<SculptList.Row> shown = List.copyOf(panel.list.children());
+				int built = panel.rowsBuilt;
+				long idle = medianRefreshMicros(panel, 21);
+				check(panel.rowsBuilt == built, "an idle refresh rebuilds no row, built " + (panel.rowsBuilt - built));
+				List<SculptList.Row> after = panel.list.children();
+				boolean same = shown.size() == after.size();
+				for (int i = 0; same && i < shown.size(); i++) {
+					same = shown.get(i) == after.get(i);
+				}
+				check(same, "an idle refresh keeps the very same rows");
+				System.out.println("SOUNDS refresh, filter off, idle median: " + idle + " us");
+			});
+			play(context, COW, 3.0);
+			context.runOnClient(mc -> {
+				SoundsPanel panel = sounds(mc);
+				Vec3 listener = mc.getSoundManager().getListenerTransform().position();
+				mc.getSoundManager().play(new SimpleSoundInstance(Identifier.parse(VILLAGER), SoundSource.NEUTRAL, 1.0F, 1.0F, RandomSource.create(),
+						false, 0, SoundInstance.Attenuation.LINEAR, listener.x() + 3, listener.y(), listener.z(), false));
+				int built = panel.rowsBuilt;
+				long start = System.nanoTime();
+				panel.refresh();
+				long micros = (System.nanoTime() - start) / 1000;
+				int rebuilt = panel.rowsBuilt - built;
+				check(rebuilt >= 1 && rebuilt <= 2, "a new play rebuilds only its row (and the cow row if its \"ago\" changed), rebuilt " + rebuilt);
+				check(panel.list.findRow(VILLAGER).columnTexts().contains("Friendly Mobs"), "the villager row shows its new recent data");
+				System.out.println("SOUNDS refresh, filter off, after one new play: " + micros + " us, " + rebuilt + " rows rebuilt");
+			});
+		} finally {
+			cleanUp(context);
+		}
+	}
+
+	private static long medianRefreshMicros(SoundsPanel panel, int runs) {
+		long[] micros = new long[runs];
+		for (int i = 0; i < runs; i++) {
+			long start = System.nanoTime();
+			panel.refresh();
+			micros[i] = (System.nanoTime() - start) / 1000;
+		}
+		java.util.Arrays.sort(micros);
+		return micros[runs / 2];
 	}
 
 	/** FR-1 AC: type villager with the filter on: only recently played villager sounds; off: every villager sound. */
@@ -176,6 +242,11 @@ public final class SoundsTabClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> press(mc, VILLAGER, SoundsPanel.BUTTON_LEVEL));
 			check(context.computeOnClient(mc -> main(mc).hasOverlay() && sounds(mc).levelSlider != null
 					&& main(mc).getFocused() == sounds(mc).levelSlider), "Level… opens the pop-up with the slider focused");
+			// The list refreshes every 5 ticks; it must not pull focus out of the pop-up.
+			play(context, VILLAGER, 3.0);
+			context.waitTicks(10);
+			check(context.computeOnClient(mc -> main(mc).hasOverlay() && main(mc).getFocused() == sounds(mc).levelSlider),
+					"the slider keeps focus while the list would refresh");
 			context.takeScreenshot("sounds-level-popup");
 			context.runOnClient(mc -> sounds(mc).levelField.setValue("40"));
 			check(context.computeOnClient(mc -> {

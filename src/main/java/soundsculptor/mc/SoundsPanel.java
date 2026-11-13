@@ -2,8 +2,10 @@ package soundsculptor.mc;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -12,25 +14,26 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
 import net.minecraft.world.phys.Vec3;
-import soundsculptor.core.boost.BoostWarning;
 import soundsculptor.core.browser.BrowserRow;
 import soundsculptor.core.browser.SoundBrowser;
-import soundsculptor.core.editor.EntryDraft;
-import soundsculptor.core.editor.FieldError;
 import soundsculptor.core.quick.ApplyTarget;
 import soundsculptor.core.quick.ApplyTo;
 import soundsculptor.core.quick.QuickActionResult;
 import soundsculptor.core.quick.QuickActions;
+import soundsculptor.core.recent.DistanceBand;
+import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.recent.RecentRow;
+import soundsculptor.core.recent.RecentSounds;
 import soundsculptor.core.recent.SortOrder;
 import soundsculptor.core.search.SearchQuery;
 import soundsculptor.core.search.SoundEntry;
 import soundsculptor.core.search.SoundNames;
 import soundsculptor.core.sets.PlaceRef;
+import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetEntry;
+import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.trace.EntryEdit;
-import soundsculptor.core.ui.SliderModel;
 import soundsculptor.core.zones.Point;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptDropdown;
@@ -80,8 +83,6 @@ public final class SoundsPanel {
 	private static final int ZONE_WIDTH = 110;
 	private static final int SEEN_WIDTH = 150;
 	private static final int HELP_WIDTH = 360;
-	private static final int LEVEL_PANEL_WIDTH = 240;
-	private static final int LEVEL_FIELD_WIDTH = 40;
 	/** Room around a toggle's or dropdown's text (the dropdown also draws its arrow). */
 	private static final int TEXT_PADDING = 12;
 	private static final int DROPDOWN_PADDING = 28;
@@ -117,8 +118,10 @@ public final class SoundsPanel {
 	/** The Level pop-up, while it is open. */
 	public SculptSlider levelSlider;
 	public SculptTextField levelField;
-	/** How many times the rows were rebuilt, for tests of the refresh rate. */
+	/** How many times a refresh ran (it may find nothing to do), for tests of the refresh rate. */
 	public int refreshCount;
+	/** How many rows were built, for tests that a refresh rebuilds only what changed. */
+	public int rowsBuilt;
 
 	private List<ApplyTarget> applyChoices = List.of(ApplyTarget.EVERYWHERE);
 	/** Every known sound, built when the tab opens so names follow the language and resource packs (FR-3.1). */
@@ -128,6 +131,20 @@ public final class SoundsPanel {
 	private boolean searchPending;
 	private long searchChangedAt;
 	private int ticks;
+
+	// What the shown rows were built from (see refresh).
+	private long shownGeneration = -1;
+	private Profile shownProfile;
+	private SetLibrary shownLibrary;
+	private ApplyTarget shownTarget;
+	private boolean shownDistance;
+	private SearchQuery shownQuery;
+	private boolean shownRecentOnly;
+	private SortOrder shownSort;
+	private long shownSecond;
+	private boolean shownAnyRecent;
+	/** Built rows by sound ID; cleared when the workspace, Apply to or Show distance changes. */
+	private final Map<String, CachedRow> rowCache = new HashMap<>();
 
 	// The Level pop-up: one visit is one change for Undo.
 	private String levelSound;
@@ -296,22 +313,106 @@ public final class SoundsPanel {
 		refresh();
 	}
 
-	/** Rebuilds the rows. The list keeps the focused row and the scroll position. */
+	/**
+	 * Brings the rows up to date. The list keeps the focused row and the scroll position.
+	 *
+	 * <p>The full list has about 2,000 rows, so a refresh does only what changed (PRD 9.1, 11.2). It does nothing when
+	 * the log's {@linkplain RecentSounds#generation generation}, the workspace, the query, the filter, the sort, Apply to
+	 * and Show distance are as they were, and the clock has not reached the next second while a row shows recent data
+	 * (its "2s ago" or play count may change). Otherwise each row is rebuilt only if what it shows changed (its recent
+	 * values to the "ago" granularity, or its "Seen as" category); the others are reused, and the list is replaced only if
+	 * a row or the order changed. A new workspace, Apply to choice or Show distance setting rebuilds every row, because
+	 * the Mute buttons and the columns depend on them. Does nothing while a pop-up is open, so focus stays in it.
+	 */
 	public void refresh() {
-		if (list == null) {
+		if (list == null || host.hasOverlay()) {
 			return;
 		}
+		refreshCount++;
 		long now = Util.getMillis();
-		List<RecentRow> recent = RecentLog.get().sounds().snapshot(now, SortOrder.MOST_RECENT, null);
+		RecentSounds log = RecentLog.get().sounds();
+		Workspace ws = ProfileManager.workspace();
+		ApplyTarget target = applyTarget();
+		boolean distance = SoundSculptorSettings.showDistance();
+		long second = now / 1000;
+		// workspace() is a new record each call: compare its parts, which change identity only when changed.
+		if (ws.profile() != shownProfile || ws.library() != shownLibrary || !target.equals(shownTarget) || distance != shownDistance) {
+			rowCache.clear();
+		} else if (log.generation() == shownGeneration && query == shownQuery && recentOnly == shownRecentOnly && sort == shownSort
+				&& (!shownAnyRecent || second == shownSecond)) {
+			return;
+		}
+		shownProfile = ws.profile();
+		shownLibrary = ws.library();
+		shownTarget = target;
+		shownDistance = distance;
+		shownQuery = query;
+		shownRecentOnly = recentOnly;
+		shownSort = sort;
+		shownSecond = second;
+		List<RecentRow> recent = log.snapshot(now, SortOrder.MOST_RECENT, null);
+		// Read after the snapshot, which drops expired rows.
+		shownGeneration = log.generation();
 		List<BrowserRow> found = SoundBrowser.rows(recent, entries, query, recentOnly, sort, KnownSounds.seenExcluded());
-		Predicate<String> muted = mutedAtApplyTarget();
+		Predicate<String> muted = null;
+		boolean anyRecent = false;
 		List<SculptList.Row> rows = new ArrayList<>(found.size());
 		for (BrowserRow row : found) {
-			rows.add(toListRow(row, now, muted));
+			Object inputs = rowInputs(row, now, log);
+			CachedRow cached = rowCache.get(row.soundId());
+			if (cached == null || !cached.inputs().equals(inputs)) {
+				if (muted == null) {
+					muted = mutedAtApplyTarget();
+				}
+				cached = new CachedRow(inputs, toListRow(row, now, muted));
+				rowCache.put(row.soundId(), cached);
+				rowsBuilt++;
+			}
+			anyRecent |= row.recent() != null;
+			rows.add(cached.row());
 		}
+		shownAnyRecent = anyRecent;
 		count = rows.size();
-		list.setRows(rows);
-		refreshCount++;
+		if (!sameRows(rows, list.children())) {
+			list.setRows(rows);
+		}
+	}
+
+	/** What a row shows besides its name and ID: equal inputs mean the row would be built the same. */
+	private static Object rowInputs(BrowserRow row, long now, RecentSounds log) {
+		RecentRow recent = row.recent();
+		if (recent == null) {
+			String category = log.seenCategory(row.soundId());
+			return category == null ? "" : category;
+		}
+		return new RecentInputs(recent.category(), recent.count(), agoBucket(now - recent.lastPlayedMs()), recent.band(),
+				recent.status(), recent.zoneName());
+	}
+
+	/** The time since the last play as {@link #ago} shows it: seconds up to a minute, then minutes. */
+	private static long agoBucket(long millis) {
+		long seconds = Math.max(0, millis / 1000);
+		return seconds < 60 ? seconds : 60 + seconds / 60;
+	}
+
+	private static boolean sameRows(List<SculptList.Row> a, List<SculptList.Row> b) {
+		if (a.size() != b.size()) {
+			return false;
+		}
+		for (int i = 0; i < a.size(); i++) {
+			if (a.get(i) != b.get(i)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** A row with recent data, by what it shows (FR-1.2). */
+	private record RecentInputs(String category, int count, long ago, DistanceBand band, PlayStatus status, String zoneName) {
+	}
+
+	/** A built row and what it was built from. */
+	private record CachedRow(Object inputs, SculptList.Row row) {
 	}
 
 	private SculptList.Row toListRow(BrowserRow row, long now, Predicate<String> muted) {
@@ -436,49 +537,9 @@ public final class SoundsPanel {
 		levelTarget = applyTarget();
 		levelBefore = ProfileManager.workspace();
 		SetEntry entry = QuickActions.quickEntry(levelBefore, levelTarget.place(), soundId);
-		Integer current = entry == null ? null : entry.volume();
-		Font font = Minecraft.getInstance().font;
-		int max = BoostWarning.sliderMax(false);
-		int panelWidth = Math.min(LEVEL_PANEL_WIDTH, host.width - 2 * Theme.PADDING);
-		int sliderWidth = panelWidth - LEVEL_FIELD_WIDTH - 3 * Theme.GAP;
-		levelField = Tooltips.describe(new SculptTextField(font, LEVEL_FIELD_WIDTH, Component.translatable("soundsculptor.rule_editor.volume_typed")),
-				Component.translatable("soundsculptor.rule_editor.volume_typed.tip"));
-		levelField.setMaxLength(3);
-		levelField.setValue(current == null ? "" : current.toString());
-		levelField.placeholder(Component.translatable("soundsculptor.trace.edit.volume_not_set"));
-		EntryDraft check = EntryDraft.of(entry == null ? SetEntry.of("new", soundId) : entry, false);
-		levelField.validator(value -> {
-			check.set(EntryDraft.Field.VOLUME, value);
-			FieldError error = check.error(EntryDraft.Field.VOLUME);
-			return error == null ? null : Component.translatable(error.translationKey(), error.args().toArray());
-		});
-		levelSlider = Tooltips.describe(new SculptSlider(sliderWidth, Component.translatable("soundsculptor.rule_editor.volume"),
-				new SliderModel(SetEntry.MIN_VOLUME, max, 5, 1, 100, Math.min(max, current == null ? 100 : current)),
-				value -> Component.literal((int) value + "%"), null,
-				value -> {
-					if (!levelField.isFocused()) {
-						levelField.setValue(Integer.toString((int) value));
-					}
-				}), Component.translatable("soundsculptor.rule_editor.volume.tip"));
-		levelField.onChange(value -> {
-			if (!levelField.isValid()) {
-				return;
-			}
-			Integer level = value.isBlank() ? null : Integer.valueOf(value.trim());
-			if (level != null && levelField.isFocused()) {
-				levelSlider.setTypedValue(level);
-			}
-			applyLevel(level);
-		});
-		SculptButton done = SculptButton.text(Component.translatable("soundsculptor.ui.done"), host::closeOverlay);
-
-		int panelHeight = 2 * Theme.WIDGET_HEIGHT + SculptTextField.ERROR_SLOT_HEIGHT + 3 * Theme.GAP;
-		int x = (host.width - panelWidth) / 2;
-		int y = Math.max(Theme.PADDING, (host.height - panelHeight) / 2);
-		levelSlider.setPosition(x + Theme.GAP, y + Theme.GAP);
-		levelField.setPosition(levelSlider.getRight() + Theme.GAP, y + Theme.GAP);
-		done.setPosition(x + panelWidth - Theme.GAP - done.getWidth(), y + 2 * Theme.GAP + Theme.WIDGET_HEIGHT + SculptTextField.ERROR_SLOT_HEIGHT);
-		host.openOverlay(x, y, panelWidth, panelHeight, List.of(levelSlider, levelField, done), levelSlider, this::finishLevel);
+		LevelPopup popup = LevelPopup.open(host, entry == null ? SetEntry.of("new", soundId) : entry, this::applyLevel, this::finishLevel);
+		levelSlider = popup.slider;
+		levelField = popup.field;
 	}
 
 	/** Sets the level from the pop-up, or clears it ({@code null}); saved at once, without its own toast. */
@@ -494,7 +555,9 @@ public final class SoundsPanel {
 			host.showToast(ProfileManager.component(result.error()), null);
 			return;
 		}
-		ProfileManager.change(current -> QuickActions.apply(current, where, soundId, edit).after());
+		if (result.changed()) {
+			ProfileManager.change(current -> QuickActions.apply(current, where, soundId, edit).after());
+		}
 	}
 
 	/** The Level pop-up closed: one Undo toast for everything changed in it. */
