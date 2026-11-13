@@ -9,6 +9,7 @@ import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SoundSet;
 import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.trace.EntryLocation;
+import soundsculptor.core.trace.TraceText;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -28,6 +29,7 @@ import soundsculptor.core.sets.SetImportPlan;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
+import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptList;
 import soundsculptor.mc.ui.SculptScreen;
@@ -58,6 +60,7 @@ import net.minecraft.util.FormattedCharSequence;
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
  *   inside the window, no two controls overlapping, no button or label text cut off.</li>
  *   <li>A-4 narration: every control on the Sound Sets, Zones and Profiles tabs, a place's Sound Sets and Attach set…,
+ *   and the sound trace (a shared set's line, which reads its places, and Add to Quick changes with its choice),
  *   including list row buttons, has a label to read.</li>
  *   <li>Pseudo-language (PRD 9.3): the same layout check with every Sound Sculptor text about 40% longer, reported.</li>
  * </ul>
@@ -70,6 +73,10 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final int BUTTON_PADDING = 8;
 	/** The fixture's second entry in Everywhere's Quick changes, as the trace lists it. */
 	private static final EntryLocation QUICK_R2 = new EntryLocation(PlaceRef.EVERYWHERE, SoundSet.QUICK_ID, "r2");
+	/** A sound SET matches: a shared set's line in the trace. */
+	private static final String COW = "minecraft:entity.cow.ambient";
+	/** A sound nothing on Everywhere matches: the trace's Add to Quick changes line. */
+	private static final String PIG = "minecraft:entity.pig.ambient";
 	/** A library set for the Sound Sets tab, its name screen and its delete warning. */
 	private static final SoundSet SET = new SoundSet("set-a11y", "Animals of the farm and the barn by the river",
 			List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
@@ -128,6 +135,29 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				return silent;
 			});
 			check(silentTrace.isEmpty(), "controls without a label in the sound trace: " + silentTrace);
+			// FR-14.4: a shared set's line (SET on Everywhere and Trading hall) lists its places in its tooltip, and the
+			// narrator reads them with the line's button; a "No entry matches" line's Add to Quick changes and its choice.
+			List<String> silentSets = context.computeOnClient(mc -> {
+				TraceScreen trace = new TraceScreen(null, COW);
+				mc.gui.setScreen(trace);
+				SculptList.Row line = trace.setRow(PlaceRef.EVERYWHERE, SET.id());
+				check(line != null && line.tooltip() != null && line.tooltip().getString().startsWith("Used in Everywhere and Trading hall."),
+						"the shared set's line lists its places, was " + (line == null || line.tooltip() == null ? null : line.tooltip().getString()));
+				String read = NarrationCompat.collect(line.buttons().get(0)::updateNarration);
+				check(read.contains("Used in Everywhere and Trading hall"), "the narrator reads the places, was " + read);
+				List<String> silent = new ArrayList<>(silentControls(trace));
+				TraceScreen none = new TraceScreen(null, PIG);
+				mc.gui.setScreen(none);
+				silent.addAll(silentControls(none));
+				SculptList.Row add = none.row(new TraceText.NoEntryTarget(PlaceRef.EVERYWHERE));
+				check(add != null && add.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
+						"the no-match line has a labelled Add to Quick changes");
+				none.openAddToQuickChanges(PlaceRef.EVERYWHERE);
+				silent.addAll(silentControls(none));
+				check(none.getFocused() == none.addQuickMute, "the choice takes focus, so Tab, arrows and Enter work in it");
+				return silent;
+			});
+			check(silentSets.isEmpty(), "controls without a label in the sound trace's set and Add to Quick changes lines: " + silentSets);
 			// A-4 for the set editor, its Attach to… menu, the Quick changes editor and the entry editor.
 			List<String> silentEditors = context.computeOnClient(mc -> {
 				SetEditorScreen editor = SetEditorScreen.edit(null, SET.id());
@@ -278,6 +308,11 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 		TRACE(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), null),
 		TRACE_VOLUME(mc -> new TraceScreen(null, "minecraft:entity.villager.ambient"), s -> {
 			((TraceScreen) s).openVolume(QUICK_R2, QuickEntries.get(ProfileManager.profile(), "r2"));
+			return null;
+		}),
+		TRACE_SHARED_SET(mc -> new TraceScreen(null, COW), null),
+		TRACE_ADD_TO_QUICK(mc -> new TraceScreen(null, PIG), s -> {
+			((TraceScreen) s).openAddToQuickChanges(PlaceRef.EVERYWHERE);
 			return null;
 		});
 

@@ -15,7 +15,7 @@ public enum TraceNotice {
 	NON_POSITIONAL("non_positional"),
 	/** "Above 100%: boost applied." */
 	BOOSTED("boosted"),
-	/** Rules or zones changed since the last play, so the result shown differs from what was heard. */
+	/** Sets or zones changed since the last play, so the result shown differs from what was heard. */
 	CHANGED_SINCE_PLAY("changed_since_play");
 
 	private final String key;

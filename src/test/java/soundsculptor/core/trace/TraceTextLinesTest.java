@@ -39,10 +39,11 @@ class TraceTextLinesTest {
 				PLAY, false, false);
 	}
 
+	/** Entry, zone and "no entry" targets; set lines are checked on their own. */
 	private static List<TraceText.Target> targets(List<TraceText.Line> lines) {
 		List<TraceText.Target> targets = new ArrayList<>();
 		for (TraceText.Line line : lines) {
-			if (line.target() != null) {
+			if (line.target() != null && !(line.target() instanceof TraceText.SetTarget)) {
 				targets.add(line.target());
 			}
 		}
@@ -67,7 +68,8 @@ class TraceTextLinesTest {
 		SetEntry zoneEntry = SetEntry.of("zr", "*villager*").withVolume(20);
 		Zone z = sphere("z", zoneEntry);
 		Zone empty = sphere("empty");
-		List<TraceText.Line> lines = TraceText.lines(trace(List.of(wildcard, exact), List.of(z, empty)), EN);
+		SoundTrace t = trace(List.of(wildcard, exact), List.of(z, empty));
+		List<TraceText.Line> lines = TraceText.lines(t, EN);
 
 		assertEquals(List.of(
 				new TraceText.EntryTarget(new EntryLocation(PlaceRef.EVERYWHERE, SoundSet.QUICK_ID, "e"), exact),
@@ -78,8 +80,9 @@ class TraceTextLinesTest {
 				new TraceText.NoEntryTarget(PlaceRef.zone("empty"))), targets(lines));
 		int everywhere = indexOf(lines, "Everywhere");
 		assertEquals("  Quick changes", lines.get(everywhere + 1).text());
-		assertNull(lines.get(everywhere + 1).target(), "the set's own line has nothing to edit yet");
-		assertEquals("    minecraft:entity.villager.ambient: Volume 60%", lines.get(everywhere + 2).text());
+		assertEquals(new TraceText.SetTarget(PlaceRef.EVERYWHERE, t.everywhere().sets().get(0)), lines.get(everywhere + 1).target(),
+				"the set's own line is about the set at its place");
+		assertEquals("    minecraft:entity.villager.ambient: Level 60%", lines.get(everywhere + 2).text());
 		assertNull(lines.get(everywhere + 3).target(), "the 'Decides loudness' line has nothing to edit");
 	}
 
@@ -100,6 +103,34 @@ class TraceTextLinesTest {
 		assertEquals("      Decides loudness (Higher in the list)", lines.get(first + 2).text());
 		int second = indexOf(lines, "  Villagers (2)");
 		assertEquals("      loudness overridden by Villagers: *:*villager*", lines.get(second + 2).text());
+	}
+
+	@Test
+	void setLinesCarryTheirSetAndPlaceQuickChangesFirst() {
+		SetEntry farmEntry = SetEntry.of("e1", "*villager*").withVolume(30);
+		SoundSet farm = new SoundSet("farm", "Farm animals", List.of(farmEntry));
+		SetLibrary library = new SetLibrary(List.of(farm));
+		SetEntry quickEntry = SetEntry.of("q", AMBIENT).withVolume(60);
+		PlaceSets everywhere = PlaceSets.EMPTY.attach("farm").withQuickEntries(List.of(quickEntry));
+		Zone pen = new Zone("pen", "Pen", true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), PlaceSets.EMPTY.attach("farm"));
+		SoundTrace t = SoundTracer.trace(new Precedence(everywhere, List.of(pen), library), library, setId -> 2, AMBIENT, PLAY, false, false);
+		List<TraceText.Line> lines = TraceText.lines(t, EN);
+
+		List<TraceText.SetTarget> sets = new ArrayList<>();
+		for (TraceText.Line line : lines) {
+			if (line.target() instanceof TraceText.SetTarget set) {
+				sets.add(set);
+			}
+		}
+		assertEquals(3, sets.size(), "Everywhere's Quick changes and Farm animals, then the zone's Farm animals: " + sets);
+		assertEquals(PlaceRef.EVERYWHERE, sets.get(0).place());
+		assertEquals(SoundSet.QUICK_ID, sets.get(0).set().setId());
+		assertEquals("farm", sets.get(1).set().setId());
+		assertEquals(PlaceRef.zone("pen"), sets.get(2).place());
+		assertEquals("farm", sets.get(2).set().setId());
+		int everywhereIndex = indexOf(lines, "Everywhere");
+		assertEquals("  Quick changes", lines.get(everywhereIndex + 1).text());
+		assertEquals(sets.get(1), lines.get(indexOf(lines, "  Farm animals · used in 2 places")).target());
 	}
 
 	@Test

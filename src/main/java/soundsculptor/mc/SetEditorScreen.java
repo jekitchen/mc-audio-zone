@@ -46,6 +46,8 @@ public final class SetEditorScreen extends SculptScreen {
 	private static final int NAME_WIDTH = 220;
 	private static final int STATUS_WIDTH = 110;
 	private static final int ON_OFF_WIDTH = 30;
+	/** An entry row's buttons: On/Off, then Edit. */
+	private static final int EDIT_BUTTON = 1;
 	/** How often the Attached to panel checks whether the other worlds have been counted. */
 	private static final int USAGE_REFRESH_TICKS = 5;
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/edit");
@@ -63,6 +65,8 @@ public final class SetEditorScreen extends SculptScreen {
 	/** Where the library set is attached in this world; {@code null} for Quick changes. */
 	private final AttachedToPanel attached;
 	private int ticks;
+	/** The entry to focus when the editor opens, or {@code null}; used once. */
+	private String openAt;
 
 	public SculptTextField nameField;
 	public SculptButton addButton;
@@ -82,16 +86,37 @@ public final class SetEditorScreen extends SculptScreen {
 	 * @throws IllegalArgumentException if the library has no such set
 	 */
 	public static SetEditorScreen edit(Screen parent, String setId) {
+		return edit(parent, setId, null);
+	}
+
+	/**
+	 * Opens the editor on a library set at one of its entries: that entry's row is scrolled into view with its Edit button
+	 * focused (the sound trace's "Open full editor", FR-14.4). An entry the set no longer has opens the editor as usual.
+	 *
+	 * @param entryId the entry to open at, or {@code null}
+	 * @throws IllegalArgumentException if the library has no such set
+	 */
+	public static SetEditorScreen edit(Screen parent, String setId, String entryId) {
 		SoundSet set = ProfileManager.library().get(setId);
 		if (set == null) {
 			throw new IllegalArgumentException("the library has no Sound Set " + setId);
 		}
-		return new SetEditorScreen(parent, SetDraft.of(set), null, Component.translatable("soundsculptor.set_editor.title"));
+		return new SetEditorScreen(parent, SetDraft.of(set), null, Component.translatable("soundsculptor.set_editor.title")).openAt(entryId);
 	}
 
 	/** Opens the editor on a place's Quick changes (FR-4.10); Save removes the set if it was left empty. */
 	public static SetEditorScreen forQuickChanges(Screen parent, PlaceRef where) {
-		return new SetEditorScreen(parent, quickDraft(where), where, Component.translatable("soundsculptor.set_editor.quick.title"));
+		return forQuickChanges(parent, where, null);
+	}
+
+	/** {@link #forQuickChanges(Screen, PlaceRef)} at one of its entries, as {@link #edit(Screen, String, String)} does. */
+	public static SetEditorScreen forQuickChanges(Screen parent, PlaceRef where, String entryId) {
+		return new SetEditorScreen(parent, quickDraft(where), where, Component.translatable("soundsculptor.set_editor.quick.title")).openAt(entryId);
+	}
+
+	private SetEditorScreen openAt(String entryId) {
+		this.openAt = entryId;
+		return this;
 	}
 
 	/** The place's Quick changes as a draft; an empty one if it has none yet. */
@@ -173,6 +198,18 @@ public final class SetEditorScreen extends SculptScreen {
 		refreshEntries();
 	}
 
+	/** Opened at an entry: focus its Edit button, once; afterwards (e.g. back from the entry editor) as usual. */
+	@Override
+	protected void setInitialFocus() {
+		SculptList.Row row = openAt == null || entryList == null ? null : entryList.findRow(openAt);
+		openAt = null;
+		if (row != null) {
+			focusPath(entryList.revealRow(row, EDIT_BUTTON));
+			return;
+		}
+		super.setInitialFocus();
+	}
+
 	@Override
 	public void tick() {
 		super.tick();
@@ -221,7 +258,7 @@ public final class SetEditorScreen extends SculptScreen {
 	}
 
 	/**
-	 * What the entry does to loudness, in the same style as the Recently Played status: "✖ Muted", "▶ Volume 30%",
+	 * What the entry does to loudness, in the same style as the Recently Played status: "✖ Muted", "▶ Level 30%",
 	 * "▶ Not muted", or "○ Off" for an entry that is turned off. Empty if it does not set loudness.
 	 */
 	static String status(SetEntry entry) {
@@ -380,24 +417,30 @@ public final class SetEditorScreen extends SculptScreen {
 	 * @param otherWorlds how many other worlds or servers use it
 	 */
 	public static Component linkedMessage(List<String> placesHere, int otherWorlds, boolean othersCounted) {
+		String list = placeList(placesHere, otherWorlds);
+		MutableComponent text = list.isEmpty() ? Component.translatable("soundsculptor.set_editor.confirm.not_here")
+				: Component.translatable("soundsculptor.set_editor.confirm.message", list);
+		if (!othersCounted) {
+			text.append("\n").append(Component.translatable("soundsculptor.set_editor.confirm.counting"));
+		}
+		return text;
+	}
+
+	/**
+	 * "Main base, Mob farm and 1 other world": this world's places by name, then how many other worlds or servers use the
+	 * set; {@code ""} when there are none. Also the sound trace's set-line tooltip (FR-14.4).
+	 */
+	static String placeList(List<String> placesHere, int otherWorlds) {
 		List<String> parts = new ArrayList<>(placesHere);
 		if (otherWorlds > 0) {
 			parts.add(Component.translatable(otherWorlds == 1 ? "soundsculptor.set_editor.confirm.other_worlds.one"
 					: "soundsculptor.set_editor.confirm.other_worlds", otherWorlds).getString());
 		}
-		MutableComponent text;
-		if (parts.isEmpty()) {
-			text = Component.translatable("soundsculptor.set_editor.confirm.not_here");
-		} else {
-			String list = parts.size() == 1 ? parts.get(0)
-					: Component.translatable("soundsculptor.set_editor.confirm.and", String.join(", ", parts.subList(0, parts.size() - 1)),
-							parts.get(parts.size() - 1)).getString();
-			text = Component.translatable("soundsculptor.set_editor.confirm.message", list);
+		if (parts.size() <= 1) {
+			return parts.isEmpty() ? "" : parts.get(0);
 		}
-		if (!othersCounted) {
-			text.append("\n").append(Component.translatable("soundsculptor.set_editor.confirm.counting"));
-		}
-		return text;
+		return Component.translatable("soundsculptor.set_editor.confirm.and", String.join(", ", parts.subList(0, parts.size() - 1)),
+				parts.get(parts.size() - 1)).getString();
 	}
 
 	/**

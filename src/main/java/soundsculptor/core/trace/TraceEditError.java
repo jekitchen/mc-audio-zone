@@ -9,14 +9,14 @@ import soundsculptor.core.sets.SetEntry;
  * shows the message under the field and nothing changes.
  */
 public enum TraceEditError {
-	/** Volume must be 0 to 200 (AC: type 250 into a volume field, an error shows and nothing changes). */
+	/** Level must be 0 to 200 (AC: type 250 into a level field, an error shows and nothing changes). */
 	VOLUME_OUT_OF_RANGE("volume_out_of_range", SetEntry.MIN_VOLUME, SetEntry.MAX_VOLUME),
 	/** Limit count must be 1 to 100. */
 	LIMIT_COUNT_OUT_OF_RANGE("limit_count_out_of_range", Limit.MIN_COUNT, Limit.MAX_COUNT),
 	/** Limit window must be 50 to 10,000 ms. */
 	LIMIT_WINDOW_OUT_OF_RANGE("limit_window_out_of_range", Limit.MIN_WINDOW_MS, Limit.MAX_WINDOW_MS),
 	/** The entry, or its set, was removed since the panel opened. */
-	RULE_NOT_FOUND("rule_not_found", 0, 0),
+	ENTRY_NOT_FOUND("entry_not_found", 0, 0),
 	/** The zone was removed since the panel opened. */
 	ZONE_NOT_FOUND("zone_not_found", 0, 0);
 
