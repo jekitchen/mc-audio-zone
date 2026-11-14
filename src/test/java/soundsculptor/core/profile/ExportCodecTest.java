@@ -3,6 +3,7 @@ package soundsculptor.core.profile;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -133,5 +134,23 @@ class ExportCodecTest {
 		assertEquals("The file is empty.", problem(" "));
 		assertEquals("This file was made with a newer Sound Sculptor. Update the mod to import it.", problem("{\"schemaVersion\": 4}"));
 		assertEquals("The file is larger than 1 MB.", problem("{\"name\": \"" + "x".repeat(1024 * 1024) + "\"}"));
+	}
+
+	/**
+	 * FR-11.4 against FR-11.6: an export holds the whole profile and every set it uses, so it can pass the 1 MB import
+	 * limit. Export and import measure it the same way (UTF-8 bytes), so the export can warn exactly when its file
+	 * would be refused.
+	 */
+	@Test
+	void exportAndImportAgreeOnTheSizeLimit() {
+		String fits = "{\"schemaVersion\": 3, \"name\": \"" + "a".repeat((int) ProfileStore.MAX_FILE_BYTES - 32) + "\"}";
+		assertEquals(ProfileStore.MAX_FILE_BYTES, fits.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
+		assertTrue(ExportCodec.fitsImportLimit(fits));
+		assertDoesNotThrow(() -> ExportCodec.read(fits));
+
+		String over = fits.replaceFirst("a", "é"); // one character, two bytes
+		assertFalse(ExportCodec.fitsImportLimit(over));
+		ProfileFormatException e = assertThrows(ProfileFormatException.class, () -> ExportCodec.read(over));
+		assertEquals("The file is larger than 1 MB.", e.problem().text(EN));
 	}
 }

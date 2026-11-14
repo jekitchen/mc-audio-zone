@@ -535,7 +535,7 @@
 	"soundsculptor.transfer.export_failed": "Could not export: %s",
 	"soundsculptor.transfer.exported.title": "Profile exported",
 	"soundsculptor.transfer.exported.message": "Saved as %s in config/soundsculptor/exports.",
-	"soundsculptor.profiles.export.too_large": "Saved as %s in config/soundsculptor/exports. Warning: it is larger than 1 MB, so it can't be imported again as it is.",
+	"soundsculptor.transfer.exported.too_large": "Saved as %s in config/soundsculptor/exports. Warning: it is larger than 1 MB, so it can't be imported again as it is.",
 	"soundsculptor.transfer.open_folder": "Open folder",
 	"soundsculptor.transfer.open_imports.tip": "Open config/soundsculptor/imports. Put profile files there to import them.",
 	"soundsculptor.transfer.import_button": "Import…",

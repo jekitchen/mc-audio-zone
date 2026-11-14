@@ -32,7 +32,7 @@ public final class EntryResolver {
 	/** Cache size cap. Servers can send arbitrary sound IDs, so the cache must not grow without bound. */
 	public static final int MAX_CACHED_IDS = 4096;
 	/**
-	 * Distinct results (combinations of winning rules) kept per list. Every cached ID points at one of these, so a
+	 * Distinct results (combinations of winning entries) kept per list. Every cached ID points at one of these, so a
 	 * lookup the cache cannot hold allocates nothing once its combination has been seen. Past this cap, a result is
 	 * neither kept nor cached.
 	 */
@@ -133,7 +133,7 @@ public final class EntryResolver {
 		return layers;
 	}
 
-	/** The winning rule per property for {@code soundId}. */
+	/** The winning entry per property for {@code soundId}. */
 	public EntryResolution resolve(String soundId) {
 		if (ordered.length == 0) {
 			hits++; // nothing to match, so nothing worth caching
@@ -244,8 +244,8 @@ public final class EntryResolver {
 	}
 
 	/**
-	 * Rules that take over at least one of {@code rule}'s properties for at least one of {@code knownIds}, for the
-	 * rule editor's "Partly overridden by" line (FR-4.6). Not for the hot path. Entries are compared by instance, so
+	 * Entries that take over at least one of {@code rule}'s properties for at least one of {@code knownIds}, for the
+	 * entry editor's "Partly overridden by" line (FR-4.6). Not for the hot path. Entries are compared by instance, so
 	 * use it on a one-layer resolver from {@link #of}: a set and its duplicate share entry instances.
 	 */
 	public Set<SetEntry> overriddenBy(SetEntry rule, Iterable<String> knownIds) {
@@ -277,7 +277,7 @@ public final class EntryResolver {
 	}
 
 	/**
-	 * Estimated bytes of the per-ID cache, for the Diagnostics memory readout (PRD 9.1). The rules themselves belong
+	 * Estimated bytes of the per-ID cache, for the Diagnostics memory readout (PRD 9.1). The entries themselves belong
 	 * to the profile and are not counted. It walks the cache, so call it on demand through {@code MemoryMeter}.
 	 */
 	public long estimatedBytes() {
@@ -303,7 +303,7 @@ public final class EntryResolver {
 		return misses;
 	}
 
-	/** Enabled rules in this list ("rules active", FR-13.3). */
+	/** Enabled entries in this list ("entries active", FR-13.3). */
 	public int ruleCount() {
 		return ordered.length;
 	}

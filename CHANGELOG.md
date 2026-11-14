@@ -33,6 +33,12 @@ Each release ships one jar that runs on every supported Minecraft version.
 - A save that Windows holds back for a moment (a virus scanner or the search indexer reading the file) is retried, and
   is written at the latest when the game closes.
 - Buttons and choices grow to fit longer text, and long hints and Diagnostics lines wrap instead of being cut off.
+- Unmute right after Mute puts the sound's entry back exactly as it was: a "Not muted" entry no longer keeps the Cue
+  the Mute added, and an entry's own Cue is no longer dropped.
+- An export larger than 1 MB is saved with a warning that it can't be imported as it is; only a failed write is
+  reported as a failed export.
+- A Sound Sets folder that can be read only in part still loads the sets it lists, and says so.
+- A profile or Sound Set file with an empty or malformed set or entry ID is set aside with a message naming the place.
 
 ### Features
 - **Profiles tab:** every server and world with a profile, with its name, address or world, Sound Set and zone counts

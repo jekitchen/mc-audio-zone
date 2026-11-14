@@ -346,7 +346,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void globalAndZoneRulesWithTheSameIdHaveTheirOwnCounters() {
-		// SetEntry IDs are unique within one list only, so a global "r1" and zone a's "r1" are different rules (FR-6.7).
+		// Entry IDs are unique within one set only, so Everywhere's "r1" and zone a's "r1" are different entries (FR-6.7).
 		SetEntry global = SetEntry.of("r1", "minecraft:entity.cow.*").withLimit(new Limit(1, 1000, false));
 		Zone a = cylinder("a", 0, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
 		profile(List.of(global), a);

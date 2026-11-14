@@ -1,6 +1,5 @@
 package soundsculptor.core.sets;
 
-
 /**
  * The messages about Sound Set files (PRD FR-11.6, FR-11.8), as translation keys (PRD 9.3). Values that are wrong in
  * the same way as in a profile file reuse the {@code soundsculptor.profile.problem.value.*} keys.

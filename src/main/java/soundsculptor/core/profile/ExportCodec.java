@@ -86,12 +86,20 @@ public final class ExportCodec {
 	}
 
 	/**
+	 * Whether a file with this text is within the import limit, 1 MB in UTF-8 (FR-11.6). An export holds the whole
+	 * profile and every set it uses (FR-11.4), so it can pass the limit: it is still written, and Export warns.
+	 */
+	public static boolean fitsImportLimit(String text) {
+		return text.getBytes(StandardCharsets.UTF_8).length <= ProfileStore.MAX_FILE_BYTES;
+	}
+
+	/**
 	 * Checks and reads an export (or plain profile) file's text. On any problem nothing is read, and the exception's
 	 * message names it in plain words with its place, for example "Sound Set 'Farm animals', entry 3, level: 250 is
 	 * above the maximum 200."
 	 */
 	public static Read read(String text) throws ProfileFormatException {
-		if (text.getBytes(StandardCharsets.UTF_8).length > ProfileStore.MAX_FILE_BYTES) {
+		if (!fitsImportLimit(text)) {
 			throw ProfileText.problem(ProfileText.TOO_LARGE);
 		}
 		if (text.isBlank()) {
