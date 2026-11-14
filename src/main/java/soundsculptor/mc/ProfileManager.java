@@ -87,6 +87,12 @@ public final class ProfileManager {
 	private static final long FLUSH_MILLIS = 10_000;
 	/** Files whose failed write was already reported with a toast; they are reported again only after a write succeeds. */
 	private static final Set<Path> reportedFailures = ConcurrentHashMap.newKeySet();
+	/**
+	 * The last name of each deleted library set by ID: read from {@code sets/deleted.json} at start, then kept up to date
+	 * here as sets are deleted, so a note about a removed set can name it even before the background save has written
+	 * the record (or when that save failed).
+	 */
+	private static final Map<String, String> deletedNames = new ConcurrentHashMap<>();
 
 	private ProfileManager() {
 	}
@@ -99,6 +105,8 @@ public final class ProfileManager {
 		setWriter = new LibraryWriter(setStore);
 		profileWriter = new ProfileWriter(store);
 		reportedFailures.clear();
+		deletedNames.clear();
+		deletedNames.putAll(setStore.deletedNames());
 		SetStore.LoadAll loaded = setStore.loadAll();
 		for (Message problem : loaded.problems()) {
 			SoundSculptorClient.LOGGER.warn("Sound Sculptor: {}", problem);
@@ -127,7 +135,7 @@ public final class ProfileManager {
 				: store.load(worldKey, displayName);
 		SetLibrary library = current.library();
 		ProfilePrune.Pruned pruned = ProfilePrune.dropMissingSetsIfComplete(result.profile(), library, libraryComplete,
-				setStore.deletedNames());
+				Map.copyOf(deletedNames));
 		current = snapshot(worldKey, pruned.profile(), library);
 		if (result.failed()) {
 			String problem = result.problem().text((key, args) -> Component.translatable(key, args).getString());
@@ -242,6 +250,7 @@ public final class ProfileManager {
 		for (SoundSet set : before.library().sets()) {
 			if (!after.library().contains(set.id())) {
 				deleted.add(set);
+				deletedNames.put(set.id(), set.name());
 			}
 		}
 		String key = before.key();

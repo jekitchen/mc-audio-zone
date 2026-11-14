@@ -89,6 +89,38 @@ class SetStoreTest {
 		assertTrue(Files.exists(dir.resolve("sets/a.json")));
 	}
 
+	/** One entry the folder listing cannot read does not stop the others from loading (PRD 9.2). */
+	@Test
+	void ioErrorOnOneListedEntryStillLoadsTheOthers() throws IOException {
+		store().save(set("a", "Alpha"));
+		store().save(set("b", "Beta"));
+		Path sets = dir.resolve("sets");
+		Iterator<Path> once = new Iterator<>() {
+			private int step;
+
+			@Override
+			public boolean hasNext() {
+				if (step == 1) {
+					step++;
+					throw new UncheckedIOException(new IOException("bad sector"));
+				}
+				return step < 3;
+			}
+
+			@Override
+			public Path next() {
+				return sets.resolve(step++ == 0 ? "a.json" : "b.json");
+			}
+		};
+		SetStore store = new SetStore(sets, folder -> StreamSupport.stream(Spliterators.spliteratorUnknownSize(once, 0), false),
+				SetStore::readText);
+		SetStore.LoadAll all = store.loadAll();
+		assertEquals(2, all.library().size(), "the sets listed before and after the bad entry load");
+		assertFalse(all.complete(), "a set behind the bad entry may be missing, so attachments must stay");
+		assertEquals(1, all.problems().size());
+		assertTrue(all.problems().get(0).text(EN).contains("bad sector"), all.problems().get(0).text(EN));
+	}
+
 	@Test
 	void fileWithIoErrorIsNotSetAside() throws IOException {
 		store().save(set("a", "Alpha"));
@@ -210,6 +242,31 @@ class SetStoreTest {
 		assertTrue(Files.exists(dir.resolve("sets/a.json.bak")));
 		assertEquals(Map.of("a", "Alpha"), store().deletedNames());
 		assertEquals(0, store().loadAll().library().size());
+	}
+
+	/** If {@code deleted.json} cannot be written, the set's file stays, so neither the set nor its name is lost. */
+	@Test
+	void deleteThatCannotRecordTheNameKeepsTheSet() throws IOException {
+		store().save(set("a", "Alpha"));
+		Files.createDirectories(dir.resolve("sets/deleted.json/inside")); // the record cannot be written
+		assertThrows(IOException.class, () -> store().delete("a", "Alpha"));
+		assertTrue(Files.exists(dir.resolve("sets/a.json")), "the set is still there, so its name is too");
+		assertEquals("Alpha", store().loadAll().library().get("a").name());
+	}
+
+	/** If the set's file cannot be moved aside, the name is recorded and the set stays until the delete is retried. */
+	@Test
+	void deleteThatCannotMoveTheFileHasRecordedTheName() throws IOException {
+		store().save(set("a", "Alpha"));
+		Files.createDirectories(dir.resolve("sets/a.json.bak/inside")); // the backup's place is taken
+		assertThrows(IOException.class, () -> store().delete("a", "Alpha"));
+		assertTrue(Files.exists(dir.resolve("sets/a.json")));
+		assertEquals(Map.of("a", "Alpha"), store().deletedNames());
+		Files.delete(dir.resolve("sets/a.json.bak/inside"));
+		Files.delete(dir.resolve("sets/a.json.bak"));
+		store().delete("a", "Alpha"); // the retry
+		assertFalse(Files.exists(dir.resolve("sets/a.json")));
+		assertEquals(Map.of("a", "Alpha"), store().deletedNames());
 	}
 
 	@Test

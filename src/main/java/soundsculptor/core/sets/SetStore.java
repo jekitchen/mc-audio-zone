@@ -18,6 +18,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,8 @@ public final class SetStore {
 	/** {@code deleted.json} keeps this many names; the oldest are dropped first. */
 	public static final int MAX_DELETED_NAMES = 1024;
 
+	/** Errors from the folder listing after which the rest of it is not asked for. */
+	private static final int MAX_LISTING_ERRORS = 16;
 	private static final String DELETED_FILE = "deleted.json";
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
@@ -103,24 +106,33 @@ public final class SetStore {
 	 *   reported (FR-11.8).</li>
 	 *   <li>A file the disk would not read (locked, no permission, device error) is not broken: it is left as it is,
 	 *   reported, and the load is {@linkplain LoadAll#complete() incomplete}. So is a folder that cannot be
-	 *   listed.</li>
+	 *   listed; when the listing fails part way, the sets it did list still load.</li>
 	 *   <li>Backups, {@code .broken} copies, temp files and {@code deleted.json} are not sets.</li>
 	 *   <li>At most {@link SetLibrary#MAX_SETS} load (the first by file name); the files beyond that are left alone,
 	 *   one problem is reported and the load is incomplete.</li>
 	 * </ul>
 	 */
 	public LoadAll loadAll() {
-		List<Path> files;
+		Listing listing;
 		try {
-			files = setFiles();
+			listing = setFiles();
 		} catch (IOException e) {
 			return unlisted(e);
 		} catch (UncheckedIOException e) {
 			return unlisted(e.getCause());
 		}
+		List<Path> files = listing.files();
+		if (listing.failure() != null && files.isEmpty()) {
+			return unlisted(listing.failure());
+		}
 		List<SoundSet> sets = new ArrayList<>();
 		List<Message> problems = new ArrayList<>();
 		boolean complete = true;
+		if (listing.failure() != null) {
+			// The sets the listing did give still load; one it could not give may be missing, so nothing is pruned.
+			problems.add(Message.of(SetText.FOLDER_PARTLY_UNREADABLE, String.valueOf(listing.failure().getMessage())));
+			complete = false;
+		}
 		int beyondLimit = 0;
 		for (Path file : files) {
 			if (sets.size() >= SetLibrary.MAX_SETS) {
@@ -162,20 +174,50 @@ public final class SetStore {
 	}
 
 	/**
-	 * The set files, by name; none when the folder does not exist.
-	 *
-	 * @throws UncheckedIOException if reading the listing fails part way
+	 * The set files the folder listing gave, by name, and the first error it reported on the way, or {@code null}.
 	 */
-	private List<Path> setFiles() throws IOException {
+	private record Listing(List<Path> files, IOException failure) {
+	}
+
+	/**
+	 * The set files, by name; none when the folder does not exist. An entry the listing cannot read is skipped and the
+	 * listing goes on, up to {@link #MAX_LISTING_ERRORS} such errors, so one bad entry does not hide the other sets.
+	 *
+	 * @throws IOException if the folder cannot be listed at all
+	 */
+	private Listing setFiles() throws IOException {
 		if (Files.notExists(directory)) {
-			return List.of();
+			return new Listing(List.of(), null);
 		}
+		List<Path> files = new ArrayList<>();
+		IOException failure = null;
+		int errors = 0;
 		try (Stream<Path> entries = lister.read(directory)) {
-			return entries.filter(f -> {
-				String name = f.getFileName().toString();
-				return name.endsWith(".json") && !name.equals(DELETED_FILE) && Files.isRegularFile(f);
-			}).sorted(Comparator.comparing(f -> f.getFileName().toString())).toList();
+			Iterator<Path> it = entries.iterator();
+			while (true) {
+				Path file;
+				try {
+					if (!it.hasNext()) {
+						break;
+					}
+					file = it.next();
+				} catch (UncheckedIOException e) {
+					if (failure == null) {
+						failure = e.getCause();
+					}
+					if (++errors >= MAX_LISTING_ERRORS) {
+						break; // the listing keeps failing: stop rather than ask forever
+					}
+					continue;
+				}
+				String name = file.getFileName().toString();
+				if (name.endsWith(".json") && !name.equals(DELETED_FILE) && Files.isRegularFile(file)) {
+					files.add(file);
+				}
+			}
 		}
+		files.sort(Comparator.comparing(f -> f.getFileName().toString()));
+		return new Listing(files, failure);
 	}
 
 	private SoundSet readFile(Path file) throws IOException, SetFormatException {
@@ -204,15 +246,21 @@ public final class SetStore {
 	}
 
 	/**
-	 * Deletes a set's file (kept as {@code .bak}, so it can be recovered by hand) and remembers its name.
+	 * Remembers a set's name, then deletes its file (kept as {@code .bak}, so it can be recovered by hand). In that
+	 * order, so a failure part way never loses both: if the name cannot be recorded the file stays, and if the file
+	 * cannot be moved the name is already recorded and the delete can simply be tried again.
 	 *
 	 * @param name the set's name, for {@link #deletedNames()}
 	 */
 	public void delete(String id, String name) throws IOException {
 		Path file = fileFor(id);
+		rememberDeleted(id, name);
 		if (Files.exists(file)) {
 			Files.move(file, file.resolveSibling(file.getFileName() + ".bak"), StandardCopyOption.REPLACE_EXISTING);
 		}
+	}
+
+	private void rememberDeleted(String id, String name) throws IOException {
 		Map<String, String> names = readDeleted();
 		names.remove(id); // so a repeated delete counts as the newest
 		names.put(id, name);

@@ -107,6 +107,7 @@ public final class TestEnglish implements Translator {
 			Map.entry("soundsculptor.sets.store.problem", "Sound Set file %1$s could not be loaded: %2$s"),
 			Map.entry("soundsculptor.sets.store.file_unreadable", "Sound Set file %1$s could not be read (%2$s). It was left as it is and is read again at the next start; places keep it attached until then."),
 			Map.entry("soundsculptor.sets.store.folder_unreadable", "The Sound Sets folder could not be read (%s). No Sound Sets are loaded this session; places keep their attached sets, and the folder is read again at the next start."),
+			Map.entry("soundsculptor.sets.store.folder_partly_unreadable", "The Sound Sets folder could not be read in full (%s). The Sound Sets it did list are loaded; places keep their attached sets, and the folder is read again at the next start."),
 			Map.entry("soundsculptor.sets.store.too_many_sets", "The library can hold up to %1$s Sound Sets; %2$s more were not loaded."),
 			// SetEntry summaries (Rules tab chips, PRD 6.1)
 			Map.entry("soundsculptor.summary.separator", ", "),
