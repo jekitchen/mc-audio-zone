@@ -22,7 +22,7 @@ java tools/CompareJars.java <jar built for 26.2> <jar built for 26.3>
 
 It prints `IDENTICAL` or lists every entry that differs (the `-sources` jars are out of scope). The build already
 keeps the build version out of the jar: its name, its `fabric.mod.json` version and `minecraft` range
-(`>=26.2 <26.4-`) and the manifest's `Fabric-Minecraft-Version` all come from `supported_minecraft_versions`. Things
+(`["~26.2", "~26.3"]`: releases only, no snapshots or pre-releases) and the manifest's `Fabric-Minecraft-Version` all come from `supported_minecraft_versions`. Things
 in code that make a build differ, and what to do instead:
 
 - **Inlined constants.** javac copies `static final` primitives and strings into the class that uses them. Key codes

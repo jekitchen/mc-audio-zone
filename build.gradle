@@ -12,10 +12,10 @@ if (!(project.minecraft_version in supportedMinecraft)) {
 }
 // "26.2-26.3": in the jar name and version, and in the manifest instead of the version Loom built against.
 def minecraftRange = supportedMinecraft.size() == 1 ? supportedMinecraft[0] : "${supportedMinecraft.first()}-${supportedMinecraft.last()}"
-// fabric.mod.json "minecraft" dependency: ">=26.2 <26.4-". The "-" after the upper bound also excludes 26.4 snapshots and
-// pre-releases, which Fabric Loader orders before 26.4 ("<26.4" alone would accept them).
-def lastMinecraft = supportedMinecraft.last().tokenize('.')
-def minecraftDependency = ">=${supportedMinecraft.first()} <${lastMinecraft[0]}.${(lastMinecraft[1] as int) + 1}-"
+// fabric.mod.json "minecraft" dependency: ["~26.2", "~26.3"], any one of which must match. "~26.3" is ">=26.3 <26.4-",
+// so each version's releases (26.3, 26.3.1, ...) are accepted and its snapshots and pre-releases, which Fabric Loader
+// orders before the release (26.3-pre.1 < 26.3), are not; the "-" also keeps out the next version's snapshots.
+def minecraftDependency = '[' + supportedMinecraft.collect { "\"~${it}\"" }.join(', ') + ']'
 
 version = "${project.mod_version}+mc${minecraftRange}"
 group = project.maven_group
@@ -90,11 +90,14 @@ dependencies {
 }
 
 processResources {
-	def props = [version: project.version, minecraft_dependency: minecraftDependency]
+	def props = [version: project.version]
 	inputs.properties props
+	inputs.property 'minecraftDependency', minecraftDependency
 
 	filesMatching('fabric.mod.json') {
 		expand props
+		// The source keeps a string placeholder so it stays valid JSON; the dependency is a JSON array.
+		filter { String line -> line.replace('"@MINECRAFT_DEPENDENCY@"', minecraftDependency) }
 	}
 }
 
