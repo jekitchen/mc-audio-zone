@@ -9,6 +9,7 @@ import soundsculptor.mc.ui.SculptTabButton;
 import soundsculptor.mc.ui.SculptDropdown;
 import soundsculptor.mc.ui.SculptScreen;
 import soundsculptor.mc.ui.SculptTextField;
+import soundsculptor.mc.ui.Theme;
 import soundsculptor.mc.ui.SculptToggle;
 import soundsculptor.mc.ui.Tooltips;
 import soundsculptor.mc.ui.demo.UiKitDemoScreen;
@@ -35,6 +36,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 	public static final int TAB_SETTINGS = 4;
 
 	private static final int PAGE_TAB_WIDTH = 100;
+	/** The least width of the Settings › Zones controls; they grow to fit a longer label. */
 	private static final int OUTLINE_MODE_WIDTH = 240;
 
 	// Remembered while the game runs, like the last used tab.
@@ -53,6 +55,8 @@ public final class SoundSculptorScreen extends SculptScreen {
 	/** The Settings tab's page tabs, in {@link SettingsPage} order. */
 	public final List<SculptTabButton> pageTabs = new ArrayList<>();
 	public SculptButton copyReportButton;
+	/** Whether Copy report sits in the footer: the Diagnostics page's text left no room for it in the body. */
+	private boolean copyReportInFooter;
 	public SculptDropdown<OutlineMode> outlineModeDropdown;
 	public SculptToggle throughBlocksToggle;
 	private DiagnosticsReport.Data diagnostics;
@@ -98,6 +102,9 @@ public final class SoundSculptorScreen extends SculptScreen {
 
 	@Override
 	protected void addFooterWidgets(List<AbstractWidget> footer) {
+		if (copyReportInFooter) {
+			footer.add(copyReportButton);
+		}
 		if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
 			footer.add(SculptButton.text(Component.translatable("screen.soundsculptor.ui_demo"),
 					() -> minecraft.gui.setScreen(new UiKitDemoScreen(this))));
@@ -107,6 +114,7 @@ public final class SoundSculptorScreen extends SculptScreen {
 
 	@Override
 	protected void buildTab(int index, Body body) {
+		copyReportInFooter = false;
 		if (index != TAB_SETTINGS && index != TAB_PROFILES && !ProfileManager.isLoaded()) {
 			// Opened outside a world (e.g. from Mod Menu on the title screen): sounds, Sound Sets and zones belong to a
 			// world's profile (FR-11.1), so there is nothing to show or change yet.
@@ -215,7 +223,8 @@ public final class SoundSculptorScreen extends SculptScreen {
 	/** Settings → Zones (PRD 6.1): FR-10.1 "Show zone outlines" and FR-10.5 "Outlines visible through blocks". */
 	private void buildZoneSettings(Body body) {
 		// "Outlines visible through blocks" is app-wide; "Show zone outlines" belongs to a world's profile.
-		throughBlocksToggle = Tooltips.describe(new SculptToggle(OUTLINE_MODE_WIDTH, Component.translatable("soundsculptor.settings.through_blocks"),
+		Component throughBlocks = Component.translatable("soundsculptor.settings.through_blocks");
+		throughBlocksToggle = Tooltips.describe(new SculptToggle(Math.max(OUTLINE_MODE_WIDTH, SculptToggle.widthFor(throughBlocks)), throughBlocks,
 				SoundSculptorSettings.outlinesThroughBlocks(), SoundSculptorSettings::setOutlinesThroughBlocks),
 				Component.translatable("soundsculptor.settings.through_blocks.tip"));
 		if (!ProfileManager.isLoaded()) {
@@ -223,13 +232,21 @@ public final class SoundSculptorScreen extends SculptScreen {
 			body.label(() -> Component.translatable("soundsculptor.settings.no_world"));
 			return;
 		}
-		outlineModeDropdown = Tooltips.describe(new SculptDropdown<>(OUTLINE_MODE_WIDTH, Component.translatable("soundsculptor.settings.outlines"),
-				List.of(OutlineMode.values()),
-				mode -> Component.translatable("soundsculptor.settings.outlines." + mode.name().toLowerCase(Locale.ROOT)),
+		Component outlines = Component.translatable("soundsculptor.settings.outlines");
+		List<Component> modeNames = new ArrayList<>();
+		for (OutlineMode mode : OutlineMode.values()) {
+			modeNames.add(outlineModeName(mode));
+		}
+		outlineModeDropdown = Tooltips.describe(new SculptDropdown<>(Math.max(OUTLINE_MODE_WIDTH, SculptDropdown.widthFor(outlines, modeNames)),
+				outlines, List.of(OutlineMode.values()), SoundSculptorScreen::outlineModeName,
 				SoundSculptorSettings.outlineMode(), SoundSculptorSettings::setOutlineMode),
 				Component.translatable("soundsculptor.settings.outlines.tip", outlinesKeyName()));
 		body.row(outlineModeDropdown);
 		body.row(throughBlocksToggle);
+	}
+
+	private static Component outlineModeName(OutlineMode mode) {
+		return Component.translatable("soundsculptor.settings.outlines." + mode.name().toLowerCase(Locale.ROOT));
 	}
 
 	private static Component outlinesKeyName() {
@@ -242,11 +259,12 @@ public final class SoundSculptorScreen extends SculptScreen {
 	private void buildDiagnostics(Body body) {
 		diagnostics = Diagnostics.data();
 		body.label(() -> Component.translatable("soundsculptor.diag.sounds", diagnostics.sounds().count()));
-		body.label(() -> Component.translatable("soundsculptor.diag.per_sound", micros(diagnostics.sounds().averageMicros()),
+		// The long lines wrap rather than being cut (PRD 9.3).
+		body.wrappedLabel(() -> Component.translatable("soundsculptor.diag.per_sound", micros(diagnostics.sounds().averageMicros()),
 				micros(diagnostics.sounds().maxMicros()), micros(diagnostics.peakSoundMicros())));
-		body.label(() -> timing("soundsculptor.diag.tick", diagnostics.tick()));
-		body.label(() -> timing("soundsculptor.diag.outlines", diagnostics.outlines()));
-		body.label(() -> Component.translatable("soundsculptor.diag.active", diagnostics.activeSets(),
+		body.wrappedLabel(() -> timing("soundsculptor.diag.tick", diagnostics.tick()));
+		body.wrappedLabel(() -> timing("soundsculptor.diag.outlines", diagnostics.outlines()));
+		body.wrappedLabel(() -> Component.translatable("soundsculptor.diag.active", diagnostics.activeSets(),
 				diagnostics.librarySets(), diagnostics.activeEntries(), diagnostics.zones()));
 		body.label(() -> Double.isNaN(diagnostics.cacheHitRate())
 				? Component.translatable("soundsculptor.diag.cache.none")
@@ -256,7 +274,12 @@ public final class SoundSculptorScreen extends SculptScreen {
 				MemoryEstimate.megabytes(MemoryEstimate.BUDGET_BYTES)));
 		copyReportButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.diag.copy"), this::copyReport),
 				Component.translatable("soundsculptor.diag.copy.tip"));
-		body.row(copyReportButton);
+		// In a small window, wrapped lines can leave no room below them: Copy report then goes in the footer, still after
+		// the page in focus order, instead of under the footer's edge.
+		copyReportInFooter = body.remaining() < Theme.WIDGET_HEIGHT;
+		if (!copyReportInFooter) {
+			body.row(copyReportButton);
+		}
 	}
 
 	private static Component timing(String key, TimingWindow.Stats stats) {

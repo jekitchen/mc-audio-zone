@@ -30,6 +30,7 @@ Each release ships one jar per supported Minecraft version.
 - Long lists of places in the delete warning and the Save confirmation scroll, so Delete and Save stay on screen.
 - A save that Windows holds back for a moment (a virus scanner or the search indexer reading the file) is retried, and
   is written at the latest when the game closes.
+- Buttons and choices grow to fit longer text, and long hints and Diagnostics lines wrap instead of being cut off.
 
 ### Features
 - **Profiles tab:** every server and world with a profile, with its name, address or world, Sound Set and zone counts

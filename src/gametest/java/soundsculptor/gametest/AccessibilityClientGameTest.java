@@ -68,10 +68,10 @@ import net.minecraft.util.Util;
  *   <li>Opened outside a world (the title screen, or Mod Menu's config button when Mod Menu is installed:
  *   {@code -Pmodmenu=true}), the screen says to join a world instead of offering settings that would go nowhere.</li>
  *   <li>A-3 layout: every Sound Sculptor screen at 854 × 480 and 1920 × 1080, GUI scales 1 to 4 and Auto: each control
- *   inside the window, no two controls overlapping, no button or label text cut off. Inside lists too: each row's
- *   buttons fit beside its text, no row button or fixed column cuts its text, and a row's long text (a name, an ID)
- *   keeps enough room to tell rows apart. The Sounds tab and the picker are checked with the Recently played filter on
- *   and off, with recently played rows (one in a long-named zone) and "In this set" marks.</li>
+ *   inside the window, no two controls overlapping, no button or label text cut off, no label below the body. Inside
+ *   lists too: each row's buttons fit beside its text, no row button or fixed column cuts its text, and a row's long
+ *   text (a name, an ID) keeps enough room to tell rows apart. The Sounds tab and the picker are checked with the
+ *   Recently played filter on and off, with recently played rows (one in a long-named zone) and "In this set" marks.</li>
  *   <li>A-4 narration: every control on the Sounds tab (the Recently played filter on and off, its search help, its
  *   Level pop-up and Add to set…), the Sounds picker (the filter on and off, and Like this…), the Sound Sets, Zones and
  *   Profiles tabs, a place's Sound Sets and Attach set…,
@@ -109,10 +109,11 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final String OTHER_PROFILE = "a11y-other.example.net";
 	/**
 	 * The most pseudo-language layout problems allowed, not counting the Diagnostics timing lines (their live numbers change
-	 * length from run to run): a ratchet at the count this check finds today, all at the narrowest GUI widths. Lower it
-	 * when fixes bring the count down.
+	 * length from run to run): a ratchet at the count this check finds today. Buttons and choices now fit their text and
+	 * long hints wrap; what is left are 38 list columns squeezed at the narrowest GUI widths (Sounds, picker, Zones,
+	 * Profiles and a place's Sound Sets), due in M16. Lower it when fixes bring the count down.
 	 */
-	private static final int PSEUDO_CEILING = 114;
+	private static final int PSEUDO_CEILING = 38;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -631,6 +632,10 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 				String text = label.text().get().getString();
 				if (font.width(text) > label.width()) {
 					problems.add(where + ": label cut off \"" + text + "\"");
+				}
+				// A label that wraps or follows a wrapped one must still end above the footer.
+				if (label.y() + font.lineHeight > az.body().bottom()) {
+					problems.add(where + ": label below the body \"" + text + "\"");
 				}
 			}
 		}

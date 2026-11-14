@@ -21,6 +21,8 @@ import net.minecraft.network.chat.Component;
  */
 public class SculptDropdown<T> extends AbstractButton {
 	private static final String ARROW = "▼";
+	/** Room around a dropdown's text: its borders and the arrow. */
+	public static final int TEXT_PADDING = 28;
 
 	private final Component label;
 	private final List<T> options;
@@ -39,6 +41,19 @@ public class SculptDropdown<T> extends AbstractButton {
 		this.onChange = onChange;
 		this.value = options.contains(initial) ? initial : options.get(0);
 		refreshMessage();
+	}
+
+	/**
+	 * The width of a dropdown that shows "Label: Option" in full for the widest of {@code optionNames}, so it keeps its
+	 * size when the choice changes and a longer translation is not cut (PRD 9.3).
+	 */
+	public static int widthFor(Component label, List<Component> optionNames) {
+		Font font = Minecraft.getInstance().font;
+		int widest = 0;
+		for (Component name : optionNames) {
+			widest = Math.max(widest, font.width(Component.translatable("soundsculptor.ui.toggle", label, name)));
+		}
+		return widest + TEXT_PADDING;
 	}
 
 	public T value() {
