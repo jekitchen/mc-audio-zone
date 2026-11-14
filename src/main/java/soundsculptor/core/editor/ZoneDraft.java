@@ -150,7 +150,6 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		put(Field.ENABLED, Boolean.toString(value));
 	}
 
-
 	/** FR-8.1 "Set to my position" or "Set to the block I'm looking at": the anchor and where it is. */
 	public void setPosition(Point position, String worldKey, String dimension) {
 		put(Field.X, Numbers.format(position.x()));

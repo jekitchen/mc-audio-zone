@@ -90,7 +90,6 @@ public final class OutlineGeometry {
 		};
 	}
 
-
 	private static double[] cylinder(Point a, double r, double halfHeight) {
 		int n = circleSegments(r);
 		double[] coords = new double[(2 * n + 4) * 6];

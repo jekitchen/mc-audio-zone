@@ -503,7 +503,7 @@
 	"soundsculptor.profiles.copy": "Copy",
 	"soundsculptor.profiles.copy.tip": "Copy this profile's Sound Sets on Everywhere and settings into this world's profile",
 	"soundsculptor.profiles.copy.title": "Copy from %s?",
-	"soundsculptor.profiles.copy.message": "%s, settings. This server's zones are kept.",
+	"soundsculptor.profiles.copy.message": "%s and settings. This server's zones are kept.",
 	"soundsculptor.profiles.count.sets_everywhere": "%s Sound Sets on Everywhere",
 	"soundsculptor.profiles.count.sets_everywhere.one": "1 Sound Set on Everywhere",
 	"soundsculptor.profiles.copy.confirm": "Copy",

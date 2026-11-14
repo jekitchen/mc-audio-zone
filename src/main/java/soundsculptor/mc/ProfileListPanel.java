@@ -213,7 +213,6 @@ public final class ProfileListPanel {
 		return plural("soundsculptor.profiles.count.sets_everywhere", count);
 	}
 
-
 	/** The text {@code key + ".one"} for 1, else {@code key} with the count. */
 	static Component plural(String key, int count) {
 		return count == 1 ? Component.translatable(key + ".one") : Component.translatable(key, count);

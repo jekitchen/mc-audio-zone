@@ -238,7 +238,6 @@ class ImportPlanTest {
 		assertEquals(null, result.colorOf("mine"), "the imported zone brings its own (missing) color");
 	}
 
-
 	@Test
 	void tooManyZonesAfterImportIsAProblem() {
 		List<Zone> many = new java.util.ArrayList<>();

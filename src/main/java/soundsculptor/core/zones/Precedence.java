@@ -296,7 +296,8 @@ public final class Precedence {
 	/**
 	 * Whether any zone could set this sound's loudness while it plays (FR-8.8): an enabled zone with an entry that sets
 	 * mute or level for {@code soundId}, in this world and dimension. A sound muted at start must still get a channel
-	 * if so, so the per-tick loop can make it audible when the source moves (matrix case P12). Allocates nothing once each sound ID has been seen.
+	 * if so, so the per-tick loop can make it audible when the source moves (matrix case P12). Allocates nothing once
+	 * each sound ID has been seen.
 	 */
 	public boolean anyZoneCouldSetLoudness(String soundId, String worldKey, String dimension) {
 		for (int i = 0; i < zones.length; i++) {

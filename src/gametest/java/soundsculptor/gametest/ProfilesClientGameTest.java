@@ -111,7 +111,7 @@ public final class ProfilesClientGameTest implements FabricClientGameTest {
 		context.waitForScreen(SculptDialog.class);
 		check(context.computeOnClient(mc -> mc.gui.screen().getTitle().getString().equals("Copy from Server A?")), "the copy dialog");
 		String copyMessage = context.computeOnClient(mc -> ((SculptDialog) mc.gui.screen()).message().getString());
-		check(copyMessage.equals("2 Sound Sets on Everywhere, settings. This server's zones are kept."),
+		check(copyMessage.equals("2 Sound Sets on Everywhere and settings. This server's zones are kept."),
 				"the dialog lists what is copied, was " + copyMessage);
 		int librarySize = context.computeOnClient(mc -> ProfileManager.library().size());
 		context.takeScreenshot("profiles-copy-dialog");

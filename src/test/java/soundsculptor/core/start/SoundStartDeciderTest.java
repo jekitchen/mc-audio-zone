@@ -239,7 +239,6 @@ class SoundStartDeciderTest {
 		assertTrue(start(s).cancel(), "zones never apply to non-positional sounds");
 	}
 
-
 	@Test
 	void disabledZonesNeverOverride() {
 		Zone a = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Cylinder(10, 20),

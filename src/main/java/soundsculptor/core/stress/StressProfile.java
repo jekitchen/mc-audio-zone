@@ -51,7 +51,7 @@ public final class StressProfile {
 	 * patterns, same settings), but each set holds 1 or 2 of them, because a zone now attaches 1 to 3 sets: on average
 	 * that matches about as many zones per sound as the old 1 to 3 rules did. The seed was picked from a scan: its pool
 	 * has no match-all {@code *} entry (shared by a dozen zones, it would make all of them match every sound), and over
-	 * the budget tests' 255 sounds its zones match 18.7 zones and 7.2 zone limits per sound, against 19.5 and 6.7 before
+	 * the budget tests' 255 sounds its zones match 18.58 zones and 7.33 zone limits per sound, against 19.5 and 6.7 before
 	 * Sound Sets. {@code StressProfileTest} keeps both within 15%.
 	 */
 	private static final long POOL_SEED = 323;
