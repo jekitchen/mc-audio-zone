@@ -73,6 +73,54 @@ public final class SoundsTabClientGameTest implements FabricClientGameTest {
 			filterStateRememberedAcrossReopen(context);
 			idleRefreshRebuildsNothing(context);
 		}
+		applyToForgottenInAnotherWorld(context);
+	}
+
+	/**
+	 * Zone ids restart at z1 in every world: Apply to set to z1 in world A must not preselect world B's own z1, and a
+	 * Mute there goes to Everywhere's Quick changes.
+	 */
+	private static void applyToForgottenInAnotherWorld(ClientGameTestContext context) {
+		try (TestSingleplayerContext worldA = TestWorlds.create(context)) {
+			worldA.getConnection().waitForChunksRender();
+			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(homeZone("z1", ProfileManager.key(), mc)))));
+			open(context);
+			try {
+				context.runOnClient(mc -> sounds(mc).setApplyTarget(sounds(mc).applyChoices().get(1)));
+				check("z1".equals(context.computeOnClient(mc -> sounds(mc).applyTarget().zoneId())), "world A: Apply to is z1");
+			} finally {
+				context.setScreen(() -> null);
+			}
+		}
+		try (TestSingleplayerContext worldB = TestWorlds.create(context)) {
+			worldB.getConnection().waitForChunksRender();
+			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(homeZone("z1", ProfileManager.key(), mc)))));
+			// Not open(): that resets the remembered state, which is what must carry over.
+			context.runOnClient(mc -> {
+				ProfileManager.setBypass(false);
+				RecentLog.get().sounds().clear();
+			});
+			context.setScreen(SoundSculptorScreen::new);
+			context.waitForScreen(SoundSculptorScreen.class);
+			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS));
+			try {
+				check(context.computeOnClient(mc -> sounds(mc).applyChoices().size()) == 2, "world B offers Everywhere and its own z1");
+				check(context.computeOnClient(mc -> sounds(mc).applyTarget().isEverywhere()), "world B: Apply to is Everywhere");
+				context.runOnClient(mc -> sounds(mc).setRecentOnly(false));
+				search(context, "villager ambient");
+				context.runOnClient(mc -> press(mc, VILLAGER, SoundsPanel.BUTTON_MUTE));
+				check(context.computeOnClient(mc -> QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER) != null
+						&& QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.zone("z1"), VILLAGER) == null),
+						"the mute lands in Everywhere's Quick changes, not in z1's");
+			} finally {
+				cleanUp(context);
+			}
+		}
+	}
+
+	private static Zone homeZone(String id, String key, Minecraft mc) {
+		Vec3 eye = mc.player.getEyePosition();
+		return new Zone(id, "Home " + id, true, key, "minecraft:overworld", new Point(eye.x, eye.y, eye.z), new Shape.Box(9, 9, 9), PlaceSets.EMPTY);
 	}
 
 	/**

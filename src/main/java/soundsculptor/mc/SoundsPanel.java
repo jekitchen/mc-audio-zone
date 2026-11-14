@@ -208,8 +208,10 @@ public final class SoundsPanel {
 		String searchText;
 		SortOrder sort;
 		boolean paused;
-		/** The zone "Apply to" chose last, or null for Everywhere. */
+		/** The zone "Apply to" chose last, or null for Everywhere. Zone ids restart in every profile, so it counts only in {@link #applyWorldKey}. */
 		String applyZoneId;
+		/** The world (profile key) {@link #applyZoneId} was chosen in. */
+		String applyWorldKey;
 
 		Remembered() {
 			reset();
@@ -221,6 +223,7 @@ public final class SoundsPanel {
 			sort = SortOrder.MOST_RECENT;
 			paused = false;
 			applyZoneId = null;
+			applyWorldKey = null;
 		}
 	}
 
@@ -855,12 +858,14 @@ public final class SoundsPanel {
 
 	/** Where quick actions put their change (FR-1.5, FR-3.7): Everywhere, or the chosen zone while the player stands in it. */
 	public ApplyTarget applyTarget() {
-		return ApplyTo.select(applyChoices, state.applyZoneId);
+		boolean sameWorld = state.applyWorldKey != null && state.applyWorldKey.equals(ProfileManager.key());
+		return ApplyTo.select(applyChoices, sameWorld ? state.applyZoneId : null);
 	}
 
 	/** Chooses where quick actions put their change; refreshes the rows, whose Mute/Unmute follows the choice. */
 	public void setApplyTarget(ApplyTarget target) {
 		state.applyZoneId = target.zoneId();
+		state.applyWorldKey = ProfileManager.key();
 		if (applyToDropdown != null && !applyToDropdown.value().equals(target)) {
 			applyToDropdown.setValue(target);
 		}
