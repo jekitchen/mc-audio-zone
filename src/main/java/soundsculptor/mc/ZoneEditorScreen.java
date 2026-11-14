@@ -80,7 +80,7 @@ public final class ZoneEditorScreen extends SculptScreen {
 		this.isNew = isNew;
 	}
 
-	/** A new 10-block sphere at the player's position, with the next palette color (FR-10.4). */
+	/** A new 10-block box at the player's position ({@link ZoneDraft#blank}), with the next palette color (FR-10.4). */
 	public static ZoneEditorScreen create(Screen parent) {
 		Profile profile = ProfileManager.profile();
 		Minecraft minecraft = Minecraft.getInstance();

@@ -5,6 +5,7 @@ import soundsculptor.core.diag.DiagnosticsReport;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.Diagnostics;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RecentLog;
@@ -46,8 +47,8 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 			context.runOnClient(mc -> {
-				main(mc).selectTab(SoundSculptorScreen.TAB_RECENT);
-				main(mc).setPaused(false);
+				SoundsPanel.resetRememberedState();
+				main(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS);
 			});
 
 			// FR-14 AC 1: *villager* muted plus the exact ID at 60% in one set: Why? shows both, the single-sound entry
@@ -55,10 +56,10 @@ public final class M5bClientGameTest implements FabricClientGameTest {
 			play(context, AMBIENT, false);
 			context.waitTicks(10);
 			context.runOnClient(mc -> {
-				SculptList.Row row = main(mc).recentList.findRow(AMBIENT);
+				SculptList.Row row = main(mc).sounds().list.findRow(AMBIENT);
 				check(row != null, "the villager sound should be listed");
-				check(row.buttons().get(2).getMessage().getString().equals("Why does it sound like this?"), "the third row button is Why?");
-				row.buttons().get(2).onPress(null);
+				check(row.buttons().get(SoundsPanel.BUTTON_WHY).getMessage().getString().equals("Why does it sound like this?"), "the row has Why?");
+				row.buttons().get(SoundsPanel.BUTTON_WHY).onPress(null);
 			});
 			context.waitForScreen(TraceScreen.class);
 			String trace = context.computeOnClient(mc -> trace(mc).text());

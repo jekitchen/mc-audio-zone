@@ -34,8 +34,9 @@ import soundsculptor.mc.ui.Tooltips;
 /**
  * The set editor (PRD FR-4.3, FR-4.9): a library Sound Set's name, its entries as a list (each row: the sound's name
  * or the group's pattern, a summary such as "✖ Muted", and On/Off, Edit, Move up, Move down and Remove), Add sounds…
- * and the {@link AttachedToPanel}. Opened on a place's Quick changes ({@link #forQuickChanges}) it has the entries
- * only: no name and no Attached to panel.
+ * (the {@link SoundPickerScreen}), Type a pattern… (the entry editor for a new entry) and the {@link AttachedToPanel}.
+ * Opened on a place's Quick changes ({@link #forQuickChanges}) it has the entries only: no name and no Attached to
+ * panel.
  *
  * <p>Everything is a draft until Save (FR-12.4): entry edits, the name, and Attach and Detach in the panel. Save applies
  * them together in one {@link ProfileManager#change}; Cancel or Esc with changes asks Save, Discard or Keep editing.
@@ -69,7 +70,10 @@ public final class SetEditorScreen extends SculptScreen {
 	private String openAt;
 
 	public SculptTextField nameField;
+	/** Add sounds…: the Sounds picker (FR-1.7). */
 	public SculptButton addButton;
+	/** Type a pattern…: the entry editor for a new entry, for a typed group pattern or a plain-word search (FR-4.8). */
+	public SculptButton typeButton;
 	public SculptList entryList;
 	public SculptButton saveButton;
 
@@ -170,14 +174,17 @@ public final class SetEditorScreen extends SculptScreen {
 	protected void buildTab(int index, Body body) {
 		addButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.set_editor.add"), this::addSounds),
 				Component.translatable("soundsculptor.set_editor.add.tip"));
+		typeButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.set_editor.type"), this::typePattern),
+				Component.translatable("soundsculptor.set_editor.type.tip"));
 		entryList = new SculptList(body.width(), SculptList.ROW_HEIGHT, Component.translatable("soundsculptor.set_editor.entries"));
 		entryList.setEmptyText(() -> Component.translatable("soundsculptor.set_editor.entries.empty"));
 		if (attached == null) {
-			body.row(addButton);
+			body.row(addButton, typeButton);
 			body.label(() -> Component.translatable("soundsculptor.set_editor.quick.hint"));
 			body.fill(entryList);
 		} else {
-			nameField = Tooltips.describe(new SculptTextField(font, Math.min(NAME_WIDTH, body.width() - addButton.getWidth() - Theme.GAP),
+			nameField = Tooltips.describe(new SculptTextField(font,
+					Math.min(NAME_WIDTH, body.width() - addButton.getWidth() - typeButton.getWidth() - 2 * Theme.GAP),
 					Component.translatable("soundsculptor.sets.name")), Component.translatable("soundsculptor.sets.name.tip"));
 			nameField.setMaxLength(SoundSet.MAX_NAME_LENGTH + 16);
 			nameField.setValue(draft.name());
@@ -188,7 +195,7 @@ public final class SetEditorScreen extends SculptScreen {
 					saveButton.active = nameProblem(text) == null;
 				}
 			});
-			body.row(nameField, addButton);
+			body.row(nameField, addButton, typeButton);
 			// The entries get three fifths of the room the Attached to panel leaves; the panel's list takes the rest.
 			int panelFixed = AttachedToPanel.fixedHeight(font);
 			entryList.setHeight(Math.max(SculptList.ROW_HEIGHT, (body.remaining() - panelFixed - Theme.GAP) * 3 / 5));
@@ -235,7 +242,7 @@ public final class SetEditorScreen extends SculptScreen {
 			String details = entry.pattern().isExact() ? join(target, details(entry, known)) : details(entry, known);
 			List<SculptButton> buttons = new ArrayList<>();
 			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(entry.enabled()), ON_OFF_WIDTH,
-					() -> setEntryEnabled(id, !entry.enabled())).narrationContext(() -> Component.translatable("soundsculptor.set_editor.entry")),
+					() -> setEntryEnabled(id, !entry.enabled())),
 					Component.translatable(entry.enabled() ? "soundsculptor.set_editor.turn_off" : "soundsculptor.set_editor.turn_on")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.set_editor.edit"), () -> editEntry(id)));
 			SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.set_editor.move_up"), () -> moveEntry(id, -1));
@@ -258,7 +265,7 @@ public final class SetEditorScreen extends SculptScreen {
 	}
 
 	/**
-	 * What the entry does to loudness, in the same style as the Recently Played status: "✖ Muted", "▶ Level 30%",
+	 * What the entry does to loudness, in the same style as the Sounds tab's status: "✖ Muted", "▶ Level 30%",
 	 * "▶ Not muted", or "○ Off" for an entry that is turned off. Empty if it does not set loudness.
 	 */
 	static String status(SetEntry entry) {
@@ -299,14 +306,27 @@ public final class SetEditorScreen extends SculptScreen {
 
 	// ---- Entry actions: they change the draft only ----
 
-	/** Add sounds…: the entry editor for a new entry, until the Sounds picker replaces it; refused when the set is full. */
+	/** Add sounds…: the Sounds picker, which adds its picks to the draft (FR-1.7); refused when the set is full. */
 	public void addSounds() {
+		if (!refuseWhenFull()) {
+			minecraft.gui.setScreen(new SoundPickerScreen(this, draft, headerSubtitle()));
+		}
+	}
+
+	/** Type a pattern…: the entry editor for a new entry (FR-4.8); refused when the set is full. */
+	public void typePattern() {
+		if (!refuseWhenFull()) {
+			minecraft.gui.setScreen(EntryEditorScreen.add(this, draft));
+		}
+	}
+
+	/** Shows the entry limit and returns true when the draft has no room for another entry. */
+	private boolean refuseWhenFull() {
 		Message full = draft.canAdd();
 		if (full != null) {
 			showToast(ProfileManager.component(full), null);
-			return;
 		}
-		minecraft.gui.setScreen(EntryEditorScreen.add(this, draft));
+		return full != null;
 	}
 
 	public void editEntry(String entryId) {

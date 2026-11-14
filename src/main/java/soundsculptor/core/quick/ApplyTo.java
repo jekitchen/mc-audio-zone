@@ -9,7 +9,7 @@ import soundsculptor.core.zones.Zone;
 import soundsculptor.core.zones.ZoneMode;
 
 /**
- * The choices of the Recently Played "Apply to" selector (PRD FR-1.5): Everywhere first, then each zone the player is
+ * The choices of the Sounds tab's "Apply to" selector (PRD FR-1.5): Everywhere first, then each zone the player is
  * standing in, in the order of the profile's zone list. Not on the hot path; the screen rebuilds the list when it
  * refreshes (at most 4 times a second, FR-1.6).
  *

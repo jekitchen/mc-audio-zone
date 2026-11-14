@@ -27,6 +27,32 @@ class RecentSoundsTest {
 		return log.snapshot(nowMs, SortOrder.MOST_RECENT, null);
 	}
 
+	// --- Generation: lets the Sounds tab skip a refresh when nothing changed (FR-1.6, PRD 9.1) ---
+
+	@Test
+	void generationChangesWithEveryChangeAndOnlyThen() {
+		long start = log.generation();
+		heard(VILLAGER, 1000);
+		long afterPlay = log.generation();
+		assertTrue(afterPlay != start, "a recorded play changes it");
+		rows(2000);
+		assertEquals(afterPlay, log.generation(), "a snapshot with nothing expired leaves it");
+		log.record(VILLAGER, "neutral", true, 30.0, false, PlayStatus.PLAYING, null, 2000);
+		assertEquals(afterPlay, log.generation(), "a play out of range is not recorded and leaves it");
+		log.record("minecraft:ui.button.click", "ui", false, 0, true, PlayStatus.PLAYING, null, 2000);
+		long afterExcluded = log.generation();
+		assertTrue(afterExcluded != afterPlay, "a newly seen vanilla-covered sound changes it (the full list hides it)");
+		log.record("minecraft:ui.button.click", "ui", false, 0, true, PlayStatus.PLAYING, null, 2100);
+		assertEquals(afterExcluded, log.generation(), "seen again, it changes nothing");
+		rows(1000 + RecentSounds.WINDOW_MS + 1000);
+		long afterExpiry = log.generation();
+		assertTrue(afterExpiry != afterExcluded, "a row expiring changes it");
+		heard(COW, 500_000);
+		long beforeClear = log.generation();
+		log.clear();
+		assertTrue(log.generation() != beforeClear, "clearing changes it");
+	}
+
 	// --- What gets recorded (FR-1.1) ---
 
 	@Test

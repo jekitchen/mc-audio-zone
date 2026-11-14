@@ -26,6 +26,8 @@ import java.util.Set;
 public final class AppSettingsCodec {
 	public static final int SCHEMA_VERSION = 1;
 
+	/** Tab names from before the Sounds tab (FR-12.1), read as the Sounds tab. */
+	private static final Set<String> RETIRED_TABS = Set.of("recent", "search");
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 	private static final Set<String> FIELDS = Set.of("schemaVersion", "showCues", "cuesWithoutSubtitles", "cueColor",
 			"cueTextScale", "cueOffsetX", "cueOffsetY", "outlinesThroughBlocks", "reducedMotion", "lastTab");
@@ -177,7 +179,9 @@ public final class AppSettingsCodec {
 			return fallback;
 		}
 		if (value.isJsonPrimitive() && ((JsonPrimitive) value).isString() && AppSettings.isValidTab(value.getAsString())) {
-			return value.getAsString();
+			String tab = value.getAsString();
+			// FR-12.1: the Sounds tab replaced Recently Played and Search, so a file saved before still opens it.
+			return RETIRED_TABS.contains(tab) ? AppSettings.DEFAULT_TAB : tab;
 		}
 		problems.add(field + ": " + value + " is not a tab name, so the default is used.");
 		return fallback;

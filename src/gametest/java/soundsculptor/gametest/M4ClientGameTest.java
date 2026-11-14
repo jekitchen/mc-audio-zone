@@ -5,6 +5,7 @@ import soundsculptor.core.quick.QuickActions;
 import soundsculptor.core.sets.PlaceRef;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.Notices;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.RecentLog;
@@ -48,18 +49,19 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 			context.runOnClient(mc -> {
-				screen(mc).selectTab(SoundSculptorScreen.TAB_RECENT);
-				screen(mc).setPaused(false);
+				SoundsPanel.resetRememberedState();
+				screen(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS);
 			});
 			check(context.computeOnClient(mc -> screen(mc).getNarrationMessage().getString()).contains("Sound Sculptor"), "screen title");
 
-			// Mute from the list, with the keyboard only: Tab into the list, Enter on the row's Mute button.
+			// Mute from the list, with the keyboard only: Tab from Sort (the last toolbar control) into the list, Enter on the
+			// row's Mute button.
 			check(play(context, VILLAGER, SoundSource.NEUTRAL, 3.0), "an unmuted villager sound should start");
-			context.runOnClient(mc -> screen(mc).setFocused(screen(mc).filterField));
+			context.runOnClient(mc -> screen(mc).setFocused(screen(mc).sounds().sortDropdown));
 			context.getInput().pressKey(InputConstants.KEY_TAB);
 			context.waitTicks(2);
 			String label = context.computeOnClient(mc -> {
-				SculptList.Row row = screen(mc).recentList.getFocused();
+				SculptList.Row row = screen(mc).sounds().list.getFocused();
 				return row == null ? "none" : row.buttons().get(0).getMessage().getString();
 			});
 			check(label.equals("Mute"), "the focused row's button should be Mute, was " + label);
@@ -72,7 +74,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			List<String> row = rowTexts(context, VILLAGER);
 			check(row.stream().anyMatch(t -> t.contains("Muted")) && row.stream().anyMatch(t -> t.startsWith("×2 ·")),
 					"the row should show Muted and count the muted play, was " + row);
-			check(context.computeOnClient(mc -> screen(mc).recentList.findRow(VILLAGER).buttons().get(0).getMessage().getString()).equals("Unmute"),
+			check(context.computeOnClient(mc -> screen(mc).sounds().list.findRow(VILLAGER).buttons().get(SoundsPanel.BUTTON_MUTE).getMessage().getString()).equals("Unmute"),
 					"the button should now say Unmute");
 			context.takeScreenshot("m4-muted-row");
 
@@ -84,7 +86,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 			context.takeScreenshot("m4-bypass-header");
 
 			// The hotkey works in the screen too.
-			context.runOnClient(mc -> screen(mc).setFocused(screen(mc).recentList));
+			context.runOnClient(mc -> screen(mc).setFocused(screen(mc).sounds().list));
 			context.getInput().pressKey(InputConstants.KEY_F10);
 			context.waitTicks(2);
 			check(!context.computeOnClient(mc -> ProfileManager.isBypassed()), "F10 in the screen should turn Bypass off");
@@ -185,7 +187,7 @@ public final class M4ClientGameTest implements FabricClientGameTest {
 
 	private static List<String> rowTexts(ClientGameTestContext context, String id) {
 		return context.computeOnClient(mc -> {
-			SculptList.Row row = screen(mc).recentList.findRow(id);
+			SculptList.Row row = screen(mc).sounds().list.findRow(id);
 			return row == null ? null : row.columnTexts();
 		});
 	}

@@ -34,6 +34,19 @@ public class SculptButton extends AbstractButton {
 		return new SculptButton(width, Theme.WIDGET_HEIGHT, label, null, onPress);
 	}
 
+	/**
+	 * The width of a text button that fits the widest of {@code labels} (no 60-pixel minimum): for list rows, where
+	 * buttons share one width so rows line up, or switch labels (On and Off) without changing size.
+	 */
+	public static int widthFor(Component... labels) {
+		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
+		int widest = 0;
+		for (Component label : labels) {
+			widest = Math.max(widest, font.width(label));
+		}
+		return widest + 16;
+	}
+
 	public static SculptButton text(Component label, int width, Runnable onPress) {
 		return new SculptButton(width, Theme.WIDGET_HEIGHT, label, null, onPress);
 	}
@@ -57,8 +70,13 @@ public class SculptButton extends AbstractButton {
 
 	@Override
 	protected MutableComponent createNarrationMessage() {
-		MutableComponent own = super.createNarrationMessage();
+		MutableComponent own = ownNarration();
 		return narrationContext == null ? own : Component.translatable("soundsculptor.ui.in_context", narrationContext.get(), own);
+	}
+
+	/** What the button itself reads, after its context: vanilla's "Label button". */
+	protected MutableComponent ownNarration() {
+		return super.createNarrationMessage();
 	}
 
 	public boolean isIconButton() {

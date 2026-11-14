@@ -13,6 +13,7 @@ import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
+import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptDialog;
@@ -29,7 +30,7 @@ import net.minecraft.client.input.KeyEvent;
 
 /**
  * Undo toasts (PRD FR-12.5, M16): quick actions in lists save at once and show a 5-second toast with Undo. Covers
- * Mute/Unmute on Search rows (with the Cue default, FR-7.6), On/Off, Move and Delete on the Rules and Zones tabs,
+ * Mute/Unmute on Sounds rows (with the Cue default, FR-7.6), On/Off, Move and Delete on the Rules and Zones tabs,
  * Undo by keyboard (Enter on the focused button, and Ctrl+Z), the toast staying while Undo has focus, and Undo being
  * refused once something else changed the profile. For library Sound Sets: Undo of a set edit, of a set added or
  * removed, of deleting a set attached to two zones (both attachments come back in place, FR-4.11), and Undo refused
@@ -49,12 +50,14 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
 
-			// Mute from Search: saved at once, the toast names the sound and has Undo; the rule takes the Cue default.
+			// Mute from the Sounds tab: saved at once, the toast names the sound and has Undo; the rule takes the Cue default.
 			context.runOnClient(mc -> {
-				main(mc).selectTab(SoundSculptorScreen.TAB_SEARCH);
-				main(mc).searchField.setValue("villager ambient");
-				main(mc).runSearch();
-				main(mc).toggleMute(VILLAGER);
+				SoundsPanel.resetRememberedState();
+				main(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				sounds(mc).setRecentOnly(false);
+				sounds(mc).searchField.setValue("villager ambient");
+				sounds(mc).runSearch();
+				sounds(mc).toggleMute(VILLAGER);
 			});
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Mute should apply at once");
 			check(context.computeOnClient(mc -> Boolean.TRUE.equals(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER).cue())),
@@ -62,7 +65,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			String toast = toastText(context);
 			check(toast.startsWith("Muted "), "the toast should say what was muted, was " + toast);
 			check(context.computeOnClient(mc -> main(mc).toast().undoButton()) != null, "the toast should offer Undo");
-			check(context.computeOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(0).getMessage().getString())
+			check(context.computeOnClient(mc -> sounds(mc).list.findRow(VILLAGER).buttons().get(SoundsPanel.BUTTON_MUTE).getMessage().getString())
 					.equals("Unmute"), "the row should now offer Unmute");
 			context.takeScreenshot("undo-toast-mute");
 
@@ -75,31 +78,31 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Undo should unmute");
 			check(context.computeOnClient(mc -> QuickEntries.of(ProfileManager.profile()).isEmpty()), "Undo should leave no entry behind");
 			check(toastText(context).equals("Undone"), "a toast should confirm the undo");
-			check(context.computeOnClient(mc -> main(mc).searchList.findRow(VILLAGER).buttons().get(0).getMessage().getString())
+			check(context.computeOnClient(mc -> sounds(mc).list.findRow(VILLAGER).buttons().get(SoundsPanel.BUTTON_MUTE).getMessage().getString())
 					.equals("Mute"), "the row should offer Mute again");
 
 			// Ctrl+Z also undoes, but not while a text field has focus (it keeps Ctrl+Z for itself).
-			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
-			context.runOnClient(mc -> main(mc).setFocused(main(mc).searchField));
+			context.runOnClient(mc -> sounds(mc).toggleMute(VILLAGER));
+			context.runOnClient(mc -> main(mc).setFocused(sounds(mc).searchField));
 			context.runOnClient(mc -> main(mc).keyPressed(ctrlZ()));
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Ctrl+Z in the search field does not undo");
 			context.runOnClient(mc -> {
-				main(mc).setFocused(main(mc).searchList);
+				main(mc).setFocused(sounds(mc).list);
 				main(mc).keyPressed(ctrlZ());
 			});
 			check(!context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "Ctrl+Z should undo the mute");
 
 			// Unmute has Undo too.
 			context.runOnClient(mc -> {
-				main(mc).toggleMute(VILLAGER);
-				main(mc).toggleMute(VILLAGER);
+				sounds(mc).toggleMute(VILLAGER);
+				sounds(mc).toggleMute(VILLAGER);
 			});
 			check(toastText(context).startsWith("Unmuted "), "Unmute should show its own toast, was " + toastText(context));
 			context.runOnClient(mc -> main(mc).pressUndo());
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)), "undoing Unmute mutes again");
 
 			// The toast stays while Undo has focus, past 5 seconds, and Undo still works then.
-			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
+			context.runOnClient(mc -> sounds(mc).toggleMute(VILLAGER));
 			context.runOnClient(mc -> main(mc).setFocused(main(mc).toast().undoButton()));
 			context.waitTicks(130);
 			check(context.computeOnClient(mc -> main(mc).toast()) != null, "the toast should stay while Undo has focus");
@@ -108,14 +111,14 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 
 			// Without focus the toast goes after 5 seconds.
 			context.runOnClient(mc -> {
-				main(mc).toggleMute(VILLAGER);
-				main(mc).setFocused(main(mc).searchList);
+				sounds(mc).toggleMute(VILLAGER);
+				main(mc).setFocused(sounds(mc).list);
 			});
 			context.waitTicks(110);
 			check(context.computeOnClient(mc -> main(mc).toast()) == null, "the toast should close after 5 seconds");
 
 			// Undo is refused once the profile changed some other way, and nothing changes.
-			context.runOnClient(mc -> main(mc).toggleMute(VILLAGER));
+			context.runOnClient(mc -> sounds(mc).toggleMute(VILLAGER));
 			context.runOnClient(mc -> ProfileManager.update(p -> QuickEntries.put(p, SetEntry.of("other", "minecraft:entity.cow.*").withVolume(40))));
 			context.runOnClient(mc -> main(mc).pressUndo());
 			check(toastText(context).startsWith("Can't undo"), "a stale Undo should say it can't undo, was " + toastText(context));
@@ -199,6 +202,7 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 
 			context.setScreen(() -> null);
 			context.runOnClient(mc -> {
+				SoundsPanel.resetRememberedState();
 				ProfileManager.update(p -> Profile.empty(p.name()));
 				ProfileManager.flushSaves();
 			});
@@ -318,6 +322,10 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 	private static SoundSculptorScreen main(Minecraft mc) {
 
 		return (SoundSculptorScreen) mc.gui.screen();
+	}
+
+	private static SoundsPanel sounds(Minecraft mc) {
+		return main(mc).sounds();
 	}
 
 	private static void check(boolean condition, String message) {
