@@ -6,7 +6,6 @@ import java.util.List;
 import soundsculptor.core.outline.ColorError;
 import soundsculptor.core.outline.ZoneColors;
 import soundsculptor.core.sets.PlaceSets;
-import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.BoxEdit;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
@@ -15,11 +14,10 @@ import soundsculptor.core.zones.ZoneEdge;
 import soundsculptor.core.zones.ZoneMode;
 
 /**
- * The zone editor's values (PRD 6.1): name, color, anchor type and coordinates, shape and sizes, mode, edge and fade
- * distance. The zone's own rule list is edited in its own rule editors and kept here as it is.
+ * The zone editor's values (PRD 6.1): name, color, coordinates, shape and sizes, mode, edge and fade distance. The
+ * zone's own rule list is edited in its own rule editors and kept here as it is.
  *
- * <p>Only the fields in use are checked: coordinates for a fixed anchor, the sizes of the current shape, and the
- * fade distance with a fade edge. A personal bubble keeps its stored anchor, world and dimension, which it ignores.
+ * <p>Only the fields in use are checked: the sizes of the current shape, and the fade distance with a fade edge.
  * The color is kept beside the zone (it belongs to the profile model): read it with {@link #color()}.
  */
 public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
@@ -29,7 +27,6 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		ENABLED(false),
 		/** Hex, e.g. {@code #E69F00}. */
 		COLOR(true),
-		ANCHOR_TYPE(false),
 		X(true),
 		Y(true),
 		Z(true),
@@ -37,7 +34,7 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		WORLD_KEY(false),
 		DIMENSION(false),
 		SHAPE(false),
-		/** Sphere and cylinder. */
+		/** Cylinder. */
 		RADIUS(true),
 		/** Box. */
 		WIDTH(true),
@@ -64,27 +61,20 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 
 	/** The zone's shape type, chosen in the editor. */
 	public enum ShapeKind {
-		SPHERE,
 		BOX,
 		CYLINDER
 	}
 
-	/** Size of a new zone, and what a size's reset button puts back: a 10-block box, sphere or cylinder. */
+	/** Size of a new zone, and what a size's reset button puts back: a 10-block box or cylinder. */
 	public static final double DEFAULT_SIZE = 10;
 
 	private final String id;
 	private final PlaceSets sets;
-	private final Point storedAnchor;
-	/** The shape when the editor opened: a sphere stays on offer for a zone that already was one (FR-8.3). */
-	private final ShapeKind openedShape;
 
-	private ZoneDraft(String id, PlaceSets sets, Point storedAnchor, EnumMap<Field, String> values,
-			EnumMap<Field, String> defaults) {
+	private ZoneDraft(String id, PlaceSets sets, EnumMap<Field, String> values, EnumMap<Field, String> defaults) {
 		super(Field.class, values, defaults);
 		this.id = id;
 		this.sets = sets;
-		this.storedAnchor = storedAnchor;
-		this.openedShape = ShapeKind.valueOf(values.get(Field.SHAPE));
 	}
 
 	/**
@@ -111,7 +101,6 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		values.put(Field.NAME, zone.name() == null ? "" : zone.name());
 		values.put(Field.ENABLED, Boolean.toString(zone.enabled()));
 		values.put(Field.COLOR, ZoneColors.format(rgb));
-		values.put(Field.ANCHOR_TYPE, zone.anchorType().name());
 		values.put(Field.X, Numbers.format(zone.anchor().x()));
 		values.put(Field.Y, Numbers.format(zone.anchor().y()));
 		values.put(Field.Z, Numbers.format(zone.anchor().z()));
@@ -123,10 +112,6 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		values.put(Field.HEIGHT, size);
 		values.put(Field.DEPTH, size);
 		switch (zone.shape()) {
-			case Shape.Sphere s -> {
-				values.put(Field.SHAPE, ShapeKind.SPHERE.name());
-				values.put(Field.RADIUS, Numbers.format(s.radius()));
-			}
 			case Shape.Box b -> {
 				values.put(Field.SHAPE, ShapeKind.BOX.name());
 				values.put(Field.WIDTH, Numbers.format(b.width()));
@@ -147,15 +132,14 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		EnumMap<Field, String> defaults = new EnumMap<>(values);
 		defaults.put(Field.ENABLED, "true");
 		defaults.put(Field.COLOR, ZoneColors.format(defaultRgb));
-		defaults.put(Field.ANCHOR_TYPE, AnchorType.FIXED.name());
-		defaults.put(Field.SHAPE, ShapeKind.BOX.name()); // see defaultText: a bubble's is a sphere
+		defaults.put(Field.SHAPE, ShapeKind.BOX.name());
 		for (Field f : List.of(Field.RADIUS, Field.WIDTH, Field.HEIGHT, Field.DEPTH)) {
 			defaults.put(f, size);
 		}
 		defaults.put(Field.MODE, ZoneMode.INSIDE.name());
 		defaults.put(Field.EDGE, ZoneEdge.Mode.DEFAULT.name());
 		defaults.put(Field.FADE, Numbers.format(ZoneEdge.DEFAULT_FADE));
-		return new ZoneDraft(zone.id(), zone.sets(), zone.anchor(), values, defaults);
+		return new ZoneDraft(zone.id(), zone.sets(), values, defaults);
 	}
 
 	public boolean enabled() {
@@ -166,51 +150,6 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 		put(Field.ENABLED, Boolean.toString(value));
 	}
 
-	public AnchorType anchorType() {
-		return AnchorType.valueOf(text(Field.ANCHOR_TYPE));
-	}
-
-	/**
-	 * Fixed zone or personal bubble. Bubbles are spheres (FR-8.3), so making a bubble turns the shape into a sphere,
-	 * and making a fixed zone of a sphere that was not one when the editor opened turns it into a box.
-	 */
-	public void setAnchorType(AnchorType value) {
-		put(Field.ANCHOR_TYPE, value.name());
-		if (!shapeChoices().contains(shape())) {
-			setShape(value == AnchorType.BUBBLE ? ShapeKind.SPHERE : ShapeKind.BOX);
-		}
-	}
-
-	/**
-	 * The shapes the editor offers (FR-8.3): a sphere for a personal bubble; a box or a cylinder for a fixed zone, and
-	 * a sphere too if the zone was one when the editor opened (existing sphere zones keep working and can become boxes).
-	 */
-	public List<ShapeKind> shapeChoices() {
-		if (anchorType() == AnchorType.BUBBLE) {
-			return List.of(ShapeKind.SPHERE);
-		}
-		return openedShape == ShapeKind.SPHERE
-				? List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER)
-				: List.of(ShapeKind.BOX, ShapeKind.CYLINDER);
-	}
-
-	/** A bubble's shape resets to a sphere, a fixed zone's to a box (FR-8.3). */
-	@Override
-	public String defaultText(Field field) {
-		if (field == Field.SHAPE) {
-			return (anchorType() == AnchorType.BUBBLE ? ShapeKind.SPHERE : ShapeKind.BOX).name();
-		}
-		return super.defaultText(field);
-	}
-
-	@Override
-	public void resetToDefault(Field field) {
-		if (field == Field.ANCHOR_TYPE) {
-			setAnchorType(AnchorType.valueOf(super.defaultText(field)));
-		} else {
-			super.resetToDefault(field);
-		}
-	}
 
 	/** FR-8.1 "Set to my position" or "Set to the block I'm looking at": the anchor and where it is. */
 	public void setPosition(Point position, String worldKey, String dimension) {
@@ -268,9 +207,7 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 				yield error == null ? null : FieldError.of(error.translationKey());
 			}
 			case X, Y, Z -> Numbers.checkNumber(text);
-			case RADIUS -> shape() == ShapeKind.SPHERE
-					? Numbers.checkDecimal(text, Shape.Sphere.MIN_RADIUS, Shape.Sphere.MAX_RADIUS)
-					: Numbers.checkDecimal(text, Shape.Cylinder.MIN_RADIUS, Shape.Cylinder.MAX_RADIUS);
+			case RADIUS -> Numbers.checkDecimal(text, Shape.Cylinder.MIN_RADIUS, Shape.Cylinder.MAX_RADIUS);
 			// Boxes line up with the block grid: whole-block sizes (M8 review).
 			case HEIGHT -> shape() == ShapeKind.BOX
 					? Numbers.checkWhole(text, (int) Shape.Box.MIN_SIDE, (int) Shape.Box.MAX_SIDE)
@@ -284,10 +221,8 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 	@Override
 	protected boolean inUse(Field field) {
 		return switch (field) {
-			case X, Y, Z, WORLD_KEY, DIMENSION -> anchorType() == AnchorType.FIXED;
-			case RADIUS -> shape() != ShapeKind.BOX;
+			case RADIUS -> shape() == ShapeKind.CYLINDER;
 			case WIDTH, DEPTH -> shape() == ShapeKind.BOX;
-			case HEIGHT -> shape() != ShapeKind.SPHERE;
 			case FADE -> edge() == ZoneEdge.Mode.FADE;
 			default -> true;
 		};
@@ -310,7 +245,6 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 	@Override
 	protected Zone create() {
 		Shape shape = switch (shape()) {
-			case SPHERE -> new Shape.Sphere(number(Field.RADIUS));
 			case BOX -> new Shape.Box(number(Field.WIDTH), number(Field.HEIGHT), number(Field.DEPTH));
 			case CYLINDER -> new Shape.Cylinder(number(Field.RADIUS), number(Field.HEIGHT));
 		};
@@ -319,16 +253,13 @@ public final class ZoneDraft extends Draft<ZoneDraft.Field, Zone> {
 			case HARD -> ZoneEdge.hard();
 			case FADE -> ZoneEdge.fade(number(Field.FADE));
 		};
-		AnchorType anchorType = anchorType();
-		Point anchor = anchorType == AnchorType.FIXED
-				? new Point(number(Field.X), number(Field.Y), number(Field.Z))
-				: storedAnchor;
-		if (shape instanceof Shape.Box box && anchorType == AnchorType.FIXED) {
+		Point anchor = new Point(number(Field.X), number(Field.Y), number(Field.Z));
+		if (shape instanceof Shape.Box box) {
 			// Every edge on a block boundary, however the center was set (typed, My position, Looking at).
 			anchor = BoxEdit.snap(anchor, box).center();
 		}
 		return new Zone(id, text(Field.NAME).trim(), enabled(), text(Field.WORLD_KEY), text(Field.DIMENSION), anchor, shape,
-				sets, mode(), edge, anchorType);
+				sets, mode(), edge);
 	}
 
 	private double number(Field field) {

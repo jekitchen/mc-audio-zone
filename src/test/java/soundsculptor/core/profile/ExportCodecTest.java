@@ -1,6 +1,5 @@
 package soundsculptor.core.profile;
 
-import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,11 +32,11 @@ class ExportCodecTest {
 	private static final SoundSet UNUSED = new SoundSet("set-unused", "Unused", List.of());
 	private static final SetLibrary LIB = new SetLibrary(List.of(FARM, RAIN, UNUSED));
 
-	/** Everywhere: Quick changes and farm; a fixed zone: rain and farm; a bubble: rain. */
+	/** Everywhere: Quick changes and farm; z1: rain and farm; b1: rain. */
 	private static final Profile PROFILE = Profile.empty("Export")
 			.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("q", "*bee*"))).attach("set-farm"))
-			.withZones(List.of(fixed("z1", new Shape.Sphere(5)).withSets(PlaceSets.EMPTY.attach("set-rain").attach("set-farm")),
-					bubble("b1").withSets(PlaceSets.EMPTY.attach("set-rain"))));
+			.withZones(List.of(fixed("z1", new Shape.Cylinder(5, 10)).withSets(PlaceSets.EMPTY.attach("set-rain").attach("set-farm")),
+					fixed("b1", new Shape.Box(8, 8, 8)).withSets(PlaceSets.EMPTY.attach("set-rain"))));
 
 	private static String problem(String text) {
 		return assertThrows(ProfileFormatException.class, () -> ExportCodec.read(text)).problem().text(EN);

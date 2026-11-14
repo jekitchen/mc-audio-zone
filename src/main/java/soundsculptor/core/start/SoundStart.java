@@ -22,10 +22,6 @@ public final class SoundStart {
 	public double x;
 	public double y;
 	public double z;
-	/** The local player's eye position, the anchor of personal bubbles; {@code NaN} skips bubbles. */
-	public double px;
-	public double py;
-	public double pz;
 	/** Whether the sound has a vanilla subtitle, the text of its cue (FR-7.2). */
 	public boolean hasSubtitle;
 	/** Whether Bypass Sound Sculptor is on (FR-13.1). */
@@ -37,7 +33,7 @@ public final class SoundStart {
 		reset();
 	}
 
-	/** Back to a non-positional sound with no ID, no world and no player position. */
+	/** Back to a non-positional sound with no ID and no world. */
 	public void reset() {
 		soundId = null;
 		vanillaCovered = false;
@@ -49,9 +45,6 @@ public final class SoundStart {
 		x = 0;
 		y = 0;
 		z = 0;
-		px = Double.NaN;
-		py = Double.NaN;
-		pz = Double.NaN;
 		hasSubtitle = false;
 		bypass = false;
 		nowMs = 0;

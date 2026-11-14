@@ -182,13 +182,9 @@ public final class ProfileListPanel {
 
 	public void confirmCopy(ProfileManager.Stored source) {
 		ProfileOps.Copy copy = ProfileOps.copyFrom(source.profile(), ProfileManager.profile(), ProfileManager.library());
-		if (copy.problem() != null) {
-			host.showToast(Component.literal(ProfileManager.text(copy.problem())), null);
-			return;
-		}
 		setScreen(new SculptDialog(host,
 				Component.translatable("soundsculptor.profiles.copy.title", source.profile().name()),
-				Component.translatable("soundsculptor.profiles.copy.message", setsOnEverywhere(copy.setCount()), bubbles(copy.bubbleCount())),
+				Component.translatable("soundsculptor.profiles.copy.message", setsOnEverywhere(copy.setCount())),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.profiles.copy.confirm"),
 						() -> confirmBoostThen(host, copy.needsBoostConfirm(ProfileManager.library()), () -> copy(source))),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.cancel"), () -> { })),
@@ -196,8 +192,8 @@ public final class ProfileListPanel {
 	}
 
 	/**
-	 * Copies the source's Sound Sets on Everywhere (library sets linked, Quick changes copied), bubbles and settings into
-	 * this world's profile; fixed zones stay.
+	 * Copies the source's Sound Sets on Everywhere (library sets linked, Quick changes copied) and settings into this
+	 * world's profile; its zones stay.
 	 */
 	public void copy(ProfileManager.Stored source) {
 		Profile latest = ProfileManager.storedProfile(source.key());
@@ -205,9 +201,6 @@ public final class ProfileListPanel {
 		// A copy that brings boosted rules was confirmed in the boost dialog (FR-5.4), so it is saved as confirmed.
 		ProfileManager.change(ws -> {
 			ProfileOps.Copy copy = ProfileOps.copyFrom(from, ws.profile(), ws.library());
-			if (copy.problem() != null) {
-				return ws;
-			}
 			Profile result = copy.needsBoostConfirm(ws.library()) ? copy.result().withBoostConfirmed(true) : copy.result();
 			return new Workspace(result, ws.library());
 		});
@@ -220,10 +213,6 @@ public final class ProfileListPanel {
 		return plural("soundsculptor.profiles.count.sets_everywhere", count);
 	}
 
-	/** "1 bubble zone" or "2 bubble zones" (Copy from… and Import). */
-	static Component bubbles(int count) {
-		return plural("soundsculptor.profiles.count.bubbles", count);
-	}
 
 	/** The text {@code key + ".one"} for 1, else {@code key} with the count. */
 	static Component plural(String key, int count) {

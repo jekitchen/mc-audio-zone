@@ -139,12 +139,6 @@ public final class SoundHook {
 			in.x = instance.getX();
 			in.y = instance.getY();
 			in.z = instance.getZ();
-			if (minecraft.player != null) {
-				// Read the eye position without building a Vec3 per sound (PRD 7.4: no allocation on the hot path).
-				in.px = minecraft.player.getX();
-				in.py = minecraft.player.getEyeY();
-				in.pz = minecraft.player.getZ();
-			}
 			WeighedSoundEvents events = minecraft.getSoundManager().getSoundEvent(id);
 			in.hasSubtitle = events != null && events.getSubtitle() != null;
 			in.bypass = ProfileManager.isBypassed();

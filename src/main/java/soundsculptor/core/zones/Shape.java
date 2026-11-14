@@ -1,8 +1,8 @@
 package soundsculptor.core.zones;
 
 /**
- * A zone's shape, centred on its anchor (PRD FR-8.3). Positions are given as offsets from the anchor. Points on the
- * boundary count as inside.
+ * A zone's shape, centred on its anchor (PRD FR-8.3): a box (MVP) or a vertical cylinder (v1). Positions are given as
+ * offsets from the anchor. Points on the boundary count as inside.
  */
 public sealed interface Shape {
 	/** Whether the offset {@code (dx, dy, dz)} from the anchor is inside the shape. */
@@ -16,40 +16,6 @@ public sealed interface Shape {
 
 	/** Distance from an outside point to the nearest point of the shape; 0 for points inside (Outside fade). */
 	double distanceOutside(double dx, double dy, double dz);
-
-	/** Sphere with radius 1 to 256 blocks. */
-	record Sphere(double radius) implements Shape {
-		public static final double MIN_RADIUS = 1;
-		public static final double MAX_RADIUS = 256;
-
-		public Sphere {
-			requireRange("radius", radius, MIN_RADIUS, MAX_RADIUS);
-		}
-
-		@Override
-		public boolean contains(double dx, double dy, double dz) {
-			// Cheap bounding-box test first (PRD 7.4), then the exact one.
-			if (Math.abs(dx) > radius || Math.abs(dy) > radius || Math.abs(dz) > radius) {
-				return false;
-			}
-			return dx * dx + dy * dy + dz * dz <= radius * radius;
-		}
-
-		@Override
-		public double volume() {
-			return 4.0 / 3.0 * Math.PI * radius * radius * radius;
-		}
-
-		@Override
-		public double depthInside(double dx, double dy, double dz) {
-			return Math.max(0, radius - Math.sqrt(dx * dx + dy * dy + dz * dz));
-		}
-
-		@Override
-		public double distanceOutside(double dx, double dy, double dz) {
-			return Math.max(0, Math.sqrt(dx * dx + dy * dy + dz * dz) - radius);
-		}
-	}
 
 	/** Axis-aligned box; width along x, height along y, depth along z, each 1 to 512 blocks. */
 	record Box(double width, double height, double depth) implements Shape {

@@ -16,7 +16,6 @@ import soundsculptor.core.editor.ZoneDraft.ShapeKind;
 import soundsculptor.core.outline.ColorError;
 import soundsculptor.core.outline.ZoneColor;
 import soundsculptor.core.sets.SetEntry;
-import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
@@ -46,43 +45,17 @@ class ZoneDraftTest {
 		assertEquals(new Point(121, 64, -33), z.anchor());
 		assertEquals(ZoneMode.INSIDE, z.mode());
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
-		assertEquals(AnchorType.FIXED, z.anchorType());
 		assertEquals(WORLD, z.worldKey());
 		assertEquals(PlaceSets.EMPTY, z.sets());
 		assertEquals(ORANGE, d.color());
 	}
 
 	@Test
-	void spheresAreNotOfferedForFixedZonesUnlessTheZoneIsOne() {
-		// FR-8.3: boxes and (v1) cylinders for fixed zones; an existing sphere keeps its shape and can become a box.
-		ZoneDraft box = ZoneDraft.blank("z1", "Pen", WORLD, OVERWORLD, new Point(0, 64, 0), ORANGE);
-		assertEquals(List.of(ShapeKind.BOX, ShapeKind.CYLINDER), box.shapeChoices());
-		ZoneDraft sphere = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(12),
+	void aCylindersShapeResetsToABox() {
+		// FR-8.3: boxes are the MVP shape; a (v1) cylinder keeps its shape and can become a box.
+		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Cylinder(12, 24),
 				quick(RULES)), ORANGE, ORANGE);
-		assertEquals(List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER), sphere.shapeChoices());
-		sphere.setShape(ShapeKind.BOX);
-		assertEquals(List.of(ShapeKind.SPHERE, ShapeKind.BOX, ShapeKind.CYLINDER), sphere.shapeChoices(),
-				"the sphere stays on offer while the editor is open, so the change can be undone");
-	}
-
-	@Test
-	void bubblesAreSpheres() {
-		// FR-8.3: spheres remain the shape of personal bubbles.
-		ZoneDraft d = ZoneDraft.blank("z1", "Bubble", WORLD, OVERWORLD, new Point(0, 64, 0), ORANGE);
-		d.setAnchorType(AnchorType.BUBBLE);
-		assertEquals(ShapeKind.SPHERE, d.shape());
-		assertEquals(List.of(ShapeKind.SPHERE), d.shapeChoices());
-		assertEquals(new Shape.Sphere(10), d.build().shape());
-		d.resetToDefault(Field.SHAPE);
-		assertEquals(ShapeKind.SPHERE, d.shape(), "a bubble's shape resets to a sphere");
-		d.setAnchorType(AnchorType.FIXED);
-		assertEquals(ShapeKind.BOX, d.shape(), "a fixed zone that was not a sphere goes back to a box");
-	}
-
-	@Test
-	void aFixedZonesShapeResetsToABox() {
-		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(12),
-				quick(RULES)), ORANGE, ORANGE);
+		assertEquals(ShapeKind.CYLINDER, d.shape());
 		assertFalse(d.isDefault(Field.SHAPE));
 		d.resetToDefault(Field.SHAPE);
 		assertEquals(ShapeKind.BOX, d.shape());
@@ -91,12 +64,13 @@ class ZoneDraftTest {
 
 	@Test
 	void existingZonesRoundTrip() {
-		Zone sphere = new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(1.25, 64, -3), new Shape.Sphere(12.5), quick(RULES));
-		Zone bubble = new Zone("z2", "Bubble", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Box(20, 8, 30), quick(RULES))
-				.withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(8)).asBubble();
+		Zone pen = new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(1.25, 64, -3), new Shape.Cylinder(12.5, 9.5),
+				quick(RULES));
+		Zone outside = new Zone("z2", "Farm", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Box(20, 8, 30), quick(RULES))
+				.withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(8));
 		Zone cylinder = new Zone("z3", "Tower", true, WORLD, "minecraft:the_nether", new Point(5, 70, 5),
 				new Shape.Cylinder(6, 40), PlaceSets.EMPTY).withEdge(ZoneEdge.hard());
-		for (Zone z : List.of(sphere, bubble, cylinder)) {
+		for (Zone z : List.of(pen, outside, cylinder)) {
 			ZoneDraft d = ZoneDraft.of(z, SKY, ORANGE);
 			assertTrue(d.canSave(), z.id());
 			assertFalse(d.isDirty(), z.id());
@@ -133,23 +107,18 @@ class ZoneDraftTest {
 		ZoneDraft d = draft();
 		d.setShape(ShapeKind.BOX);
 		d.set(Field.WIDTH, "9999");
-		d.setShape(ShapeKind.SPHERE);
+		d.setShape(ShapeKind.CYLINDER);
 		assertNull(d.error(Field.WIDTH));
 		assertTrue(d.canSave());
-		assertEquals(new Shape.Sphere(10), d.build().shape());
+		assertEquals(new Shape.Cylinder(10, 20), d.build().shape());
 	}
 
 	@Test
-	void aBubbleIgnoresCoordinatesAndKeepsItsStoredAnchor() {
+	void coordinatesAreAlwaysChecked() {
+		// Every zone has fixed coordinates (FR-8.1).
 		ZoneDraft d = draft();
-		d.setAnchorType(AnchorType.BUBBLE);
 		d.set(Field.X, "not a number");
-		assertTrue(d.canSave());
-		Zone z = d.build();
-		assertTrue(z.isBubble());
-		assertEquals(new Point(120.5, 64, -33.5), z.anchor());
-
-		d.setAnchorType(AnchorType.FIXED);
+		assertFalse(d.canSave());
 		assertEquals(FieldError.NOT_A_NUMBER, d.error(Field.X).translationKey());
 		d.set(Field.X, "");
 		assertEquals(FieldError.REQUIRED, d.error(Field.X).translationKey());
@@ -196,7 +165,7 @@ class ZoneDraftTest {
 	@Test
 	void dirtyIgnoresHowANumberOrColorIsWritten() {
 		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", true, WORLD, OVERWORLD, new Point(120.5, 64, 0),
-				new Shape.Sphere(10), quick(RULES)), ORANGE, ORANGE);
+				new Shape.Cylinder(10, 20), quick(RULES)), ORANGE, ORANGE);
 		d.set(Field.X, "120.50");
 		d.set(Field.RADIUS, "10.0");
 		d.set(Field.COLOR, "e69f00");
@@ -220,9 +189,9 @@ class ZoneDraftTest {
 	@Test
 	void resetToDefaultPerValue() {
 		ZoneDraft d = ZoneDraft.of(new Zone("z1", "Pen", false, WORLD, OVERWORLD, new Point(1, 2, 3),
-				new Shape.Cylinder(30, 60), quick(RULES)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(2)).asBubble(), SKY, ORANGE);
-		for (Field f : List.of(Field.ENABLED, Field.COLOR, Field.ANCHOR_TYPE, Field.SHAPE, Field.RADIUS, Field.HEIGHT,
-				Field.MODE, Field.EDGE, Field.FADE)) {
+				new Shape.Cylinder(30, 60), quick(RULES)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(2)), SKY, ORANGE);
+		for (Field f : List.of(Field.ENABLED, Field.COLOR, Field.SHAPE, Field.RADIUS, Field.HEIGHT, Field.MODE, Field.EDGE,
+				Field.FADE)) {
 			assertFalse(d.isDefault(f), f.name());
 			d.resetToDefault(f);
 			assertTrue(d.isDefault(f), f.name());
@@ -231,7 +200,6 @@ class ZoneDraftTest {
 		assertEquals(new Shape.Box(10, 10, 10), z.shape());
 		assertEquals(ZoneMode.INSIDE, z.mode());
 		assertEquals(ZoneEdge.DEFAULT, z.edge());
-		assertFalse(z.isBubble());
 		assertTrue(z.enabled());
 		assertEquals(quick(RULES), z.sets(), "the zone's own sets are kept");
 	}
@@ -257,9 +225,9 @@ class ZoneDraftTest {
 		assertThrows(IllegalStateException.class, d::build);
 	}
 
-	/** An unsaved-looking sphere zone, so the field tests are not affected by box snapping. */
+	/** An unsaved-looking cylinder zone, so the field tests are not affected by box snapping. */
 	private static ZoneDraft draft() {
 		return ZoneDraft.of(new Zone("z1", "Trading hall", true, WORLD, OVERWORLD, new Point(120.5, 64, -33.5),
-				new Shape.Sphere(10), PlaceSets.EMPTY), ORANGE, ORANGE);
+				new Shape.Cylinder(10, 20), PlaceSets.EMPTY), ORANGE, ORANGE);
 	}
 }

@@ -5,7 +5,6 @@ import static soundsculptor.core.Fixtures.quick;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import soundsculptor.core.sets.SetEntry;
@@ -85,17 +84,16 @@ class WorldIdsTest {
 	// "Give this copy its own profile" (FR-11.1)
 
 	private static Zone fixed(String id, String worldKey) {
-		return new Zone(id, "Hall " + id, true, worldKey, "minecraft:overworld", new Point(1, 64, 2), new Shape.Sphere(8),
+		return new Zone(id, "Hall " + id, true, worldKey, "minecraft:overworld", new Point(1, 64, 2), new Shape.Cylinder(8, 16),
 				quick(List.of(SetEntry.of("r1", "*villager*").withVolume(50))));
 	}
 
 	@Test
-	void ownProfileGetsANewIdAndKeepsEverythingWithFixedZonesMovedToTheNewKey() {
+	void ownProfileGetsANewIdAndKeepsEverythingWithItsZonesMovedToTheNewKey() {
 		String oldKey = WorldKey.world(ID).key();
-		Zone bubble = fixed("z2", "").asBubble();
 		Profile current = Profile.empty("My World")
 				.withEverywhere(quick(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true))))
-				.withZones(List.of(fixed("z1", oldKey), bubble, fixed("z3", "play.example.net")))
+				.withZones(List.of(fixed("z1", oldKey), fixed("z3", "play.example.net")))
 				.withZoneColor("z1", 0xE69F00);
 
 		WorldIds.OwnProfile own = WorldIds.giveOwnProfile(current, oldKey, ids(OTHER_ID));
@@ -110,9 +108,8 @@ class WorldIdsTest {
 		List<Zone> zones = own.profile().zones();
 		assertEquals(newKey, zones.get(0).worldKey());
 		assertEquals(fixed("z1", newKey), zones.get(0));
-		assertSame(bubble, zones.get(1));
 		// A zone made for another place stays inactive here, as before.
-		assertEquals("play.example.net", zones.get(2).worldKey());
+		assertEquals("play.example.net", zones.get(1).worldKey());
 		assertEquals(0xE69F00, own.profile().colorOf("z1"));
 	}
 

@@ -43,15 +43,14 @@ class SetImportPlanTest {
 		return new SetLibrary(List.of(sets), next::incrementAndGet);
 	}
 
-	private static Zone bubble(String id, PlaceSets sets) {
-		return new Zone(id, "Bubble", true, "a.net", "minecraft:overworld", new Point(0, 0, 0), new Shape.Sphere(4), sets)
-				.asBubble();
+	private static Zone hall(String id, PlaceSets sets) {
+		return new Zone(id, "Hall", true, "a.net", "minecraft:overworld", new Point(0, 0, 0), new Shape.Cylinder(4, 8), sets);
 	}
 
-	/** The file's profile: Everywhere has Quick changes and the farm set; a bubble attaches rain and farm. */
+	/** The file's profile: Everywhere has Quick changes and the farm set; a zone attaches rain and farm. */
 	private static final Profile FILE = Profile.empty("Friend")
 			.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("q", "*bee*"))).attach("set-farm"))
-			.withZones(List.of(bubble("b1", PlaceSets.EMPTY.attach("set-rain").attach("set-farm"))));
+			.withZones(List.of(hall("b1", PlaceSets.EMPTY.attach("set-rain").attach("set-farm"))));
 
 	private static List<String> ids(PlaceSets place) {
 		return place.attached().stream().map(Attachment::setId).toList();
@@ -366,7 +365,7 @@ class SetImportPlanTest {
 		SetLibrary lib = library(FARM);
 		// Neither set-gone nor set-rain is in the file's sets or in this library.
 		SetImportPlan plan = SetImportPlan.of(List.of(FARM), file, lib);
-		assertEquals(2, plan.missingRefs(), "set-gone on Everywhere and set-rain on the bubble");
+		assertEquals(2, plan.missingRefs(), "set-gone on Everywhere and set-rain on the zone");
 		SetImportPlan.Applied applied = plan.apply(file, lib, Map.of());
 		assertEquals(List.of(SoundSet.QUICK_ID, "set-farm"), ids(applied.profile().everywhere()));
 		assertEquals(List.of("set-farm"), ids(applied.profile().zone("b1").sets()));

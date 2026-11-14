@@ -252,7 +252,7 @@ public final class M8StressClientGameTest implements FabricClientGameTest {
 	private static Zone shift(Zone zone, double dx, double dy, double dz) {
 		Point a = zone.anchor();
 		return new Zone(zone.id(), zone.name(), zone.enabled(), zone.worldKey(), zone.dimension(),
-				new Point(a.x() + dx, a.y() + dy, a.z() + dz), zone.shape(), zone.sets(), zone.mode(), zone.edge(), zone.anchorType());
+				new Point(a.x() + dx, a.y() + dy, a.z() + dz), zone.shape(), zone.sets(), zone.mode(), zone.edge());
 	}
 
 	private static double median(List<TimingWindow.Stats> stats, boolean average) {

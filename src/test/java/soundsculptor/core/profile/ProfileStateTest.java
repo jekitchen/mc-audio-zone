@@ -2,7 +2,7 @@ package soundsculptor.core.profile;
 
 import static soundsculptor.core.Fixtures.quick;
 
-import static soundsculptor.core.profile.ProfileZonesTest.bubble;
+import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -16,6 +16,7 @@ import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.sets.SetEntry;
 import soundsculptor.core.sets.SetLibrary;
+import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.ZoneEdge;
 
 import org.junit.jupiter.api.Test;
@@ -30,7 +31,7 @@ class ProfileStateTest {
 			.withDefaultEdge(ZoneEdge.fade(6));
 
 	private static Profile joinedAndConfirmed(String name) {
-		return new Profile(name, SETTINGS, quick(List.of(SetEntry.of("r1", "x:a").withVolume(150))), List.of(bubble("b")), Map.of())
+		return new Profile(name, SETTINGS, quick(List.of(SetEntry.of("r1", "x:a").withVolume(150))), List.of(fixed("b", new Shape.Box(8, 8, 8))), Map.of())
 				.withLastJoined(JOINED).withBoostConfirmed(true);
 	}
 
@@ -56,7 +57,7 @@ class ProfileStateTest {
 		Profile p = joinedAndConfirmed("A");
 		for (Profile changed : List.of(p.withName("B"), p.withSettings(ProfileSettings.DEFAULTS), p.withEverywhere(quick(List.of())),
 				p.withZones(List.of()), p.withZoneColor("b", 7), p.withEverywhere(quick(SetEntry.of("q1", "x:b").withMute(true))),
-				p.withEverywhere(PlaceSets.EMPTY.attach("set-farm")), p.withZones(List.of(bubble("b"), bubble("c"))).withZoneColor("c", 1))) {
+				p.withEverywhere(PlaceSets.EMPTY.attach("set-farm")), p.withZones(List.of(fixed("b", new Shape.Box(8, 8, 8)), fixed("c", new Shape.Box(8, 8, 8)))).withZoneColor("c", 1))) {
 			assertEquals(JOINED, changed.lastJoined());
 			assertTrue(changed.boostConfirmed());
 		}

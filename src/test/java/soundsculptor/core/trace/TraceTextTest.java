@@ -35,8 +35,8 @@ class TraceTextTest {
 		return new LastPlay(true, WORLD, OVERWORLD, x, 0, 0, volume, dropped, cueShown);
 	}
 
-	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), quick(List.of(rules)));
+	private static Zone cylinder(String id, double x, double radius, SetEntry... rules) {
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Cylinder(radius, 2 * radius), quick(List.of(rules)));
 	}
 
 	private static PlaceSets attached(String... setIds) {
@@ -123,8 +123,8 @@ class TraceTextTest {
 
 	@Test
 	void zonesShowModeWeightDistanceTheirSetsAndTheWinners() {
-		Zone near = sphere("near", 3, 20, SetEntry.of("rn", "*villager*").withVolume(20));
-		Zone far = sphere("far", 9, 20, SetEntry.of("rf", "*villager*").withVolume(80));
+		Zone near = cylinder("near", 3, 20, SetEntry.of("rn", "*villager*").withVolume(20));
+		Zone far = cylinder("far", 9, 20, SetEntry.of("rf", "*villager*").withVolume(80));
 		String text = text(precedence(List.of(), List.of(far, near)), playAt(0, 20, false, false), false);
 		assertTrue(text.contains(String.join("\n",
 				"Zones",
@@ -175,7 +175,7 @@ class TraceTextTest {
 
 	@Test
 	void fadeWeightAndUnnamedZones() {
-		Zone fade = new Zone("z7", "", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(20),
+		Zone fade = new Zone("z7", "", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Cylinder(20, 40),
 				quick(List.of(SetEntry.of("r", "*").withMute(true)))).withEdge(soundsculptor.core.zones.ZoneEdge.fade(8));
 		String text = text(precedence(List.of(), List.of(fade)), playAt(16, 50, false, false), false);
 		assertTrue(text.contains("  z7 (Inside): weight 50%, 16 blocks from its anchor"), text);

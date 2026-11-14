@@ -35,7 +35,7 @@ import soundsculptor.core.zones.ZoneMode;
  */
 public final class StressProfile {
 	public static final double PEN_Y = 64;
-	/** The player's eye position, standing in the middle of the pen: the anchor of the profile's personal bubbles. */
+	/** The player's eye position, standing in the middle of the pen: the anchor of the zones around the player. */
 	public static final Point PLAYER = new Point(0, PEN_Y + 1.62, 0);
 	/** The two sets attached to Everywhere. */
 	public static final List<String> EVERYWHERE_SET_IDS = List.of("stress-everywhere-1", "stress-everywhere-2");
@@ -180,9 +180,9 @@ public final class StressProfile {
 	}
 
 	/**
-	 * The stress profile's 64 zones that all affect the pen: Inside spheres, boxes and cylinders scattered up to 20
-	 * blocks away, Outside spheres 40 to 60 blocks away, and personal bubbles around the player. Every third zone fades.
-	 * Each attaches 1 to 3 different sets from the pool in {@link #library()}.
+	 * The stress profile's 64 zones that all affect the pen: Inside boxes and cylinders scattered up to 20 blocks away,
+	 * Outside cylinders 40 to 60 blocks away, and boxes centred on the player. Every third zone fades. Each attaches 1 to
+	 * 3 different sets from the pool in {@link #library()}.
 	 */
 	public static List<Zone> zones(String worldKey, String dimension) {
 		return generate(worldKey, dimension).stress();
@@ -197,8 +197,8 @@ public final class StressProfile {
 	}
 
 	/**
-	 * Builds the zones from one random stream in the same order as before Sound Sets, so the geometry and each zone's own
-	 * entries are what they were then. The stress zones' pool sets come from a second stream that does not disturb it.
+	 * Builds the zones from one random stream in the same order as before Sound Sets, so each zone's own entries are what
+	 * they were then. The stress zones' pool sets come from a second stream that does not disturb it.
 	 */
 	private static Generated generate(String worldKey, String dimension) {
 		Random random = new Random(SEED + 1);
@@ -213,11 +213,12 @@ public final class StressProfile {
 			double dy = Math.abs(PEN_Y - ay);
 			Shape shape;
 			ZoneMode mode = ZoneMode.INSIDE;
-			boolean bubble = false;
 			switch (i % 8) {
 				case 0, 1 -> {
+					// A cube or an upright cylinder whose half-size reaches past the pen centre.
 					double reach = Math.sqrt(ax * ax + dy * dy + az * az);
-					shape = new Shape.Sphere(Math.min(Shape.Sphere.MAX_RADIUS, Math.ceil(reach) + 2 + random.nextInt(18)));
+					double r = Math.min(Shape.Cylinder.MAX_RADIUS, Math.ceil(reach) + 2 + random.nextInt(18));
+					shape = i % 8 == 0 ? cube(r) : new Shape.Cylinder(r, Math.min(Shape.Cylinder.MAX_HEIGHT, 2 * r));
 				}
 				case 2, 3 -> shape = new Shape.Box(side(Math.abs(ax), random), side(dy, random), side(Math.abs(az), random));
 				case 4, 5 -> shape = new Shape.Cylinder(
@@ -228,12 +229,16 @@ public final class StressProfile {
 					double distance = 40 + random.nextInt(21);
 					ax = Math.round(Math.cos(angle) * distance);
 					az = Math.round(Math.sin(angle) * distance);
-					shape = new Shape.Sphere(5 + random.nextInt(16));
+					double r = 5 + random.nextInt(16);
+					shape = new Shape.Cylinder(r, 2 * r);
 					mode = ZoneMode.OUTSIDE;
 				}
 				default -> {
-					shape = new Shape.Sphere(10 + random.nextInt(31));
-					bubble = true;
+					// Centred on the player: the zones nearest to most sounds in the pen.
+					shape = cube(10 + random.nextInt(31));
+					ax = PLAYER.x();
+					ay = PLAYER.y();
+					az = PLAYER.z();
 				}
 			}
 			List<SetEntry> own = new ArrayList<>();
@@ -253,11 +258,16 @@ public final class StressProfile {
 			if (i % 3 == 0) {
 				zone = zone.withEdge(ZoneEdge.fade(1 + random.nextInt(8)));
 			}
-			zone = bubble ? zone.asBubble() : zone;
 			stress.add(zone);
 			typical.add(zone.withSets(PlaceSets.EMPTY.attach(zoneSetId(i))));
 		}
 		return new Generated(List.copyOf(stress), List.copyOf(typical), List.copyOf(zoneSets));
+	}
+
+	/** A cube with half-side {@code half}. */
+	private static Shape.Box cube(double half) {
+		double side = Math.min(Shape.Box.MAX_SIDE, 2 * half);
+		return new Shape.Box(side, side, side);
 	}
 
 	/** A box side long enough to reach the pen centre from {@code offset} away, plus some slack. */

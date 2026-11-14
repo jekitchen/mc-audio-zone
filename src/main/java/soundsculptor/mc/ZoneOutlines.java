@@ -7,7 +7,6 @@ import soundsculptor.core.outline.OutlineMode;
 import soundsculptor.core.outline.OutlineVisibility;
 import soundsculptor.core.outline.ZoneColors;
 import soundsculptor.core.profile.Profile;
-import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.core.zones.ZoneEdge;
@@ -94,16 +93,13 @@ public final class ZoneOutlines {
 					continue; // drawn below from the editor's values
 				}
 				if (mode != OutlineMode.NEVER && OutlineVisibility.shouldDraw(zone, mode, editingId, key, dimension, camera.x, camera.y, camera.z)) {
-					Outline outline = CACHE.computeIfAbsent(zone, z -> OutlineGeometry.of(z, edge, null));
+					Outline outline = CACHE.computeIfAbsent(zone, z -> OutlineGeometry.of(z, edge));
 					drawZone(zone, outline, colorOf(profile, zone), onTop, camera);
 				}
 			}
 			if (editing != null && OutlineVisibility.shouldDraw(editing, OutlineMode.ALWAYS, editingId, key, dimension, camera.x, camera.y, camera.z)) {
-				Point anchor = editing.isBubble() && minecraft.player != null
-						? new Point(minecraft.player.getEyePosition().x, minecraft.player.getEyePosition().y, minecraft.player.getEyePosition().z)
-						: null;
 				int color = marking != null ? ZoneMarking.color(minecraft) : ZoneEditorScreen.editingColor(minecraft);
-				drawZone(editing, OutlineGeometry.of(editing, edge, anchor), color, onTop, camera);
+				drawZone(editing, OutlineGeometry.of(editing, edge), color, onTop, camera);
 			}
 		} catch (RuntimeException | LinkageError e) {
 			// Never break world rendering: stop drawing outlines for the rest of the session.

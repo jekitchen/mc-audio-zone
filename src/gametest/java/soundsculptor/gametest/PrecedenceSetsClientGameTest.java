@@ -137,8 +137,8 @@ public final class PrecedenceSetsClientGameTest implements FabricClientGameTest 
 	private static void p16(ClientGameTestContext context, String key) {
 		SoundSet farm = new SoundSet("p16-farm", "Farm animals", List.of(SetEntry.of("e1", COWS).withVolume(30)));
 		Vec3 cow = context.computeOnClient(mc -> cowInBoat(mc).position());
-		Zone a = new Zone("p16-a", "A", true, key, OVERWORLD, new Point(cow.x, cow.y, cow.z), new Shape.Sphere(4), PlaceSets.EMPTY.attach(farm.id()));
-		Zone b = new Zone("p16-b", "B", true, key, OVERWORLD, new Point(cow.x + 40, cow.y, cow.z), new Shape.Sphere(4), PlaceSets.EMPTY.attach(farm.id()));
+		Zone a = new Zone("p16-a", "A", true, key, OVERWORLD, new Point(cow.x, cow.y, cow.z), new Shape.Cylinder(4, 8), PlaceSets.EMPTY.attach(farm.id()));
+		Zone b = new Zone("p16-b", "B", true, key, OVERWORLD, new Point(cow.x + 40, cow.y, cow.z), new Shape.Cylinder(4, 8), PlaceSets.EMPTY.attach(farm.id()));
 		context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()).withZones(List.of(a, b)),
 				ws.library().put(farm))));
 		check(play(context, AMBIENT) == 0.3F, "P16: the cow in A plays at the set's 30%");

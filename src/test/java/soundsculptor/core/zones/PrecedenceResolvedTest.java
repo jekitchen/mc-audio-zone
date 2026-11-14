@@ -28,9 +28,8 @@ class PrecedenceResolvedTest {
 			p.resolve(id, resolved);
 			for (int x = -60; x <= 60; x += 12) {
 				for (int z = -60; z <= 60; z += 15) {
-					double px = x / 3.0;
-					p.decide(id, true, WORLD, OVERWORLD, x, 64, z, px, 65.62, 0, a);
-					p.decideResolved(resolved, true, WORLD, OVERWORLD, x, 64, z, px, 65.62, 0, b);
+					p.decide(id, true, WORLD, OVERWORLD, x, 64, z, a);
+					p.decideResolved(resolved, true, WORLD, OVERWORLD, x, 64, z, b);
 					String where = id + " at " + x + ", " + z;
 					assertEquals(a.volumePercent(), b.volumePercent(), where);
 					assertSame(a.loudnessZone(), b.loudnessZone(), where);

@@ -32,11 +32,6 @@ class ProfileZonesTest {
 				quick(List.of(SetEntry.of(id + "r1", "*villager*").withVolume(50))));
 	}
 
-	/** A bubble as the file stores it: no world key, dimension or position. */
-	static Zone bubble(String id) {
-		return new Zone(id, "Bubble " + id, true, "", "", new Point(0, 0, 0), new Shape.Sphere(8),
-				quick(List.of(SetEntry.of(id + "r1", "*").withMute(true)))).asBubble();
-	}
 
 	@Test
 	void threeArgumentConstructorStillWorksWithNoZones() {
@@ -47,7 +42,7 @@ class ProfileZonesTest {
 
 	@Test
 	void quickActionsKeepTheZones() {
-		Profile p = Profile.empty("A").withZones(List.of(fixed("z1", new Shape.Sphere(10))))
+		Profile p = Profile.empty("A").withZones(List.of(fixed("z1", new Shape.Cylinder(10, 20))))
 				.withZoneColor("z1", 0xE69F00);
 		Profile muted = p.withEverywhere(p.everywhere().withQuickEntries(List.of(SetEntry.of("q1", "minecraft:a").withMute(true))))
 				.withSettings(new ProfileSettings(false));
@@ -64,7 +59,7 @@ class ProfileZonesTest {
 
 	@Test
 	void replacingZonesDropsColorsOfRemovedZones() {
-		Profile p = Profile.empty("A").withZones(List.of(fixed("z1", new Shape.Sphere(10)), fixed("z2", new Shape.Sphere(5))))
+		Profile p = Profile.empty("A").withZones(List.of(fixed("z1", new Shape.Cylinder(10, 20)), fixed("z2", new Shape.Cylinder(5, 10))))
 				.withZoneColor("z1", 1).withZoneColor("z2", 2);
 		Profile q = p.withZones(List.of(p.zones().get(1)));
 		assertEquals(Map.of("z2", 2), q.zoneColors());
@@ -74,33 +69,32 @@ class ProfileZonesTest {
 
 	@Test
 	void zonesRoundTripThroughTheFile() throws ProfileFormatException {
-		Zone sphere = fixed("z1", new Shape.Sphere(12.5));
+		Zone round = fixed("z1", new Shape.Cylinder(12.5, 25));
 		Zone box = fixed("z2", new Shape.Box(20, 8, 30)).withEdge(ZoneEdge.fade(6));
 		Zone cylinder = new Zone("z3", "Tower", false, SERVER, "minecraft:the_nether", new Point(-5, 70, 9),
 				new Shape.Cylinder(4, 40), quick(List.of(new SetEntry("r9", false, soundsculptor.core.sets.SoundPattern.of("minecraft:block.*"),
 						null, 150, new Limit(2, 500, true), false))))
 				.withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.hard());
-		Profile p = Profile.empty("Server").withZones(List.of(sphere, box, cylinder, bubble("b1")))
-				.withZoneColor("z1", 0xE69F00).withZoneColor("b1", 0x123456);
+		Profile p = Profile.empty("Server").withZones(List.of(round, box, cylinder))
+				.withZoneColor("z1", 0xE69F00).withZoneColor("z3", 0x123456);
 		Profile back = ProfileCodec.fromJson(ProfileCodec.toJson(p));
 		assertEquals(p, back);
 	}
 
 	@Test
 	void fileMatchesTheSketchAndOmitsUnsetProperties() {
-		Profile p = Profile.empty("Server").withZones(List.of(fixed("z1", new Shape.Box(20, 8, 30)), bubble("b1")))
-				.withZoneColor("z1", 0xE69F00);
+		Profile p = Profile.empty("Server").withZones(List.of(fixed("z1", new Shape.Box(20, 8, 30)),
+				fixed("z2", new Shape.Cylinder(4, 8)))).withZoneColor("z1", 0xE69F00);
 		String json = ProfileCodec.toJson(p);
 		assertTrue(json.contains("\"color\": \"#E69F00\""), json);
 		assertTrue(json.contains("\"type\": \"fixed\""), json);
 		assertTrue(json.contains("\"worldKey\": \"play.example.net\""), json);
 		assertTrue(json.contains("\"type\": \"box\""), json);
 		assertTrue(json.contains("\"mode\": \"inside\""), json);
-		assertTrue(json.contains("\"type\": \"bubble\""), json);
+		assertTrue(json.contains("\"type\": \"cylinder\""), json);
 		assertFalse(json.contains("\"fade\""), "a default edge has no fade distance: " + json);
-		// The bubble has no color, and its anchor carries no world data.
-		String bubblePart = json.substring(json.indexOf("\"b1\""));
-		assertFalse(bubblePart.contains("color"), bubblePart);
-		assertFalse(bubblePart.contains("worldKey"), bubblePart);
+		// The second zone has no color.
+		String secondPart = json.substring(json.indexOf("\"z2\""));
+		assertFalse(secondPart.contains("color"), secondPart);
 	}
 }

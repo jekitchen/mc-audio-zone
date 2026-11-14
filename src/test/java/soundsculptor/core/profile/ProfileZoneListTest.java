@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 /** The Zones tab's list operations and zone rule lists (PRD 6.1 Zones, FR-8.6, FR-9 step 5). */
 class ProfileZoneListTest {
 	private static Zone zone(String id) {
-		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10), PlaceSets.EMPTY);
+		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(10, 20), PlaceSets.EMPTY);
 	}
 
 	private static List<String> ids(Profile p) {

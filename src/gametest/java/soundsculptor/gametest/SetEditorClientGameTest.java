@@ -427,7 +427,7 @@ public final class SetEditorClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zone(String id, String name, String worldKey, Point center) {
-		return new Zone(id, name, true, worldKey, "minecraft:overworld", center, new Shape.Sphere(8), PlaceSets.EMPTY);
+		return new Zone(id, name, true, worldKey, "minecraft:overworld", center, new Shape.Cylinder(8, 16), PlaceSets.EMPTY);
 	}
 
 	private static SetEditorScreen editor(Minecraft mc) {

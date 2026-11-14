@@ -7,7 +7,6 @@ import soundsculptor.core.Allocations;
 import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.stress.StressProfile;
 import soundsculptor.core.trace.LastPlays;
-import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 
 import org.junit.jupiter.api.Test;
@@ -23,7 +22,6 @@ class SoundStartBudgetTest {
 	private static final String WORLD = "world:stress";
 	private static final String OVERWORLD = "minecraft:overworld";
 	private static final double BUDGET_NANOS = 5_000;
-	private static final Point PLAYER = StressProfile.PLAYER;
 
 	private final SoundStartDecider decider = new SoundStartDecider(new LastPlays());
 	private final String[] ids = StressProfile.soundIds().toArray(new String[0]);
@@ -55,9 +53,6 @@ class SoundStartBudgetTest {
 			in.x = xs[i];
 			in.y = StressProfile.PEN_Y;
 			in.z = zs[i];
-			in.px = PLAYER.x();
-			in.py = PLAYER.y();
-			in.pz = PLAYER.z();
 			in.hasSubtitle = true;
 			in.nowMs = 1_000 + pass * 10;
 			decider.start(in, out);

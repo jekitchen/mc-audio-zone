@@ -29,6 +29,9 @@ final class ProfileText {
 	static final String ABOVE_MAX = "soundsculptor.profile.problem.value.above_max";
 	static final String BELOW_MIN = "soundsculptor.profile.problem.value.below_min";
 	static final String NOT_CHOICE = "soundsculptor.profile.problem.value.not_choice";
+	/** A shape or anchor type that was dropped before release (owner decision 2026-11-13). */
+	static final String UNSUPPORTED_SHAPE = "soundsculptor.profile.problem.value.unsupported_shape";
+	static final String UNSUPPORTED_ANCHOR = "soundsculptor.profile.problem.value.unsupported_anchor";
 	static final String NOT_COLOR = "soundsculptor.profile.problem.value.not_color";
 	static final String NOT_OBJECT = "soundsculptor.profile.problem.value.not_object";
 	static final String NOT_LIST = "soundsculptor.profile.problem.value.not_list";
@@ -60,9 +63,8 @@ final class ProfileText {
 	static final String UNKNOWN_FIELD = "soundsculptor.profile.warning.unknown_field";
 	static final String UNKNOWN_FIELD_AT = "soundsculptor.profile.warning.unknown_field_at";
 
-	// Import, copy and rename (FR-11.2, FR-11.3, FR-11.5).
+	// Import and rename (FR-11.3, FR-11.5).
 	static final String IMPORT_TOO_MANY_ZONES = "soundsculptor.profile.problem.import_too_many_zones";
-	static final String COPY_TOO_MANY_ZONES = "soundsculptor.profile.problem.copy_too_many_zones";
 	static final String NAME_EMPTY = "soundsculptor.profile.problem.name_empty";
 	static final String NAME_TOO_LONG = "soundsculptor.profile.problem.name_too_long";
 

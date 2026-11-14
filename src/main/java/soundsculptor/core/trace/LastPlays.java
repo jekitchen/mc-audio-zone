@@ -22,20 +22,9 @@ public final class LastPlays {
 		}
 	};
 
-	/** Records a play without the player's position (personal bubbles are then left out of its trace). */
+	/** Records a play. */
 	public void record(String soundId, boolean positional, String worldKey, String dimension, double x, double y, double z,
 			float volumePercent, boolean dropped, boolean cueShown) {
-		record(soundId, positional, worldKey, dimension, x, y, z, Double.NaN, Double.NaN, Double.NaN, volumePercent, dropped,
-				cueShown);
-	}
-
-	/**
-	 * Records a play.
-	 *
-	 * @param px the local player's eye position at the play, the anchor of personal bubbles
-	 */
-	public void record(String soundId, boolean positional, String worldKey, String dimension, double x, double y, double z,
-			double px, double py, double pz, float volumePercent, boolean dropped, boolean cueShown) {
 		Slot e = entries.get(soundId);
 		if (e == null) {
 			e = new Slot();
@@ -47,9 +36,6 @@ public final class LastPlays {
 		e.x = x;
 		e.y = y;
 		e.z = z;
-		e.px = px;
-		e.py = py;
-		e.pz = pz;
 		e.volumePercent = volumePercent;
 		e.dropped = dropped;
 		e.cueShown = cueShown;
@@ -61,8 +47,7 @@ public final class LastPlays {
 		if (e == null) {
 			return null;
 		}
-		return new LastPlay(e.positional, e.worldKey, e.dimension, e.x, e.y, e.z, e.px, e.py, e.pz, e.volumePercent,
-				e.dropped, e.cueShown);
+		return new LastPlay(e.positional, e.worldKey, e.dimension, e.x, e.y, e.z, e.volumePercent, e.dropped, e.cueShown);
 	}
 
 	public int size() {
@@ -84,7 +69,7 @@ public final class LastPlays {
 	}
 
 	private static final class Slot {
-		static final long BYTES = MemoryEstimate.object(2 * MemoryEstimate.REFERENCE + 6 * 8 + 4 + 3);
+		static final long BYTES = MemoryEstimate.object(2 * MemoryEstimate.REFERENCE + 3 * 8 + 4 + 3);
 
 		boolean positional;
 		String worldKey;
@@ -92,9 +77,6 @@ public final class LastPlays {
 		double x;
 		double y;
 		double z;
-		double px;
-		double py;
-		double pz;
 		float volumePercent;
 		boolean dropped;
 		boolean cueShown;

@@ -21,8 +21,8 @@ class ZoneSummaryTest {
 	private static final String OVERWORLD = "minecraft:overworld";
 	private static final ZoneEdge HARD = ZoneEdge.hard();
 
-	private static Zone sphere(double radius) {
-		return new Zone("z", "Hall", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Sphere(radius), PlaceSets.EMPTY);
+	private static Zone cylinder(double radius) {
+		return new Zone("z", "Hall", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Cylinder(radius, 2 * radius), PlaceSets.EMPTY);
 	}
 
 	private static String where(Zone zone, String world, String dimension, double x) {
@@ -31,51 +31,45 @@ class ZoneSummaryTest {
 
 	@Test
 	void hereWhenThePlayerIsInside() {
-		assertEquals("Here", where(sphere(10), WORLD, OVERWORLD, 3));
+		assertEquals("Here", where(cylinder(10), WORLD, OVERWORLD, 3));
 	}
 
 	@Test
 	void roundedBlocksFromTheAnchorWhenOutside() {
-		assertEquals("120 blocks away", where(sphere(10), WORLD, OVERWORLD, 120.4));
-		assertEquals("121 blocks away", where(sphere(10), WORLD, OVERWORLD, 120.6));
-		assertEquals(LocationKind.AWAY, ZoneSummary.location(sphere(10), WORLD, OVERWORLD, new Point(50, 64, 0), HARD).kind());
+		assertEquals("120 blocks away", where(cylinder(10), WORLD, OVERWORLD, 120.4));
+		assertEquals("121 blocks away", where(cylinder(10), WORLD, OVERWORLD, 120.6));
+		assertEquals(LocationKind.AWAY, ZoneSummary.location(cylinder(10), WORLD, OVERWORLD, new Point(50, 64, 0), HARD).kind());
 	}
 
 	@Test
 	void outsideZoneIsHereWhenThePlayerIsOutsideItsShape() {
-		Zone base = sphere(20).withMode(ZoneMode.OUTSIDE);
+		Zone base = cylinder(20).withMode(ZoneMode.OUTSIDE);
 		assertEquals("Here", where(base, WORLD, OVERWORLD, 50));
 		assertEquals("5 blocks away", where(base, WORLD, OVERWORLD, 5));
 	}
 
 	@Test
 	void otherWorldBeforeOtherDimension() {
-		assertEquals("Other world", where(sphere(10), "other.example.net", "minecraft:the_nether", 0));
-		assertEquals("Other dimension", where(sphere(10), WORLD, "minecraft:the_nether", 0));
+		assertEquals("Other world", where(cylinder(10), "other.example.net", "minecraft:the_nether", 0));
+		assertEquals("Other dimension", where(cylinder(10), WORLD, "minecraft:the_nether", 0));
 	}
 
-	@Test
-	void bubbleIsAlwaysHere() {
-		Zone bubble = sphere(8).asBubble();
-		assertEquals("Here", where(bubble, "other.example.net", "minecraft:the_nether", 500));
-	}
 
 	@Test
 	void fadeEdgeCountsAsHereOnlyOnceTheWeightIsAboveZero() {
-		Zone fade = sphere(20).withEdge(ZoneEdge.fade(8));
+		Zone fade = cylinder(20).withEdge(ZoneEdge.fade(8));
 		assertEquals("Here", where(fade, WORLD, OVERWORLD, 15));
 		assertEquals("20 blocks away", where(fade, WORLD, OVERWORLD, 20));
 	}
 
 	@Test
-	void shapeModeAndBubbleChips() {
-		assertEquals(List.of("Sphere, radius 10", "Inside", "Here"), chips(sphere(10)));
+	void shapeAndModeChips() {
+		assertEquals(List.of("Cylinder, radius 10, height 20", "Inside", "Here"), chips(cylinder(10)));
 		Zone box = new Zone("b", "Farm", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Box(20, 8, 30.5), PlaceSets.EMPTY)
 				.withMode(ZoneMode.OUTSIDE);
 		assertEquals(List.of("Box 20 × 8 × 30.5", "Outside", "5 blocks away"), chipsAt(box, 5));
-		Zone cylinder = new Zone("c", "Tower", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Cylinder(6, 40), PlaceSets.EMPTY)
-				.asBubble();
-		assertEquals(List.of("Cylinder, radius 6, height 40", "Inside", "Personal bubble", "Here"), chips(cylinder));
+		Zone tower = new Zone("c", "Tower", true, WORLD, OVERWORLD, new Point(0, 64, 0), new Shape.Cylinder(6, 40), PlaceSets.EMPTY);
+		assertEquals(List.of("Cylinder, radius 6, height 40", "Inside", "Here"), chips(tower));
 	}
 
 	private static List<String> chips(Zone zone) {

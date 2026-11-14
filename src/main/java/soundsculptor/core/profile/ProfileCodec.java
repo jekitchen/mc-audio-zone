@@ -8,7 +8,6 @@ import soundsculptor.core.sets.PlaceSets;
 import soundsculptor.core.sets.SetCodec;
 import soundsculptor.core.sets.SetFormatException;
 import soundsculptor.core.sets.SoundSet;
-import soundsculptor.core.zones.AnchorType;
 import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.Shape;
@@ -65,7 +64,6 @@ public final class ProfileCodec {
 	private static final Set<String> ANCHOR_FIELDS = Set.of("type", "x", "y", "z", "dimension", "worldKey");
 	private static final Set<String> EDGE_FIELDS = Set.of("mode", "fade");
 	private static final Map<String, Set<String>> SHAPE_FIELDS = Map.of(
-			"sphere", Set.of("type", "radius"),
 			"box", Set.of("type", "width", "height", "depth"),
 			"cylinder", Set.of("type", "radius", "height"));
 
@@ -163,24 +161,15 @@ public final class ProfileCodec {
 			json.addProperty("color", ZoneColors.format(color));
 		}
 		JsonObject anchor = new JsonObject();
-		if (zone.isBubble()) {
-			// A bubble follows the player: it carries no position or world data (PRD FR-8.2).
-			anchor.addProperty("type", "bubble");
-		} else {
-			anchor.addProperty("type", "fixed");
-			anchor.addProperty("x", zone.anchor().x());
-			anchor.addProperty("y", zone.anchor().y());
-			anchor.addProperty("z", zone.anchor().z());
-			anchor.addProperty("dimension", zone.dimension());
-			anchor.addProperty("worldKey", zone.worldKey());
-		}
+		anchor.addProperty("type", "fixed");
+		anchor.addProperty("x", zone.anchor().x());
+		anchor.addProperty("y", zone.anchor().y());
+		anchor.addProperty("z", zone.anchor().z());
+		anchor.addProperty("dimension", zone.dimension());
+		anchor.addProperty("worldKey", zone.worldKey());
 		json.add("anchor", anchor);
 		JsonObject shape = new JsonObject();
 		switch (zone.shape()) {
-			case Shape.Sphere s -> {
-				shape.addProperty("type", "sphere");
-				shape.addProperty("radius", s.radius());
-			}
 			case Shape.Box b -> {
 				shape.addProperty("type", "box");
 				shape.addProperty("width", b.width());
@@ -374,16 +363,14 @@ public final class ProfileCodec {
 		String name = z.has("name") ? z.string("name") : null;
 		boolean enabled = !z.has("enabled") || z.bool("enabled");
 		Fields a = z.object("anchor", z.where(), ANCHOR_FIELDS);
-		String anchorType = a.choice("type", "anchor type", "fixed", "bubble");
-		String worldKey = "";
-		String dimension = "";
-		Point anchor = new Point(0, 0, 0);
-		if (anchorType.equals("fixed")) {
-			anchor = new Point(a.number("x", -MAX_COORDINATE, MAX_COORDINATE), a.number("y", -MAX_COORDINATE, MAX_COORDINATE),
-					a.number("z", -MAX_COORDINATE, MAX_COORDINATE));
-			dimension = a.string("dimension");
-			worldKey = a.string("worldKey");
-		}
+		// Every zone is fixed (FR-8.1). Personal bubbles were dropped before release (owner decision 2026-11-13), so a file
+		// that still has one is refused like any other value out of spec.
+		a.refuse("type", "anchor type", "bubble", ProfileText.UNSUPPORTED_ANCHOR);
+		a.choice("type", "anchor type", "fixed");
+		Point anchor = new Point(a.number("x", -MAX_COORDINATE, MAX_COORDINATE), a.number("y", -MAX_COORDINATE, MAX_COORDINATE),
+				a.number("z", -MAX_COORDINATE, MAX_COORDINATE));
+		String dimension = a.string("dimension");
+		String worldKey = a.string("worldKey");
 		Shape shape = readShape(z);
 		ZoneMode mode = ZoneMode.INSIDE;
 		if (z.has("mode")) {
@@ -401,8 +388,7 @@ public final class ProfileCodec {
 			};
 		}
 		PlaceSets sets = readPlace(z, warnings);
-		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, mode, edge,
-				anchorType.equals("fixed") ? AnchorType.FIXED : AnchorType.BUBBLE);
+		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, mode, edge);
 	}
 
 	private static Shape readShape(Fields z) throws ProfileFormatException {
@@ -412,10 +398,11 @@ public final class ProfileCodec {
 		}
 		JsonObject json = raw.getAsJsonObject();
 		Fields probe = new Fields(json, z.where(), null, null);
-		String type = probe.choice("type", "shape type", "sphere", "box", "cylinder");
+		// Sphere shapes were dropped before release (owner decision 2026-11-13): refused like any other value out of spec.
+		probe.refuse("type", "shape type", "sphere", ProfileText.UNSUPPORTED_SHAPE);
+		String type = probe.choice("type", "shape type", "box", "cylinder");
 		Fields s = z.object("shape", z.where(), SHAPE_FIELDS.get(type));
 		return switch (type) {
-			case "sphere" -> new Shape.Sphere(s.number("radius", Shape.Sphere.MIN_RADIUS, Shape.Sphere.MAX_RADIUS));
 			case "box" -> new Shape.Box(s.number("width", Shape.Box.MIN_SIDE, Shape.Box.MAX_SIDE),
 					s.number("height", Shape.Box.MIN_SIDE, Shape.Box.MAX_SIDE),
 					s.number("depth", Shape.Box.MIN_SIDE, Shape.Box.MAX_SIDE));
@@ -549,7 +536,19 @@ public final class ProfileCodec {
 			return value;
 		}
 
-		/** One of the allowed words, e.g. "sphere"; {@code label} names the field in the message ("shape type"). */
+		/**
+		 * Refuses a word the format no longer has, e.g. a removed shape, with its own message {@code key} instead of
+		 * the list of choices. Does nothing for any other value.
+		 */
+		void refuse(String field, String label, String removed, String key) throws ProfileFormatException {
+			JsonElement value = json.get(field);
+			if (value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()
+					&& removed.equals(value.getAsString())) {
+				throw problem(label, key, describe(value));
+			}
+		}
+
+		/** One of the allowed words, e.g. "box"; {@code label} names the field in the message ("shape type"). */
 		String choice(String field, String label, String... allowed) throws ProfileFormatException {
 			if (!has(field)) {
 				throw problem(label, ProfileText.MISSING);

@@ -151,7 +151,7 @@ public final class SoundStartDecider {
 		}
 
 		SoundDecision d = decision;
-		p.decide(in.soundId, in.positional, in.worldKey, in.dimension, in.x, in.y, in.z, in.px, in.py, in.pz, d);
+		p.decide(in.soundId, in.positional, in.worldKey, in.dimension, in.x, in.y, in.z, d);
 		float volume = d.volumePercent();
 		out.handled = true;
 		out.decision = d;
@@ -193,7 +193,6 @@ public final class SoundStartDecider {
 	}
 
 	private void record(SoundStart in, float volume, boolean dropped, boolean cueShown) {
-		lastPlays.record(in.soundId, in.positional, in.worldKey, in.dimension, in.x, in.y, in.z, in.px, in.py, in.pz, volume,
-				dropped, cueShown);
+		lastPlays.record(in.soundId, in.positional, in.worldKey, in.dimension, in.x, in.y, in.z, volume, dropped, cueShown);
 	}
 }

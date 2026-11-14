@@ -9,7 +9,6 @@ import soundsculptor.core.diag.TimingWindow;
 import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.recent.RecentSounds;
 import soundsculptor.core.trace.LastPlays;
-import soundsculptor.core.zones.Point;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.SoundDecision;
 
@@ -26,7 +25,6 @@ class HotPathBudgetTest {
 	private static final String WORLD = "world:stress";
 	private static final String OVERWORLD = "minecraft:overworld";
 	private static final double BUDGET_NANOS = 5_000;
-	private static final Point PLAYER = StressProfile.PLAYER;
 
 	private final Precedence precedence = new Precedence(StressProfile.everywhere(), StressProfile.zones(WORLD, OVERWORLD),
 			StressProfile.library());
@@ -45,7 +43,7 @@ class HotPathBudgetTest {
 	private void decideAll(SoundDecision out, int rounds) {
 		for (int r = 0; r < rounds; r++) {
 			for (int i = 0; i < ids.length; i++) {
-				precedence.decide(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], PLAYER.x(), PLAYER.y(), PLAYER.z(), out);
+				precedence.decide(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], out);
 			}
 		}
 	}
@@ -68,7 +66,7 @@ class HotPathBudgetTest {
 		SoundDecision out = new SoundDecision();
 		int byZone = 0;
 		for (int i = 0; i < ids.length; i++) {
-			precedence.decide(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], PLAYER.x(), PLAYER.y(), PLAYER.z(), out);
+			precedence.decide(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], out);
 			if (out.loudnessZone() != null) {
 				byZone++;
 			}
@@ -100,11 +98,11 @@ class HotPathBudgetTest {
 		long now = 1_000L + round * 10L; // stays inside the 3-minute window, so no row expires
 		for (int i = 0; i < ids.length; i++) {
 			long t0 = System.nanoTime();
-			precedence.decide(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], PLAYER.x(), PLAYER.y(), PLAYER.z(), out);
+			precedence.decide(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], out);
 			PlayStatus status = out.volumePercent() == 0 ? PlayStatus.MUTED : PlayStatus.PLAYING;
 			String zoneName = out.loudnessZone() == null ? null : out.loudnessZone().name();
 			recent.record(ids[i], "neutral", true, 6.0, true, status, zoneName, now);
-			lastPlays.record(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], PLAYER.x(), PLAYER.y(), PLAYER.z(), out.volumePercent(), false, false);
+			lastPlays.record(ids[i], true, WORLD, OVERWORLD, xs[i], 64, zs[i], out.volumePercent(), false, false);
 			timing.add(System.nanoTime() - t0, now);
 		}
 	}

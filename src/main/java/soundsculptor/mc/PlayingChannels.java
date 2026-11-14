@@ -11,7 +11,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.ChannelAccess;
 import net.minecraft.util.Util;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * Re-decides playing positional sounds every client tick (PRD FR-8.8), so a sound changes volume when it moves into
@@ -131,11 +130,8 @@ public final class PlayingChannels {
 			if (ProfileManager.isBypassed() || !ProfileManager.isLoaded()) {
 				playing.updateBypassed(applyGain);
 			} else {
-				Vec3 eye = minecraft.player == null ? null : minecraft.player.getEyePosition();
 				Precedence precedence = ProfileManager.precedence();
-				playing.update(precedence, ProfileManager.key(), WorldSession.dimension(minecraft),
-						eye == null ? Double.NaN : eye.x, eye == null ? Double.NaN : eye.y, eye == null ? Double.NaN : eye.z,
-						false, applyGain);
+				playing.update(precedence, ProfileManager.key(), WorldSession.dimension(minecraft), false, applyGain);
 			}
 		} catch (RuntimeException | LinkageError e) {
 			// Fail open: stop re-deciding; the sounds keep the volume they have.

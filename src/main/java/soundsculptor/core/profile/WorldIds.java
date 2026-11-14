@@ -77,10 +77,10 @@ public final class WorldIds {
 	}
 
 	/**
-	 * Gives a copied world its own ID and profile. The copy starts with everything it had: the same rules, settings,
-	 * bubbles and zone colors, and its fixed zones, which are moved to the new key so they stay active here (bubbles carry no world key) (the
-	 * coordinates mean the same place in a copy). Zones made for another world are left as they are. The shared
-	 * profile itself is not changed, so the original world keeps it.
+	 * Gives a copied world its own ID and profile. The copy starts with everything it had: the same rules, settings
+	 * and zone colors, and its zones, which are moved to the new key so they stay active here (the coordinates mean
+	 * the same place in a copy). Zones made for another world are left as they are. The shared profile itself is not
+	 * changed, so the original world keeps it.
 	 *
 	 * @param current the profile the copy shares now
 	 * @param oldKey  the key the copy uses now ({@code world:<shared id>}, or a folder fallback)

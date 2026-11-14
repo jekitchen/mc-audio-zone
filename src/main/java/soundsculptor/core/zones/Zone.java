@@ -9,9 +9,8 @@ import soundsculptor.core.sets.PlaceSets;
  * from.
  *
  * <ul>
- *   <li>A <b>fixed</b> zone (FR-8.1) is active only in its own server or world ({@code worldKey}) and dimension.</li>
- *   <li>A <b>personal bubble</b> (FR-8.2, v1) is anchored at the local player's eye position, updated every tick,
- *       wherever the player is; its stored {@code anchor}, world key and dimension are not used.</li>
+ *   <li>Every zone is fixed (FR-8.1): its {@code anchor} is the shape's geometric center, and it is active only in its
+ *       own server or world ({@code worldKey}) and dimension.</li>
  *   <li>{@link ZoneMode#INSIDE} (default) affects sounds in the shape; {@link ZoneMode#OUTSIDE} (v1) affects sounds
  *       outside it in the same dimension.</li>
  *   <li>The edge (FR-8.5) is hard, or fades over a distance; {@link ZoneEdge#DEFAULT} uses the profile's setting.</li>
@@ -21,51 +20,42 @@ import soundsculptor.core.sets.PlaceSets;
  * @param sets the Sound Sets attached to the zone, and its Quick changes, as for Everywhere (FR-8.6)
  */
 public record Zone(String id, String name, boolean enabled, String worldKey, String dimension, Point anchor, Shape shape,
-		PlaceSets sets, ZoneMode mode, ZoneEdge edge, AnchorType anchorType) {
+		PlaceSets sets, ZoneMode mode, ZoneEdge edge) {
 	public Zone {
 		if (id == null || worldKey == null || dimension == null || anchor == null || shape == null || mode == null
-				|| edge == null || anchorType == null) {
-			throw new IllegalArgumentException("zone id, world key, dimension, anchor, shape, mode, edge and anchor type are required");
+				|| edge == null) {
+			throw new IllegalArgumentException("zone id, world key, dimension, anchor, shape, mode and edge are required");
 		}
 		Objects.requireNonNull(sets, "sets");
 	}
 
-	/** A fixed Inside zone with the profile's default edge: the MVP zone. */
+	/** An Inside zone with the profile's default edge: the MVP zone. */
 	public Zone(String id, String name, boolean enabled, String worldKey, String dimension, Point anchor, Shape shape,
 			PlaceSets sets) {
-		this(id, name, enabled, worldKey, dimension, anchor, shape, sets, ZoneMode.INSIDE, ZoneEdge.DEFAULT, AnchorType.FIXED);
+		this(id, name, enabled, worldKey, dimension, anchor, shape, sets, ZoneMode.INSIDE, ZoneEdge.DEFAULT);
 	}
 
 	public Zone withMode(ZoneMode value) {
-		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, value, edge, anchorType);
+		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, value, edge);
 	}
 
 	public Zone withEdge(ZoneEdge value) {
-		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, mode, value, anchorType);
+		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, mode, value);
 	}
 
 	/** The same zone with other attached sets (FR-8.6). */
 	public Zone withSets(PlaceSets value) {
-		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, value, mode, edge, anchorType);
+		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, value, mode, edge);
 	}
 
 	/** The same zone turned on or off. */
 	public Zone withEnabled(boolean value) {
-		return new Zone(id, name, value, worldKey, dimension, anchor, shape, sets, mode, edge, anchorType);
+		return new Zone(id, name, value, worldKey, dimension, anchor, shape, sets, mode, edge);
 	}
 
 	/** The same zone in another world (used when a copied world gets its own profile, FR-11.1). */
 	public Zone withWorldKey(String value) {
-		return new Zone(id, name, enabled, value, dimension, anchor, shape, sets, mode, edge, anchorType);
-	}
-
-	/** The same zone as a personal bubble that follows the local player. */
-	public Zone asBubble() {
-		return new Zone(id, name, enabled, worldKey, dimension, anchor, shape, sets, mode, edge, AnchorType.BUBBLE);
-	}
-
-	public boolean isBubble() {
-		return anchorType == AnchorType.BUBBLE;
+		return new Zone(id, name, enabled, value, dimension, anchor, shape, sets, mode, edge);
 	}
 
 	/**

@@ -2,7 +2,6 @@ package soundsculptor.core.profile;
 
 import static soundsculptor.core.Fixtures.quick;
 
-import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,10 +24,10 @@ class ProfileSummaryTest {
 
 	@Test
 	void rowHasNameKeyCountsAndLastJoined() {
-		// fixed() carries Quick changes; Everywhere and the bubble share one library set, and Everywhere has another.
+		// fixed() carries Quick changes; Everywhere and b1 share one library set, and Everywhere has another.
 		Profile p = new Profile("My server", ProfileSettings.DEFAULTS,
 				quick(List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b"))).attach("set-farm").attach("set-rain"))
-				.withZones(List.of(fixed("z1", new Shape.Sphere(4)), bubble("b1").withSets(PlaceSets.EMPTY.attach("set-farm"))));
+				.withZones(List.of(fixed("z1", new Shape.Cylinder(4, 8)), fixed("b1", new Shape.Box(8, 8, 8)).withSets(PlaceSets.EMPTY.attach("set-farm"))));
 		ProfileSummary row = ProfileSummary.of("play.example.net", p, MONDAY, "play.example.net");
 		assertEquals("My server", row.displayName());
 		assertEquals("play.example.net", row.worldKey());

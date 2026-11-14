@@ -19,11 +19,11 @@ import java.util.Set;
  * FR-11.5a, FR-11.7), for the import dialog to show before anything changes.
  *
  * <ul>
- *   <li>The file's Everywhere sets, personal bubbles and settings replace this profile's.</li>
- *   <li>Fixed zones are imported only if they were made for this server (same world key, ignoring case); one with the
- *       same ID as an existing zone replaces it, so restoring a backup does not duplicate zones. The others are
- *       skipped and counted.</li>
- *   <li>This profile's other fixed zones are kept, and so is its display name.</li>
+ *   <li>The file's Everywhere sets and settings replace this profile's.</li>
+ *   <li>Its zones, which are all fixed (FR-8.1), are imported only if they were made for this server (same world key,
+ *       ignoring case); one with the same ID as an existing zone replaces it, so restoring a backup does not duplicate
+ *       zones. The others are skipped and counted.</li>
+ *   <li>This profile's other zones are kept, and so is its display name.</li>
  *   <li>The Sound Sets in the file are added to the library as {@link SetImportPlan} describes, and the imported places
  *       attach them; an attachment to a set in neither the file nor the library is dropped and counted.</li>
  * </ul>
@@ -36,15 +36,14 @@ import java.util.Set;
  * @param library       the library after the import (unchanged if there is a problem)
  * @param sets          how each set in the file compares with the library, for the dialog
  * @param setCount      sets on Everywhere after the import, Quick changes included
- * @param bubbleCount   personal bubbles imported
  * @param fixedImported fixed zones imported (made for this server)
  * @param fixedSkipped  fixed zones skipped (made for another server)
  * @param setsAdded     sets added to the library
  * @param setsMissing   attachments dropped because the set is in neither the file nor the library
  * @param problem       why the import cannot be done, or null
  */
-public record ImportPlan(Profile result, SetLibrary library, SetImportPlan sets, int setCount, int bubbleCount,
-		int fixedImported, int fixedSkipped, int setsAdded, int setsMissing, Message problem) {
+public record ImportPlan(Profile result, SetLibrary library, SetImportPlan sets, int setCount, int fixedImported,
+		int fixedSkipped, int setsAdded, int setsMissing, Message problem) {
 	/** "%s Sound Sets not found, skipped". */
 	static final String MISSING = "soundsculptor.profile.import.sets_missing";
 	/** "1 Sound Set not found, skipped". */
@@ -86,33 +85,26 @@ public record ImportPlan(Profile result, SetLibrary library, SetImportPlan sets,
 			Map<String, String> names) {
 		String here = currentWorldKey.toLowerCase(Locale.ROOT);
 		List<Zone> imported = new ArrayList<>();
-		int bubbles = 0;
-		int fixedIn = 0;
 		int skipped = 0;
-		Set<String> replacedFixed = new HashSet<>();
+		Set<String> importedIds = new HashSet<>();
 		for (Zone zone : file.profile().zones()) {
-			if (zone.isBubble()) {
+			if (zone.worldKey().toLowerCase(Locale.ROOT).equals(here)) {
 				imported.add(zone);
-				bubbles++;
-			} else if (zone.worldKey().toLowerCase(Locale.ROOT).equals(here)) {
-				imported.add(zone);
-				replacedFixed.add(zone.id());
-				fixedIn++;
+				importedIds.add(zone.id());
 			} else {
 				skipped++;
 			}
 		}
+		int fixedIn = imported.size();
 		// Only the places that are imported attach sets here; skipped zones are left out before the sets are matched.
 		Profile importedPart = file.profile().withZones(imported);
 		SetImportPlan setPlan = SetImportPlan.of(file.sets(), importedPart, lib);
 
 		List<Zone> zones = new ArrayList<>();
 		Map<String, Integer> colors = new LinkedHashMap<>();
-		Set<String> used = new HashSet<>();
 		for (Zone zone : current.zones()) {
-			if (!zone.isBubble() && !replacedFixed.contains(zone.id())) {
+			if (!importedIds.contains(zone.id())) {
 				zones.add(zone);
-				used.add(zone.id());
 				Integer rgb = current.colorOf(zone.id());
 				if (rgb != null) {
 					colors.put(zone.id(), rgb);
@@ -121,53 +113,34 @@ public record ImportPlan(Profile result, SetLibrary library, SetImportPlan sets,
 		}
 		int keptZones = zones.size();
 		if (keptZones + imported.size() > Precedence.MAX_ZONES) {
-			return refused(current, lib, setPlan, importedPart, bubbles, fixedIn, skipped,
+			return refused(current, lib, setPlan, importedPart, fixedIn, skipped,
 					Message.of(ProfileText.IMPORT_TOO_MANY_ZONES, keptZones + imported.size(), Precedence.MAX_ZONES));
 		}
 		// An exact match, a full library or a missing or taken name: nothing changes (FR-11.5a).
 		Message setProblem = setPlan.canApply(lib, names);
 		if (setProblem != null) {
-			return refused(current, lib, setPlan, importedPart, bubbles, fixedIn, skipped, setProblem);
+			return refused(current, lib, setPlan, importedPart, fixedIn, skipped, setProblem);
 		}
 		SetImportPlan.Applied applied = setPlan.apply(importedPart, lib, names);
 		Profile source = applied.profile();
+		// An imported zone with the same ID as one of this profile's has replaced it above, so IDs never clash.
 		for (Zone zone : source.zones()) {
-			String id = freeId(zone.id(), used);
-			used.add(id);
-			zones.add(id.equals(zone.id()) ? zone : withId(zone, id));
+			zones.add(zone);
 			Integer rgb = source.colorOf(zone.id());
 			if (rgb != null) {
-				colors.put(id, rgb);
+				colors.put(zone.id(), rgb);
 			}
 		}
 		Profile result = new Profile(current.name(), source.settings(), source.everywhere(), zones, colors,
 				current.lastJoined(), current.boostConfirmed());
-		return new ImportPlan(result, applied.library(), setPlan, source.everywhere().attached().size(), bubbles, fixedIn,
-				skipped, applied.library().size() - lib.size(), setPlan.missingRefs(), null);
+		return new ImportPlan(result, applied.library(), setPlan, source.everywhere().attached().size(), fixedIn, skipped,
+				applied.library().size() - lib.size(), setPlan.missingRefs(), null);
 	}
 
 	/** Nothing changes; the counts still describe the file. */
 	private static ImportPlan refused(Profile current, SetLibrary lib, SetImportPlan setPlan, Profile importedPart,
-			int bubbles, int fixedIn, int skipped, Message problem) {
-		return new ImportPlan(current, lib, setPlan, importedPart.everywhere().attached().size(), bubbles, fixedIn, skipped, 0,
+			int fixedIn, int skipped, Message problem) {
+		return new ImportPlan(current, lib, setPlan, importedPart.everywhere().attached().size(), fixedIn, skipped, 0,
 				setPlan.missingRefs(), problem);
-	}
-
-	/** {@code id}, or {@code id-2}, {@code id-3}... if it is taken. */
-	static String freeId(String id, Set<String> used) {
-		if (!used.contains(id)) {
-			return id;
-		}
-		for (int n = 2;; n++) {
-			String candidate = id + "-" + n;
-			if (!used.contains(candidate)) {
-				return candidate;
-			}
-		}
-	}
-
-	static Zone withId(Zone z, String id) {
-		return new Zone(id, z.name(), z.enabled(), z.worldKey(), z.dimension(), z.anchor(), z.shape(), z.sets(), z.mode(),
-				z.edge(), z.anchorType());
 	}
 }

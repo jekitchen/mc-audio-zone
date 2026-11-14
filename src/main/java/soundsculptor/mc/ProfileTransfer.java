@@ -205,7 +205,7 @@ public final class ProfileTransfer {
 	/** What the import will do, in the dialog's words. */
 	public static Component planMessage(ImportPlan plan, int warnings) {
 		MutableComponent message = Component.translatable("soundsculptor.transfer.import.replace",
-				ProfileListPanel.setsOnEverywhere(plan.setCount()), ProfileListPanel.bubbles(plan.bubbleCount()));
+				ProfileListPanel.setsOnEverywhere(plan.setCount()));
 		if (plan.setsAdded() > 0) {
 			message.append(" ").append(plan.setsAdded() == 1 ? Component.translatable("soundsculptor.transfer.import.sets_added.one")
 					: Component.translatable("soundsculptor.transfer.import.sets_added", plan.setsAdded()));

@@ -40,8 +40,8 @@ class PrecedenceSetsTest {
 		return place;
 	}
 
-	private static Zone sphere(String id, double x, double radius, PlaceSets sets) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), sets);
+	private static Zone cylinder(String id, double x, double radius, PlaceSets sets) {
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Cylinder(radius, 2 * radius), sets);
 	}
 
 	private static SoundSet set(String id, SetEntry... entries) {
@@ -56,8 +56,8 @@ class PrecedenceSetsTest {
 
 	@Test
 	void p16LinkedSetChangesBothZones() {
-		Zone a = sphere("a", 0, 10, attached(FARM.id()));
-		Zone b = sphere("b", 100, 10, attached(FARM.id()));
+		Zone a = cylinder("a", 0, 10, attached(FARM.id()));
+		Zone b = cylinder("b", 100, 10, attached(FARM.id()));
 		SetLibrary library = new SetLibrary(List.of(FARM));
 		Precedence before = new Precedence(PlaceSets.EMPTY, List.of(a, b), library);
 		assertEquals(30, decide(before, COW, 0).volumePercent(), 1e-6);
@@ -92,14 +92,14 @@ class PrecedenceSetsTest {
 		assertEquals(0, decide(new Precedence(attached("set-g"), List.of(), library), VILLAGER, 0).volumePercent(), 1e-6);
 
 		// P3: the closest anchor wins, whatever the list order.
-		Zone near = sphere("near", 3, 10, attached("set-20"));
-		Zone far = sphere("far", 9, 20, attached("set-80"));
+		Zone near = cylinder("near", 3, 10, attached("set-20"));
+		Zone far = cylinder("far", 9, 20, attached("set-80"));
 		assertEquals(20, decide(new Precedence(PlaceSets.EMPTY, List.of(near, far), library), VILLAGER, 0).volumePercent(), 1e-6);
 		assertEquals(20, decide(new Precedence(PlaceSets.EMPTY, List.of(far, near), library), VILLAGER, 0).volumePercent(), 1e-6);
 
 		// P4: each property comes from the closest zone that sets it.
-		Zone muting = sphere("m", 2, 10, attached("set-m"));
-		Zone limiting = sphere("l", 6, 10, attached("set-l"));
+		Zone muting = cylinder("m", 2, 10, attached("set-m"));
+		Zone limiting = cylinder("l", 6, 10, attached("set-l"));
 		SoundDecision d = decide(new Precedence(PlaceSets.EMPTY, List.of(muting, limiting), library), VILLAGER, 0);
 		assertEquals(0, d.volumePercent(), 1e-6);
 		assertSame(muting, d.loudnessZone());
@@ -108,8 +108,8 @@ class PrecedenceSetsTest {
 		assertEquals("set-l", d.limitSet());
 
 		// P5: a tie on distance goes to the smaller zone.
-		Zone small = sphere("small", 5, 6, attached("set-20"));
-		Zone big = new Zone("big", "big", true, WORLD, OVERWORLD, new Point(0, 5, 0), new Shape.Sphere(10), attached("set-80"));
+		Zone small = cylinder("small", 5, 6, attached("set-20"));
+		Zone big = new Zone("big", "big", true, WORLD, OVERWORLD, new Point(0, 5, 0), new Shape.Cylinder(10, 20), attached("set-80"));
 		assertEquals(20, decide(new Precedence(PlaceSets.EMPTY, List.of(big, small), library), VILLAGER, 0).volumePercent(), 1e-6);
 		assertEquals(20, decide(new Precedence(PlaceSets.EMPTY, List.of(small, big), library), VILLAGER, 0).volumePercent(), 1e-6);
 	}
@@ -118,8 +118,8 @@ class PrecedenceSetsTest {
 	void limiterKeysDifferPerPlaceForSharedSet() {
 		SoundSet limited = set("set-limit", SetEntry.of("e1", COW).withLimit(new Limit(1, 1000, false)));
 		SetLibrary library = new SetLibrary(List.of(limited));
-		Zone a = sphere("a", 0, 10, attached(limited.id()));
-		Zone b = sphere("b", 100, 10, attached(limited.id()));
+		Zone a = cylinder("a", 0, 10, attached(limited.id()));
+		Zone b = cylinder("b", 100, 10, attached(limited.id()));
 		SoundStartDecider decider = new SoundStartDecider(new LastPlays());
 		decider.setProfile(new Precedence(attached(limited.id()), List.of(a, b), library));
 
@@ -148,9 +148,6 @@ class PrecedenceSetsTest {
 		in.worldKey = WORLD;
 		in.dimension = OVERWORLD;
 		in.x = x;
-		in.px = Double.NaN;
-		in.py = Double.NaN;
-		in.pz = Double.NaN;
 		in.range = 16;
 		in.distanceSq = 1;
 		in.nowMs = nowMs;

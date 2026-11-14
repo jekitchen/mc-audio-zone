@@ -35,12 +35,12 @@ public final class M7cClientGameTest implements FabricClientGameTest {
 		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
 			String key = context.computeOnClient(mc -> ProfileManager.key());
-			// A sphere 8 blocks in front of the player, so the screenshot shows it.
+			// A cylinder 8 blocks in front of the player, so the screenshot shows it.
 			Vec3 center = context.computeOnClient(mc -> mc.player.getEyePosition().add(mc.player.getLookAngle().scale(8)));
 			Zone pen = new Zone("z1", "Pen", true, key, "minecraft:overworld", new Point(center.x, center.y, center.z),
-					new Shape.Sphere(4), PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "*villager*").withMute(true))));
+					new Shape.Cylinder(4, 8), PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "*villager*").withMute(true))));
 			Zone nether = new Zone("z2", "Nether pen", true, key, "minecraft:the_nether", new Point(center.x, center.y, center.z),
-					new Shape.Sphere(4), PlaceSets.EMPTY);
+					new Shape.Cylinder(4, 8), PlaceSets.EMPTY);
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(pen, nether)).withZoneColor("z1", 0x56B4E9)));
 
 			// The default is "Only while editing": nothing is drawn while no zone editor is open.
@@ -51,8 +51,8 @@ public final class M7cClientGameTest implements FabricClientGameTest {
 			// FR-10 AC 1: Always: the nearby zone is drawn in its color with its name label; the Nether zone is not.
 			context.runOnClient(mc -> SoundSculptorSettings.setOutlineMode(OutlineMode.ALWAYS));
 			context.waitTicks(FRAMES);
-			int sphereLines = lines(context);
-			check(sphereLines > 0, "Always should draw the zone");
+			int cylinderLines = lines(context);
+			check(cylinderLines > 0, "Always should draw the zone");
 			check(context.computeOnClient(mc -> ZoneOutlines.labelsLastFrame()) == 1, "one label (the Nether zone is not drawn)");
 			context.takeScreenshot("m7c-outline-always");
 
@@ -66,7 +66,7 @@ public final class M7cClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> mc.gui.setScreen(ZoneEditorScreen.edit(new SoundSculptorScreen(), ProfileManager.profile().zone("z1"))));
 			context.waitForScreen(ZoneEditorScreen.class);
 			context.waitTicks(FRAMES);
-			check(lines(context) == sphereLines, "the edited zone should be drawn, was " + lines(context));
+			check(lines(context) == cylinderLines, "the edited zone should be drawn, was " + lines(context));
 			context.runOnClient(mc -> ((ZoneEditorScreen) mc.gui.screen()).setShape(ZoneDraft.ShapeKind.BOX));
 			context.waitTicks(FRAMES);
 			check(lines(context) == 12, "switching to a box in the editor should draw its 12 edges, was " + lines(context));

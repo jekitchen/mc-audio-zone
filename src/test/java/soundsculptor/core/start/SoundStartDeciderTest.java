@@ -55,8 +55,8 @@ class SoundStartDeciderTest {
 		return SoundStartDecider.limiterKey(null, SoundSet.QUICK_ID, entryId);
 	}
 
-	private static Zone sphere(String id, double x, double radius, SetEntry... rules) {
-		return new Zone(id, "Zone " + id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), quick(List.of(rules)));
+	private static Zone cylinder(String id, double x, double radius, SetEntry... rules) {
+		return new Zone(id, "Zone " + id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Cylinder(radius, 2 * radius), quick(List.of(rules)));
 	}
 
 	private void profile(List<SetEntry> global, Zone... zones) {
@@ -165,7 +165,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p1ZoneOverridesGlobalInsideAndNamesTheZone() {
-		Zone a = sphere("a", 0, 10, villagers("z1").withVolume(50));
+		Zone a = cylinder("a", 0, 10, villagers("z1").withVolume(50));
 		profile(List.of(villagers("g1").withMute(true)), a);
 
 		SoundStartResult inside = start(villagerAt(0));
@@ -181,13 +181,13 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p3ClosestAnchorWins() {
-		profile(List.of(), sphere("a", 3, 10, villagers("ra").withVolume(20)), sphere("b", 9, 20, villagers("rb").withVolume(80)));
+		profile(List.of(), cylinder("a", 3, 10, villagers("ra").withVolume(20)), cylinder("b", 9, 20, villagers("rb").withVolume(80)));
 		assertEquals(0.2F, start(villagerAt(0)).factor(), 1e-6);
 	}
 
 	@Test
 	void p6FadeEdgeBlendsTheVolume() {
-		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
+		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Cylinder(10, 20),
 				quick(List.of(SetEntry.of("ra", "*").withMute(true)))).withEdge(ZoneEdge.fade(4));
 		profile(List.of(), a);
 		// 2 blocks inside a 4-block fade: half way.
@@ -196,7 +196,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p10FixedZonesStayInTheirDimension() {
-		profile(List.of(), sphere("a", 0, 10, villagers("ra").withMute(true)));
+		profile(List.of(), cylinder("a", 0, 10, villagers("ra").withMute(true)));
 		SoundStart s = villagerAt(0);
 		s.dimension = NETHER;
 		SoundStartResult r = start(s);
@@ -206,7 +206,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p12ZoneMuteStartsSilentlySoThePerTickLoopCanBringItBack() {
-		profile(List.of(), sphere("a", 0, 10, villagers("ra").withMute(true)));
+		profile(List.of(), cylinder("a", 0, 10, villagers("ra").withMute(true)));
 		SoundStartResult r = start(villagerAt(0));
 		assertEquals(PlayStatus.MUTED, r.status());
 		assertFalse(r.cancel());
@@ -215,7 +215,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void globalMuteStartsSilentlyWhenAZoneInThisWorldCouldOverrideIt() {
-		Zone far = sphere("far", 500, 10, villagers("z1").withVolume(50));
+		Zone far = cylinder("far", 500, 10, villagers("z1").withVolume(50));
 		profile(List.of(villagers("g1").withMute(true)), far);
 		assertFalse(start(villagerAt(0)).cancel());
 
@@ -226,31 +226,23 @@ class SoundStartDeciderTest {
 
 	@Test
 	void globalMuteIsCancelledWhenZonesOnlySetOtherProperties() {
-		profile(List.of(villagers("g1").withMute(true)), sphere("a", 0, 10, villagers("z1").withCue(true)));
+		profile(List.of(villagers("g1").withMute(true)), cylinder("a", 0, 10, villagers("z1").withCue(true)));
 		assertTrue(start(villagerAt(0)).cancel());
 	}
 
 	@Test
 	void globalMuteOfANonPositionalSoundIsCancelled() {
-		profile(List.of(villagers("g1").withMute(true)), sphere("a", 0, 10, villagers("z1").withVolume(50)));
+		profile(List.of(villagers("g1").withMute(true)), cylinder("a", 0, 10, villagers("z1").withVolume(50)));
 		SoundStart s = villagerAt(0);
 		s.positional = false;
 		s.range = Float.POSITIVE_INFINITY;
 		assertTrue(start(s).cancel(), "zones never apply to non-positional sounds");
 	}
 
-	@Test
-	void bubblesCanOverrideAGlobalMuteAnywhere() {
-		Zone bubble = sphere("b", 0, 10, villagers("z1").withVolume(50)).asBubble();
-		profile(List.of(villagers("g1").withMute(true)), bubble);
-		SoundStart s = villagerAt(100);
-		s.dimension = NETHER;
-		assertFalse(start(s).cancel());
-	}
 
 	@Test
 	void disabledZonesNeverOverride() {
-		Zone a = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
+		Zone a = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Cylinder(10, 20),
 				quick(List.of(villagers("z1").withVolume(50))));
 		profile(List.of(villagers("g1").withMute(true)), a);
 		assertTrue(start(villagerAt(0)).cancel());
@@ -278,7 +270,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p8CueOnlyZoneKeepsTheGlobalBoost() {
-		profile(List.of(villagers("g1").withVolume(150)), sphere("a", 0, 10, villagers("z1").withCue(true)));
+		profile(List.of(villagers("g1").withVolume(150)), cylinder("a", 0, 10, villagers("z1").withCue(true)));
 		assertEquals(1.5F, start(villagerAt(0)).factor(), 1e-6);
 	}
 
@@ -327,8 +319,8 @@ class SoundStartDeciderTest {
 
 	@Test
 	void p4MutedWithLimitFromAnotherZone() {
-		Zone a = sphere("a", 2, 10, villagers("ra").withMute(true).withCue(true));
-		Zone b = sphere("b", 6, 10, villagers("rb").withLimit(TWO_PER_SECOND));
+		Zone a = cylinder("a", 2, 10, villagers("ra").withMute(true).withCue(true));
+		Zone b = cylinder("b", 6, 10, villagers("rb").withLimit(TWO_PER_SECOND));
 		profile(List.of(), a, b);
 		assertEquals(PlayStatus.MUTED, start(villagerAt(0), 1_000).status());
 		assertTrue(out.cue());
@@ -343,7 +335,7 @@ class SoundStartDeciderTest {
 	void zoneLimitWinsInsideTheZone() {
 		// FR-6 AC: global limit 5/s, zone limit 1/s on the same sound: inside the zone, at most 1 per second plays.
 		profile(List.of(villagers("g1").withLimit(new Limit(5, 1000, false))),
-				sphere("a", 0, 10, villagers("z1").withLimit(new Limit(1, 1000, false))));
+				cylinder("a", 0, 10, villagers("z1").withLimit(new Limit(1, 1000, false))));
 		int played = 0;
 		for (int i = 0; i < 10; i++) {
 			if (start(villagerAt(0), 1_000 + i * 50).status() != PlayStatus.LIMITED) {
@@ -357,7 +349,7 @@ class SoundStartDeciderTest {
 	void globalAndZoneRulesWithTheSameIdHaveTheirOwnCounters() {
 		// SetEntry IDs are unique within one list only, so a global "r1" and zone a's "r1" are different rules (FR-6.7).
 		SetEntry global = SetEntry.of("r1", "minecraft:entity.cow.*").withLimit(new Limit(1, 1000, false));
-		Zone a = sphere("a", 0, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
+		Zone a = cylinder("a", 0, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
 		profile(List.of(global), a);
 
 		SoundStart cow = villagerAt(100); // outside the zone: the global rule decides
@@ -396,8 +388,8 @@ class SoundStartDeciderTest {
 
 	@Test
 	void twoZonesWithTheSameRuleIdHaveTheirOwnCounters() {
-		Zone a = sphere("a", 0, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
-		Zone b = sphere("b", 100, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
+		Zone a = cylinder("a", 0, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
+		Zone b = cylinder("b", 100, 10, villagers("r1").withLimit(new Limit(1, 1000, false)));
 		profile(List.of(), a, b);
 		assertEquals(PlayStatus.PLAYING, start(villagerAt(0), 1_000).status());
 		assertEquals(PlayStatus.PLAYING, start(villagerAt(100), 1_001).status());
@@ -485,7 +477,7 @@ class SoundStartDeciderTest {
 
 	@Test
 	void fullyFadedZoneMuteShowsACueButAPartlyFadedOneDoesNot() {
-		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Sphere(10),
+		Zone a = new Zone("a", "A", true, WORLD, OVERWORLD, new Point(0, 0, 0), new Shape.Cylinder(10, 20),
 				quick(List.of(villagers("z1").withMute(true).withCue(true)))).withEdge(ZoneEdge.fade(4));
 		profile(List.of(), a);
 		assertTrue(start(villagerAt(0)).cue(), "full weight at the centre: volume 0");
@@ -498,15 +490,11 @@ class SoundStartDeciderTest {
 	void theLastPlayIsRecordedForTheTrace() {
 		profile(List.of(villagers("g1").withVolume(60)));
 		SoundStart s = villagerAt(1);
-		s.px = 2;
-		s.py = 3;
-		s.pz = 4;
 		start(s);
 		LastPlay play = lastPlays.get(VILLAGER);
 		assertNotNull(play);
 		assertEquals(60, play.volumePercent(), 1e-6);
 		assertEquals(1, play.x(), 1e-9);
-		assertEquals(2, play.px(), 1e-9);
 		assertEquals(WORLD, play.worldKey());
 		assertFalse(play.dropped());
 		assertFalse(play.cueShown());

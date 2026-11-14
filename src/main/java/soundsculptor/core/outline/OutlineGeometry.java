@@ -10,14 +10,12 @@ import soundsculptor.core.zones.ZoneMode;
  * Builds the line segments for a zone's outline (PRD FR-10.2, FR-10.3):
  * <ul>
  *   <li>box: its 12 edges;</li>
- *   <li>sphere: three great circles, one in each axis plane through the anchor;</li>
  *   <li>cylinder: top and bottom circles plus four vertical lines.</li>
  * </ul>
  * Outside zones are marked dashed. A fade zone gets an inner outline where the fade reaches full strength: the shape
  * shrunk by the fade distance for Inside zones, grown by it for Outside zones.
  *
- * <p>Build once per zone and cache: outlines only change when the zone is edited. A personal bubble's outline is
- * rebuilt around the player while its editor is open.
+ * <p>Build once per zone and cache: outlines only change when the zone is edited.
  */
 public final class OutlineGeometry {
 	/** Segments per circle for small shapes, so they still look round. */
@@ -28,17 +26,14 @@ public final class OutlineGeometry {
 	private OutlineGeometry() {
 	}
 
-	/** The outline at the zone's own anchor, with a hard profile default edge. */
+	/** The outline with a hard profile default edge. */
 	public static Outline of(Zone zone) {
-		return of(zone, ZoneEdge.hard(), null);
+		return of(zone, ZoneEdge.hard());
 	}
 
-	/**
-	 * @param profileEdge the profile's default edge, for zones whose edge is {@link ZoneEdge#DEFAULT}
-	 * @param anchor      where to draw it: the player's eye position for a bubble; {@code null} for the zone's anchor
-	 */
-	public static Outline of(Zone zone, ZoneEdge profileEdge, Point anchor) {
-		Point a = anchor != null ? anchor : zone.anchor();
+	/** @param profileEdge the profile's default edge, for zones whose edge is {@link ZoneEdge#DEFAULT} */
+	public static Outline of(Zone zone, ZoneEdge profileEdge) {
+		Point a = zone.anchor();
 		boolean dashed = zone.mode() == ZoneMode.OUTSIDE;
 		ZoneEdge edge = zone.edge().mode() == ZoneEdge.Mode.DEFAULT ? profileEdge : zone.edge();
 		Outline inner = null;
@@ -61,7 +56,6 @@ public final class OutlineGeometry {
 				double hz = b.depth() / 2 + grow;
 				yield hx > 0 && hy > 0 && hz > 0 ? box(a, hx, hy, hz) : null;
 			}
-			case Shape.Sphere s -> s.radius() + grow > 0 ? sphere(a, s.radius() + grow) : null;
 			case Shape.Cylinder c -> {
 				double r = c.radius() + grow;
 				double hh = c.height() / 2 + grow;
@@ -96,21 +90,12 @@ public final class OutlineGeometry {
 		};
 	}
 
-	private static double[] sphere(Point a, double r) {
-		int n = circleSegments(r);
-		double[] coords = new double[3 * n * 6];
-		int k = 0;
-		for (int plane = 0; plane < 3; plane++) {
-			k = circle(coords, k, a, plane, r, 0, n);
-		}
-		return coords;
-	}
 
 	private static double[] cylinder(Point a, double r, double halfHeight) {
 		int n = circleSegments(r);
 		double[] coords = new double[(2 * n + 4) * 6];
-		int k = circle(coords, 0, a, 1, r, -halfHeight, n);
-		k = circle(coords, k, a, 1, r, halfHeight, n);
+		int k = circle(coords, 0, a, r, -halfHeight, n);
+		k = circle(coords, k, a, r, halfHeight, n);
 		double[][] sides = {{r, 0}, {0, r}, {-r, 0}, {0, -r}};
 		for (double[] s : sides) {
 			coords[k++] = a.x() + s[0];
@@ -128,39 +113,23 @@ public final class OutlineGeometry {
 	}
 
 	/**
-	 * Writes a closed circle of {@code n} segments in plane 0 (XY), 1 (XZ) or 2 (YZ) around the anchor, shifted by
-	 * {@code offset} along the plane's normal (used for cylinder tops and bottoms).
+	 * Writes a closed horizontal circle of {@code n} segments around the anchor, {@code dy} above it (a cylinder's top
+	 * or bottom).
 	 */
-	private static int circle(double[] coords, int k, Point a, int plane, double r, double offset, int n) {
+	private static int circle(double[] coords, int k, Point a, double r, double dy, int n) {
 		for (int i = 0; i < n; i++) {
 			int j = (i + 1) % n; // closes the circle on the exact first point
-			k = put(coords, k, a, plane, r, i, n, offset);
-			k = put(coords, k, a, plane, r, j, n, offset);
+			k = put(coords, k, a, r, i, n, dy);
+			k = put(coords, k, a, r, j, n, dy);
 		}
 		return k;
 	}
 
-	private static int put(double[] coords, int k, Point a, int plane, double r, int step, int n, double offset) {
+	private static int put(double[] coords, int k, Point a, double r, int step, int n, double dy) {
 		double angle = 2 * Math.PI * step / n;
-		double u = Math.cos(angle) * r;
-		double v = Math.sin(angle) * r;
-		switch (plane) {
-			case 0 -> {
-				coords[k] = a.x() + u;
-				coords[k + 1] = a.y() + v;
-				coords[k + 2] = a.z() + offset;
-			}
-			case 1 -> {
-				coords[k] = a.x() + u;
-				coords[k + 1] = a.y() + offset;
-				coords[k + 2] = a.z() + v;
-			}
-			default -> {
-				coords[k] = a.x() + offset;
-				coords[k + 1] = a.y() + u;
-				coords[k + 2] = a.z() + v;
-			}
-		}
+		coords[k] = a.x() + Math.cos(angle) * r;
+		coords[k + 1] = a.y() + dy;
+		coords[k + 2] = a.z() + Math.sin(angle) * r;
 		return k + 3;
 	}
 }

@@ -168,7 +168,7 @@ public final class UiKitDemoScreen extends SculptScreen {
 					lastAction = "Sort: " + value;
 				}), "sort");
 		applyToDropdown = tip(new SculptDropdown<>(160, Component.translatable("soundsculptor.demo.apply_to"),
-				List.of("Global", "Trading hall", "Build bubble"), Component::literal, applyTo, value -> {
+				List.of("Global", "Trading hall", "Build site"), Component::literal, applyTo, value -> {
 					applyTo = value;
 					lastAction = "Apply to: " + value;
 				}), "apply_to");

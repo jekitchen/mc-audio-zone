@@ -15,7 +15,7 @@ import soundsculptor.core.zones.ZoneMode;
 
 import org.junit.jupiter.api.Test;
 
-/** PRD FR-10.2 and FR-10.3 for v1 zones: cylinder, dashed Outside lines, inner fade line, bubbles. */
+/** PRD FR-10.2 and FR-10.3 for v1 zones: cylinder, dashed Outside lines, inner fade line. */
 class OutlineFullZonesTest {
 	private static final String WORLD = "w";
 	private static final String OVERWORLD = "minecraft:overworld";
@@ -46,28 +46,30 @@ class OutlineFullZonesTest {
 
 	@Test
 	void outsideZonesUseDashedLinesInsideZonesSolid() {
-		assertFalse(OutlineGeometry.of(zone(new Shape.Sphere(5))).dashed());
-		assertTrue(OutlineGeometry.of(zone(new Shape.Sphere(5)).withMode(ZoneMode.OUTSIDE)).dashed());
+		assertFalse(OutlineGeometry.of(zone(new Shape.Cylinder(5, 10))).dashed());
+		assertTrue(OutlineGeometry.of(zone(new Shape.Cylinder(5, 10)).withMode(ZoneMode.OUTSIDE)).dashed());
 	}
 
 	@Test
 	void hardEdgedZonesHaveNoInnerLine() {
-		assertNull(OutlineGeometry.of(zone(new Shape.Sphere(10)).withEdge(HARD), HARD, null).inner());
+		assertNull(OutlineGeometry.of(zone(new Shape.Cylinder(10, 20)).withEdge(HARD), HARD).inner());
 	}
 
 	@Test
 	void insideFadeDrawsAFainterLineWhereTheFadeReachesFullStrength() {
-		Outline o = OutlineGeometry.of(zone(new Shape.Sphere(10)).withEdge(ZoneEdge.fade(4)), HARD, null);
+		Outline o = OutlineGeometry.of(zone(new Shape.Cylinder(10, 20)).withEdge(ZoneEdge.fade(4)), HARD);
 		Outline inner = o.inner();
 		assertNotNull(inner);
+		// The cylinder shrunk by the fade distance: radius 6, from 6 below the anchor to 6 above it.
 		for (int i = 0; i < inner.segmentCount(); i++) {
-			assertEquals(6, Math.sqrt(inner.x1(i) * inner.x1(i) + (inner.y1(i) - 64) * (inner.y1(i) - 64) + inner.z1(i) * inner.z1(i)), 1e-9);
+			assertEquals(6, Math.hypot(inner.x1(i), inner.z1(i)), 1e-9);
+			assertEquals(6, Math.abs(inner.y1(i) - 64), 1e-9);
 		}
 	}
 
 	@Test
 	void outsideFadeLineIsOutsideTheShape() {
-		Outline o = OutlineGeometry.of(zone(new Shape.Box(10, 10, 10)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(2)), HARD, null);
+		Outline o = OutlineGeometry.of(zone(new Shape.Box(10, 10, 10)).withMode(ZoneMode.OUTSIDE).withEdge(ZoneEdge.fade(2)), HARD);
 		double maxX = 0;
 		for (int i = 0; i < o.inner().segmentCount(); i++) {
 			maxX = Math.max(maxX, Math.abs(o.inner().x1(i)));
@@ -79,34 +81,13 @@ class OutlineFullZonesTest {
 	@Test
 	void defaultEdgeUsesTheProfileEdgeForTheInnerLine() {
 		Zone z = zone(new Shape.Cylinder(10, 20));
-		assertNull(OutlineGeometry.of(z, HARD, null).inner());
-		assertNotNull(OutlineGeometry.of(z, ZoneEdge.fade(4), null).inner());
+		assertNull(OutlineGeometry.of(z, HARD).inner());
+		assertNotNull(OutlineGeometry.of(z, ZoneEdge.fade(4)).inner());
 	}
 
 	@Test
 	void fadeDeeperThanTheShapeHasNoInnerLine() {
-		assertNull(OutlineGeometry.of(zone(new Shape.Sphere(3)).withEdge(ZoneEdge.fade(4)), HARD, null).inner());
-	}
-
-	@Test
-	void bubbleOutlineIsDrawnAroundTheGivenPlayerPosition() {
-		Zone bubble = zone(new Shape.Sphere(8)).asBubble();
-		Outline o = OutlineGeometry.of(bubble, HARD, new Point(100, 70, -20));
-		for (int i = 0; i < o.segmentCount(); i++) {
-			double dx = o.x1(i) - 100;
-			double dy = o.y1(i) - 70;
-			double dz = o.z1(i) + 20;
-			assertEquals(8, Math.sqrt(dx * dx + dy * dy + dz * dz), 1e-9);
-		}
-	}
-
-	@Test
-	void bubbleIsDrawnOnlyWhileBeingEdited() {
-		Zone bubble = zone(new Shape.Sphere(8)).asBubble();
-		assertFalse(OutlineVisibility.shouldDraw(bubble, OutlineMode.ALWAYS, null, WORLD, OVERWORLD, 0, 64, 0));
-		assertTrue(OutlineVisibility.shouldDraw(bubble, OutlineMode.ALWAYS, "z", "any.server", "minecraft:the_end", 0, 0, 0));
-		assertTrue(OutlineVisibility.shouldDraw(bubble, OutlineMode.EDITING, "z", WORLD, OVERWORLD, 0, 0, 0));
-		assertFalse(OutlineVisibility.shouldDraw(bubble, OutlineMode.NEVER, "z", WORLD, OVERWORLD, 0, 0, 0));
+		assertNull(OutlineGeometry.of(zone(new Shape.Cylinder(3, 6)).withEdge(ZoneEdge.fade(4)), HARD).inner());
 	}
 
 	@Test

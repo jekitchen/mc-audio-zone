@@ -32,13 +32,6 @@ class ShapeDistanceTest {
 
 	// --- Depth inside (for Inside-mode fade) ---
 
-	@Test
-	void sphereDepthIsDistanceToTheSurface() {
-		Shape s = new Shape.Sphere(10);
-		assertEquals(10, s.depthInside(0, 0, 0), 1e-9);
-		assertEquals(2, s.depthInside(8, 0, 0), 1e-9);
-		assertEquals(0, s.depthInside(12, 0, 0), 1e-9, "outside has no depth");
-	}
 
 	@Test
 	void boxDepthIsDistanceToTheNearestFace() {
@@ -59,12 +52,6 @@ class ShapeDistanceTest {
 
 	// --- Distance outside (for Outside-mode fade and outline culling) ---
 
-	@Test
-	void sphereDistanceOutside() {
-		Shape s = new Shape.Sphere(10);
-		assertEquals(5, s.distanceOutside(15, 0, 0), 1e-9);
-		assertEquals(0, s.distanceOutside(3, 0, 0), 1e-9, "inside is 0");
-	}
 
 	@Test
 	void boxDistanceOutsideMeasuresToTheNearestPoint() {

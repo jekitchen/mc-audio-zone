@@ -35,15 +35,15 @@ import net.minecraft.world.phys.Vec3;
  * The zone editor (PRD 6.1 Zones, FR-8 MVP, FR-10.4): name, on/off, color, the center with "My position" and "Block
  * I'm looking at" (FR-8.1), and the box's size (FR-8.3), drawn by marking two corners in the world or moved one side at
  * a time (M8 review). The zone's attached Sound Sets are edited on their own screen ("Sound Sets…", FR-8.6). Save and Cancel with the unsaved-changes dialog (FR-12.4), errors under the fields that
- * disable Save (FR-12.7). Outside mode, fade edges, cylinders and personal bubbles arrive in M13; a zone's existing
- * settings for them are kept.
+ * disable Save (FR-12.7). Outside mode, fade edges and cylinders arrive in M13; a zone's existing settings for them
+ * are kept.
  */
 public final class ZoneEditorScreen extends SculptScreen {
 	private static final int NAME_WIDTH = 200;
 	private static final int ENABLED_WIDTH = 100;
 	private static final int COORD_WIDTH = 60;
 	private static final int SIZE_WIDTH = 50;
-	private static final int SHAPE_WIDTH = 130;
+	private static final int SHAPE_WIDTH = 170;
 	private static final int POSITION_WIDTH = 90;
 	private static final int MARK_WIDTH = 110;
 	private static final int SIDE_WIDTH = 140;
@@ -209,7 +209,7 @@ public final class ZoneEditorScreen extends SculptScreen {
 					() -> moveSide(1)), Component.translatable("soundsculptor.zone_editor.grow.tip"));
 			body.row(sideDropdown, shrinkButton, growButton);
 		} else {
-			// A sphere or cylinder from an older profile or a later version keeps its shape, and can become a box.
+			// A cylinder (v1) keeps its shape, and can become a box.
 			shapeDropdown = Tooltips.describe(new SculptDropdown<>(SHAPE_WIDTH, Component.translatable("soundsculptor.zone_editor.shape"),
 					List.of(draft.shape(), ShapeKind.BOX),
 					shape -> Component.translatable("soundsculptor.zone_editor.shape." + shape.name().toLowerCase(Locale.ROOT)),

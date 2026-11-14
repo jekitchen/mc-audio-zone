@@ -46,15 +46,14 @@ class StressProfileTest {
 
 	@Test
 	void hasTheMaximumSixtyFourZonesOfEveryKind() {
-		// PRD 11.2: spheres, boxes, cylinders, some fade, some Outside; plus personal bubbles.
+		// PRD 11.2: boxes, cylinders, some fade, some Outside.
 		List<Zone> zones = StressProfile.zones(WORLD, OVERWORLD);
 		assertEquals(Precedence.MAX_ZONES, zones.size());
-		assertTrue(zones.stream().anyMatch(z -> z.shape() instanceof Shape.Sphere));
 		assertTrue(zones.stream().anyMatch(z -> z.shape() instanceof Shape.Box));
 		assertTrue(zones.stream().anyMatch(z -> z.shape() instanceof Shape.Cylinder));
 		assertTrue(zones.stream().anyMatch(z -> z.mode() == ZoneMode.OUTSIDE));
 		assertTrue(zones.stream().anyMatch(z -> z.edge().mode() == ZoneEdge.Mode.FADE));
-		assertTrue(zones.stream().anyMatch(Zone::isBubble));
+		assertTrue(zones.stream().anyMatch(z -> z.anchor().equals(StressProfile.PLAYER)), "zones centred on the player");
 	}
 
 	@Test
@@ -135,7 +134,7 @@ class StressProfileTest {
 	void everyZoneAffectsThePenCentre() {
 		// The pen is 9 x 9 blocks around (0, 64, 0), with the player standing in it.
 		for (Zone z : StressProfile.zones(WORLD, OVERWORLD)) {
-			Point a = z.isBubble() ? StressProfile.PLAYER : z.anchor();
+			Point a = z.anchor();
 			double w = z.weight(-a.x(), StressProfile.PEN_Y - a.y(), -a.z(), ZoneEdge.hard());
 			assertTrue(w > 0, z.id() + " weight " + w);
 		}

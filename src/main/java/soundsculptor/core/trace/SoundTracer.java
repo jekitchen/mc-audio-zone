@@ -71,21 +71,10 @@ public final class SoundTracer {
 			List<Zone> zones = p.zones();
 			for (int i = 0; i < zones.size(); i++) {
 				Zone zone = zones.get(i);
-				if (!zone.enabled()) {
+				if (!zone.enabled() || !play.worldKey().equals(zone.worldKey()) || !play.dimension().equals(zone.dimension())) {
 					continue;
 				}
-				Point a;
-				if (zone.isBubble()) {
-					if (Double.isNaN(play.px())) {
-						continue;
-					}
-					a = new Point(play.px(), play.py(), play.pz());
-				} else {
-					if (!play.worldKey().equals(zone.worldKey()) || !play.dimension().equals(zone.dimension())) {
-						continue;
-					}
-					a = zone.anchor();
-				}
+				Point a = zone.anchor();
 				double dx = play.x() - a.x();
 				double dy = play.y() - a.y();
 				double dz = play.z() - a.z();
@@ -108,8 +97,7 @@ public final class SoundTracer {
 
 		SoundDecision d = new SoundDecision();
 		if (play != null) {
-			p.decide(soundId, play.positional(), play.worldKey(), play.dimension(), play.x(), play.y(), play.z(), play.px(),
-					play.py(), play.pz(), d);
+			p.decide(soundId, play.positional(), play.worldKey(), play.dimension(), play.x(), play.y(), play.z(), d);
 		} else {
 			p.decide(soundId, false, "", "", 0, 0, 0, d);
 		}

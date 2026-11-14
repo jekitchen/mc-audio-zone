@@ -15,11 +15,11 @@ import soundsculptor.core.sets.SetLibrary;
  * Combines Everywhere and the zones into one decision per sound (PRD FR-9), separately for loudness, limit and cue:
  * <ol>
  *   <li>Resolve Everywhere's attached Sound Sets for the sound ID (FR-4.5).</li>
- *   <li>Collect zones whose weight {@code w} for the sound is above 0 ({@link Zone#weight}): fixed zones only in their
- *       own world and dimension, personal bubbles wherever the player is. Non-positional sounds skip zones.</li>
+ *   <li>Collect zones in the sound's world and dimension whose weight {@code w} for the sound is above 0
+ *       ({@link Zone#weight}). Non-positional sounds skip zones.</li>
  *   <li>A zone takes part for a property only if an entry in its attached sets sets it.</li>
  *   <li>Among those, the zone whose anchor is closest to the sound wins. Outside zones are measured from their centre
- *       too; a bubble's anchor is the player.</li>
+ *       too.</li>
  *   <li>Anchors within 0.01 blocks of the same distance tie: the smaller shape wins, then the zone higher in the list.</li>
  *   <li>Volume blends {@code everywhere + (zone - everywhere) × w}; limit and cue use the zone when {@code w ≥ 0.5}.</li>
  *   <li>A property nothing sets keeps vanilla behavior (100%, no limit, cue off).</li>
@@ -53,12 +53,11 @@ public final class Precedence {
 	private final ZoneEdge profileEdge;
 	/**
 	 * Per zone, in flat arrays so the per-sound loop reads them together instead of following references (zone,
-	 * anchor, shape): on/off, bubble, Inside mode, the fixed anchor and the shape's half-size on each axis. An Inside
-	 * zone has weight 0 outside its shape, so a sound beyond the half-size on any axis is rejected without the exact
-	 * test (PRD 7.4: "a cheap axis-aligned bounding-box test before the exact sphere or cylinder test").
+	 * anchor, shape): on/off, Inside mode, the anchor and the shape's half-size on each axis. An Inside zone has weight
+	 * 0 outside its shape, so a sound beyond the half-size on any axis is rejected without the exact test (PRD 7.4: "a
+	 * cheap axis-aligned bounding-box test before the exact cylinder test").
 	 */
 	private final boolean[] enabled;
-	private final boolean[] bubble;
 	private final boolean[] inside;
 	private final double[] ax;
 	private final double[] ay;
@@ -73,7 +72,7 @@ public final class Precedence {
 	 * like the resolvers' own caches, because servers can send arbitrary IDs.
 	 */
 	private final Map<String, EntryResolution[]> rows = new ConcurrentHashMap<>();
-	/** Which zones are fixed in the last world and dimension decided (bubbles are always "here"). */
+	/** Which zones are in the last world and dimension decided. */
 	private String hereWorldKey;
 	private String hereDimension;
 	private boolean[] here = new boolean[0];
@@ -101,7 +100,6 @@ public final class Precedence {
 		int n = this.zones.length;
 		this.volumes = new double[n];
 		this.enabled = new boolean[n];
-		this.bubble = new boolean[n];
 		this.inside = new boolean[n];
 		this.ax = new double[n];
 		this.ay = new double[n];
@@ -115,17 +113,11 @@ public final class Precedence {
 			zoneResolvers[i] = EntryResolver.forPlace(zone.sets(), library, zoneCaches);
 			volumes[i] = zone.shape().volume();
 			enabled[i] = zone.enabled();
-			bubble[i] = zone.isBubble();
 			inside[i] = zone.mode() == ZoneMode.INSIDE;
 			ax[i] = zone.anchor().x();
 			ay[i] = zone.anchor().y();
 			az[i] = zone.anchor().z();
 			switch (zone.shape()) {
-				case Shape.Sphere sphere -> {
-					hx[i] = sphere.radius();
-					hy[i] = sphere.radius();
-					hz[i] = sphere.radius();
-				}
 				case Shape.Box box -> {
 					hx[i] = box.width() / 2;
 					hy[i] = box.height() / 2;
@@ -140,24 +132,16 @@ public final class Precedence {
 		}
 	}
 
-	/** {@link #decide(String, boolean, String, String, double, double, double, double, double, double, SoundDecision)}
-	 * without a player position: personal bubbles are skipped. */
-	public void decide(String soundId, boolean positional, String worldKey, String dimension, double x, double y, double z,
-			SoundDecision out) {
-		decide(soundId, positional, worldKey, dimension, x, y, z, Double.NaN, Double.NaN, Double.NaN, out);
-	}
-
 	/**
 	 * Decides one sound and writes the result into {@code out}.
 	 *
 	 * @param positional whether the sound has a world position (PRD section 5); zones never apply otherwise
 	 * @param worldKey   the current server or world (FR-11.1)
 	 * @param dimension  the current dimension, e.g. {@code minecraft:overworld}
-	 * @param px         the local player's eye position, the anchor of personal bubbles; {@code NaN} skips bubbles
 	 */
 	public void decide(String soundId, boolean positional, String worldKey, String dimension, double x, double y, double z,
-			double px, double py, double pz, SoundDecision out) {
-		decide(soundId, null, positional, worldKey, dimension, x, y, z, px, py, pz, out);
+			SoundDecision out) {
+		decide(soundId, null, positional, worldKey, dimension, x, y, z, out);
 	}
 
 	/** The cached resolutions of every list for this sound ID; computed on first sight. */
@@ -176,7 +160,7 @@ public final class Precedence {
 	}
 
 	/**
-	 * Which zones are fixed in this world and dimension. Recomputed only when they change, so the per-sound loop does
+	 * Which zones are in this world and dimension. Recomputed only when they change, so the per-sound loop does
 	 * not compare strings for every zone. Not thread-safe beyond the game thread, like the rest of the hot path.
 	 */
 	private boolean[] here(String worldKey, String dimension) {
@@ -207,16 +191,16 @@ public final class Precedence {
 	}
 
 	/**
-	 * The same decision as {@link #decide(String, boolean, String, String, double, double, double, double, double,
-	 * double, SoundDecision)}, from resolutions {@link #resolve} filled for this snapshot. Skips the per-ID lookups.
+	 * The same decision as {@link #decide(String, boolean, String, String, double, double, double, SoundDecision)},
+	 * from resolutions {@link #resolve} filled for this snapshot. Skips the per-ID lookups.
 	 */
 	public void decideResolved(EntryResolution[] resolved, boolean positional, String worldKey, String dimension,
-			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
-		decide(null, resolved, positional, worldKey, dimension, x, y, z, px, py, pz, out);
+			double x, double y, double z, SoundDecision out) {
+		decide(null, resolved, positional, worldKey, dimension, x, y, z, out);
 	}
 
 	private void decide(String soundId, EntryResolution[] resolved, boolean positional, String worldKey, String dimension,
-			double x, double y, double z, double px, double py, double pz, SoundDecision out) {
+			double x, double y, double z, SoundDecision out) {
 		out.reset();
 		if (resolved == null) {
 			resolved = row(soundId);
@@ -239,30 +223,15 @@ public final class Precedence {
 
 		if (positional) {
 			for (int i = 0; i < zones.length; i++) {
-				if (!enabled[i]) {
+				if (!enabled[i] || !inThisWorld[i]) {
 					continue;
 				}
 				if (resolved[i + 1] == EntryResolution.NONE) {
 					continue; // nothing in this zone matches the sound: skip the geometry (same result, it is skipped below)
 				}
-				double dx;
-				double dy;
-				double dz;
-				if (bubble[i]) {
-					if (Double.isNaN(px)) {
-						continue;
-					}
-					dx = x - px;
-					dy = y - py;
-					dz = z - pz;
-				} else {
-					if (!inThisWorld[i]) {
-						continue;
-					}
-					dx = x - ax[i];
-					dy = y - ay[i];
-					dz = z - az[i];
-				}
+				double dx = x - ax[i];
+				double dy = y - ay[i];
+				double dz = z - az[i];
 				if (inside[i] && (Math.abs(dx) > hx[i] || Math.abs(dy) > hy[i] || Math.abs(dz) > hz[i])) {
 					continue; // outside the shape's bounding box: an Inside zone's weight is 0 there
 				}
@@ -326,9 +295,8 @@ public final class Precedence {
 
 	/**
 	 * Whether any zone could set this sound's loudness while it plays (FR-8.8): an enabled zone with an entry that sets
-	 * mute or level for {@code soundId}, that is either a personal bubble or a fixed zone in this world and dimension.
-	 * A sound muted at start must still get a channel if so, so the per-tick loop can make it audible when the source
-	 * or the player moves (matrix case P12). Allocates nothing once each sound ID has been seen.
+	 * mute or level for {@code soundId}, in this world and dimension. A sound muted at start must still get a channel
+	 * if so, so the per-tick loop can make it audible when the source moves (matrix case P12). Allocates nothing once each sound ID has been seen.
 	 */
 	public boolean anyZoneCouldSetLoudness(String soundId, String worldKey, String dimension) {
 		for (int i = 0; i < zones.length; i++) {
@@ -336,7 +304,7 @@ public final class Precedence {
 			if (!zone.enabled()) {
 				continue;
 			}
-			if (!zone.isBubble() && (!worldKey.equals(zone.worldKey()) || !dimension.equals(zone.dimension()))) {
+			if (!worldKey.equals(zone.worldKey()) || !dimension.equals(zone.dimension())) {
 				continue;
 			}
 			if (zoneResolvers[i].resolve(soundId).loudness() != null) {
@@ -374,7 +342,7 @@ public final class Precedence {
 	public long estimatedBytes() {
 		long bytes = MemoryEstimate.object(5 * MemoryEstimate.REFERENCE)
 				+ MemoryEstimate.array(MemoryEstimate.REFERENCE, zoneResolvers.length) + MemoryEstimate.array(8, volumes.length)
-				+ 6 * MemoryEstimate.array(8, ax.length) + 4 * MemoryEstimate.array(1, enabled.length)
+				+ 6 * MemoryEstimate.array(8, ax.length) + 3 * MemoryEstimate.array(1, enabled.length)
 				+ MemoryEstimate.CONCURRENT_HASH_MAP + MemoryEstimate.hashTable(rows.size())
 				+ rows.size() * (MemoryEstimate.HASH_NODE + MemoryEstimate.array(MemoryEstimate.REFERENCE, zones.length + 1))
 				+ everywhere.estimatedBytes();

@@ -51,7 +51,7 @@ class QuickChangesTest {
 
 	private static Zone pen(PlaceSets sets) {
 		return new Zone("pen", "Pen", true, "play.example.net", "minecraft:overworld", new Point(0, 64, 0),
-				new Shape.Sphere(10), sets);
+				new Shape.Cylinder(10, 20), sets);
 	}
 
 	private static Workspace ws(PlaceSets everywhere, PlaceSets pen, SoundSet... library) {
