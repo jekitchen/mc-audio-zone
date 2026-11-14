@@ -51,7 +51,7 @@ public final class ZoneListPanel {
 		newZoneButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.zones.new"),
 				() -> setScreen(ZoneEditorScreen.create(host))), Component.translatable("soundsculptor.zones.new.tip"));
 		body.row(newZoneButton);
-		body.label(() -> Component.translatable("soundsculptor.zones.hint"));
+		body.wrappedLabel(() -> Component.translatable("soundsculptor.zones.hint"));
 		list = new SculptList(body.width(), 100, Component.translatable("soundsculptor.zones.list"));
 		body.fill(list);
 		refresh();

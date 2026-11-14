@@ -90,8 +90,6 @@ public final class SoundsPanel {
 	/** The play count the plays column is measured for ("×999 · 59s ago"). */
 	private static final int PLAYS_MEASURED = 999;
 	private static final int HELP_WIDTH = 360;
-	/** Room around a dropdown's text and its arrow. */
-	private static final int DROPDOWN_PADDING = 28;
 	private static final int HELP_LINES = 7;
 	private static final Identifier MUTE_ICON = icon("mute");
 	private static final Identifier VOLUME_ICON = icon("volume");
@@ -249,7 +247,7 @@ public final class SoundsPanel {
 
 		// The picker has no Apply to, Pause or Sort: they act on places, and its rows have no quick actions.
 		if (picker == null) {
-			buildPlaceRow(body, font);
+			buildPlaceRow(body);
 		}
 
 		body.label(() -> Component.translatable(count == 1 ? "soundsculptor.sounds.count.one" : "soundsculptor.sounds.count", count));
@@ -264,31 +262,37 @@ public final class SoundsPanel {
 	}
 
 	/** Apply to, Pause and Sort (the Sounds tab only). */
-	private void buildPlaceRow(SculptScreen.Body body, Font font) {
+	private void buildPlaceRow(SculptScreen.Body body) {
 		pauseToggle = Tooltips.describe(new SculptToggle(SculptToggle.widthFor(Component.translatable("soundsculptor.sounds.pause")),
 				Component.translatable("soundsculptor.sounds.pause"), state.paused, this::setPaused),
 				Component.translatable("soundsculptor.sounds.pause.tip"));
-		sortDropdown = Tooltips.describe(new SculptDropdown<>(sortWidth(font), Component.translatable("soundsculptor.sounds.sort"),
+		sortDropdown = Tooltips.describe(new SculptDropdown<>(sortWidth(), Component.translatable("soundsculptor.sounds.sort"),
 				List.of(SortOrder.values()), SoundsPanel::sortName, state.sort, this::setSort),
 				Component.translatable("soundsculptor.sounds.sort.tip"));
 		applyChoices = computeApplyChoices();
-		int applyWidth = Math.max(MIN_APPLY_TO_WIDTH,
+		Component applyLabel = Component.translatable("soundsculptor.sounds.apply_to");
+		int share = Math.max(MIN_APPLY_TO_WIDTH,
 				Math.min(MAX_APPLY_TO_WIDTH, body.width() - pauseToggle.getWidth() - sortDropdown.getWidth() - 2 * Theme.GAP));
-		applyToDropdown = Tooltips.describe(new SculptDropdown<>(applyWidth, Component.translatable("soundsculptor.sounds.apply_to"),
-				applyChoices, choice -> Component.translatable(choice.translationKey(), choice.args().toArray()),
+		// Never narrower than "Apply to: Everywhere" in full; a long zone name is cut instead.
+		int applyWidth = Math.max(share, SculptDropdown.widthFor(applyLabel, List.of(applyName(ApplyTarget.EVERYWHERE))));
+		applyToDropdown = Tooltips.describe(new SculptDropdown<>(applyWidth, applyLabel, applyChoices, SoundsPanel::applyName,
 				applyTarget(), this::setApplyTarget), Component.translatable("soundsculptor.sounds.apply_to.tip"));
-		// Pause and Sort keep their place while hidden, so turning the filter on or off moves nothing else.
-		body.row(applyToDropdown, pauseToggle, sortDropdown);
+		// Pause and Sort keep their place while hidden, so turning the filter on or off moves nothing else. When the
+		// three do not fit on one line (a narrow window, a longer translation), Sort and then Pause move to the next.
+		body.flow(applyToDropdown, pauseToggle, sortDropdown);
 		showFilterControls();
 	}
 
-	private static int sortWidth(Font font) {
-		int widest = 0;
+	private static Component applyName(ApplyTarget choice) {
+		return Component.translatable(choice.translationKey(), choice.args().toArray());
+	}
+
+	private static int sortWidth() {
+		List<Component> names = new ArrayList<>();
 		for (SortOrder order : SortOrder.values()) {
-			widest = Math.max(widest, font.width(Component.translatable("soundsculptor.ui.toggle",
-					Component.translatable("soundsculptor.sounds.sort"), sortName(order))));
+			names.add(sortName(order));
 		}
-		return widest + DROPDOWN_PADDING;
+		return SculptDropdown.widthFor(Component.translatable("soundsculptor.sounds.sort"), names);
 	}
 
 	private static Component sortName(SortOrder order) {

@@ -44,6 +44,7 @@ public final class ZoneEditorScreen extends SculptScreen {
 	private static final int COORD_WIDTH = 60;
 	private static final int SIZE_WIDTH = 50;
 	private static final int SHAPE_WIDTH = 170;
+	/** The least width of My position and Looking at; they grow to fit a longer label. */
 	private static final int POSITION_WIDTH = 90;
 	private static final int MARK_WIDTH = 110;
 	private static final int SIDE_WIDTH = 140;
@@ -180,11 +181,15 @@ public final class ZoneEditorScreen extends SculptScreen {
 		xField = textField(Field.X, COORD_WIDTH, "x");
 		yField = textField(Field.Y, COORD_WIDTH, "y");
 		zField = textField(Field.Z, COORD_WIDTH, "z");
-		myPositionButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.zone_editor.my_position"), POSITION_WIDTH,
-				this::setToMyPosition), Component.translatable("soundsculptor.zone_editor.my_position.tip"));
-		lookingAtButton = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.zone_editor.looking_at"), POSITION_WIDTH,
-				this::setToLookedAtBlock), Component.translatable("soundsculptor.zone_editor.looking_at.tip"));
-		body.row(xField, yField, zField, myPositionButton, lookingAtButton);
+		Component myPosition = Component.translatable("soundsculptor.zone_editor.my_position");
+		Component lookingAt = Component.translatable("soundsculptor.zone_editor.looking_at");
+		// Both the same width, and wide enough for the longer label; they move to the next line if the row is full.
+		int positionWidth = Math.max(POSITION_WIDTH, SculptButton.widthFor(myPosition, lookingAt));
+		myPositionButton = Tooltips.describe(SculptButton.text(myPosition, positionWidth, this::setToMyPosition),
+				Component.translatable("soundsculptor.zone_editor.my_position.tip"));
+		lookingAtButton = Tooltips.describe(SculptButton.text(lookingAt, positionWidth, this::setToLookedAtBlock),
+				Component.translatable("soundsculptor.zone_editor.looking_at.tip"));
+		body.flow(xField, yField, zField, myPositionButton, lookingAtButton);
 
 		shapeDropdown = null;
 		markCornersButton = null;

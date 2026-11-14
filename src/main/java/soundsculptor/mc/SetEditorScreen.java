@@ -180,7 +180,7 @@ public final class SetEditorScreen extends SculptScreen {
 		entryList.setEmptyText(() -> Component.translatable("soundsculptor.set_editor.entries.empty"));
 		if (attached == null) {
 			body.row(addButton, typeButton);
-			body.label(() -> Component.translatable("soundsculptor.set_editor.quick.hint"));
+			body.wrappedLabel(() -> Component.translatable("soundsculptor.set_editor.quick.hint"));
 			body.fill(entryList);
 		} else {
 			nameField = Tooltips.describe(new SculptTextField(font,

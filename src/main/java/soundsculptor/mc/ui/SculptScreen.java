@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.client.gui.ComponentPath;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -15,8 +16,12 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
+import soundsculptor.core.ui.RowFlow;
+import soundsculptor.core.ui.WrappedLines;
 
 /**
  * Screen base (PRD 6.1, 6.2): header (title, subtitle such as the active profile, header widgets, close button),
@@ -626,12 +631,47 @@ public abstract class SculptScreen extends Screen {
 				}
 				widget.setPosition(rowX, cursorY);
 				rowX += widget.getWidth() + Theme.GAP;
-				int extra = widget instanceof SculptTextField ? SculptTextField.ERROR_SLOT_HEIGHT : 0;
-				rowHeight = Math.max(rowHeight, widget.getHeight() + extra);
+				rowHeight = Math.max(rowHeight, heightOf(widget));
 				widgets.add(widget);
 			}
 			cursorY += rowHeight + Theme.GAP;
 			return this;
+		}
+
+		/**
+		 * Adds widgets left to right like {@link #row}, but a widget that does not fit in what is left of the line
+		 * starts the next line, so a toolbar wraps instead of cutting a control's text (PRD 9.3). Widths wider than the
+		 * body are reduced.
+		 */
+		public Body flow(AbstractWidget... row) {
+			int[] widths = new int[row.length];
+			for (int i = 0; i < row.length; i++) {
+				if (row[i].getWidth() > width) {
+					row[i].setWidth(width);
+				}
+				widths[i] = row[i].getWidth();
+			}
+			List<RowFlow.Spot> spots = RowFlow.place(widths, width, Theme.GAP);
+			int line = 0;
+			int lineHeight = 0;
+			for (int i = 0; i < row.length; i++) {
+				RowFlow.Spot spot = spots.get(i);
+				if (spot.line() != line) {
+					cursorY += lineHeight + Theme.GAP;
+					line = spot.line();
+					lineHeight = 0;
+				}
+				row[i].setPosition(x + spot.x(), cursorY);
+				lineHeight = Math.max(lineHeight, heightOf(row[i]));
+				widgets.add(row[i]);
+			}
+			cursorY += lineHeight + Theme.GAP;
+			return this;
+		}
+
+		/** A widget's height on a row: a text field reserves room for its error message. */
+		private static int heightOf(AbstractWidget widget) {
+			return widget.getHeight() + (widget instanceof SculptTextField ? SculptTextField.ERROR_SLOT_HEIGHT : 0);
 		}
 
 		/** A line of text; the supplier is read every frame, so it can show live values. */
@@ -639,6 +679,52 @@ public abstract class SculptScreen extends Screen {
 			labels.add(new Label(text, x, cursorY + 2, width));
 			cursorY += net.minecraft.client.Minecraft.getInstance().font.lineHeight + Theme.GAP;
 			return this;
+		}
+
+		/**
+		 * Text that wraps onto as many lines as it needs at the body's width, pushing what follows down (PRD 9.3: a
+		 * longer translation wraps instead of being cut). The supplier is read every frame, like {@link #label}; the
+		 * number of lines is set by the text when the body is laid out (see {@link WrappedLines#line}).
+		 */
+		public Body wrappedLabel(Supplier<Component> text) {
+			Font font = net.minecraft.client.Minecraft.getInstance().font;
+			Wrapper wrapper = new Wrapper(font, text, width);
+			int reserved = WrappedLines.count(wrapper.lines());
+			for (int i = 0; i < reserved; i++) {
+				int index = i;
+				labels.add(new Label(() -> Component.literal(WrappedLines.line(wrapper.lines(), reserved, index)),
+						x, cursorY + 2 + i * font.lineHeight, width));
+			}
+			cursorY += reserved * font.lineHeight + Theme.GAP;
+			return this;
+		}
+
+		/** A wrapped label's text split into lines, split again only when the text changes. */
+		private static final class Wrapper {
+			private final Font font;
+			private final Supplier<Component> text;
+			private final int width;
+			private String last;
+			private List<String> lines;
+
+			Wrapper(Font font, Supplier<Component> text, int width) {
+				this.font = font;
+				this.text = text;
+				this.width = width;
+			}
+
+			List<String> lines() {
+				String now = text.get().getString();
+				if (!now.equals(last)) {
+					List<String> split = new ArrayList<>();
+					for (FormattedText line : font.getSplitter().splitLines(now, width, Style.EMPTY)) {
+						split.add(line.getString());
+					}
+					last = now;
+					lines = split;
+				}
+				return lines;
+			}
 		}
 
 		/** Adds one widget that takes the full width and all the remaining height (e.g. a list). */
