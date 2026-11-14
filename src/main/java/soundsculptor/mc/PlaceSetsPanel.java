@@ -1,6 +1,7 @@
 package soundsculptor.mc;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.UnaryOperator;
 import net.minecraft.client.Minecraft;
@@ -106,14 +107,12 @@ public final class PlaceSetsPanel {
 		String name = quickName();
 		String status = statusText(enabled);
 		String details = join(entriesText(quick.entries().size()), Component.translatable("soundsculptor.place_sets.quick.pinned").getString());
-		Component rowName = Component.literal(name);
 		List<SculptButton> buttons = List.of(
-				onOffButton(SoundSet.QUICK_ID, enabled, rowName),
-				SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.place_sets.edit"), () -> edit(SoundSet.QUICK_ID))
-						.narrationContext(() -> rowName),
-				Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.place_sets.save_to_library"), this::openSaveToLibrary)
-						.narrationContext(() -> rowName), Component.translatable("soundsculptor.place_sets.save_to_library.tip")),
-				detachButton(SoundSet.QUICK_ID, rowName));
+				onOffButton(SoundSet.QUICK_ID, enabled),
+				SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.place_sets.edit"), () -> edit(SoundSet.QUICK_ID)),
+				Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.place_sets.save_to_library"), this::openSaveToLibrary),
+						Component.translatable("soundsculptor.place_sets.save_to_library.tip")),
+				detachButton(SoundSet.QUICK_ID));
 		return new SculptList.Row(SoundSet.QUICK_ID, List.of(
 				new SculptList.Row.Column(() -> name, 0, 0),
 				new SculptList.Row.Column(() -> status, statusWidth(), 0),
@@ -128,38 +127,32 @@ public final class PlaceSetsPanel {
 		String status = statusText(a.enabled());
 		int alsoUsed = ws.profile().placesUsing(id).size() - 1 + (usage == null ? 0 : usage.otherPlaceCount(id, ProfileManager.key()));
 		String details = join(set == null ? "" : entriesText(set.entries().size()), alsoUsedText(alsoUsed));
-		Component rowName = Component.literal(name);
 		List<SculptButton> buttons = new ArrayList<>();
-		buttons.add(onOffButton(id, a.enabled(), rowName));
-		SculptButton edit = SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.place_sets.edit"), () -> edit(id))
-				.narrationContext(() -> rowName);
+		buttons.add(onOffButton(id, a.enabled()));
+		SculptButton edit = SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.place_sets.edit"), () -> edit(id));
 		edit.active = set != null;
 		buttons.add(edit);
-		SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.place_sets.move_up"), () -> move(id, -1))
-				.narrationContext(() -> rowName);
+		SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.place_sets.move_up"), () -> move(id, -1));
 		up.active = canMoveUp;
 		buttons.add(up);
-		SculptButton down = SculptButton.icon(DOWN_ICON, Component.translatable("soundsculptor.place_sets.move_down"), () -> move(id, 1))
-				.narrationContext(() -> rowName);
+		SculptButton down = SculptButton.icon(DOWN_ICON, Component.translatable("soundsculptor.place_sets.move_down"), () -> move(id, 1));
 		down.active = canMoveDown;
 		buttons.add(down);
-		buttons.add(detachButton(id, rowName));
+		buttons.add(detachButton(id));
 		return new SculptList.Row(id, List.of(
 				new SculptList.Row.Column(() -> name, 0, 0),
 				new SculptList.Row.Column(() -> status, statusWidth(), 0),
 				new SculptList.Row.Column(() -> details, 0, 1)), buttons);
 	}
 
-	private SculptButton onOffButton(String setId, boolean enabled, Component rowName) {
-		return Tooltips.describe(SculptButton.text(SculptToggle.stateText(enabled), onOffWidth(), () -> setEnabled(setId, !enabled))
-				.narrationContext(() -> rowName),
+	private SculptButton onOffButton(String setId, boolean enabled) {
+		return Tooltips.describe(SculptButton.text(SculptToggle.stateText(enabled), onOffWidth(), () -> setEnabled(setId, !enabled)),
 				Component.translatable(enabled ? "soundsculptor.place_sets.turn_off" : "soundsculptor.place_sets.turn_on"));
 	}
 
-	private SculptButton detachButton(String setId, Component rowName) {
-		return Tooltips.describe(SculptButton.text(DETACH, SculptButton.widthFor(DETACH), () -> detach(setId))
-				.narrationContext(() -> rowName), Component.translatable(SoundSet.QUICK_ID.equals(setId)
-						? "soundsculptor.place_sets.detach.quick_tip" : "soundsculptor.place_sets.detach.tip"));
+	private SculptButton detachButton(String setId) {
+		return Tooltips.describe(SculptButton.text(DETACH, SculptButton.widthFor(DETACH), () -> detach(setId)),
+				Component.translatable(SoundSet.QUICK_ID.equals(setId) ?"soundsculptor.place_sets.detach.quick_tip" : "soundsculptor.place_sets.detach.tip"));
 	}
 
 	/** "○ Off" for a set switched off here, so the state is text and not color alone; empty when on. */
@@ -181,9 +174,13 @@ public final class PlaceSetsPanel {
 		return Component.translatable(size == 1 ? "soundsculptor.sets.entries.one" : "soundsculptor.sets.entries", size).getString();
 	}
 
-	/** A column that fits {@link #entriesText} for any set size, up to {@value SoundSet#MAX_ENTRIES}. */
-	static int entriesWidth() {
-		return SculptList.Row.Column.widthFor(Component.literal(entriesText(1)), Component.literal(entriesText(SoundSet.MAX_ENTRIES)));
+	/** A column that fits {@link #entriesText} for each of {@code sets}: the widest row of the list, measured once per build. */
+	static int entriesWidth(Collection<SoundSet> sets) {
+		int widest = 0;
+		for (SoundSet set : sets) {
+			widest = Math.max(widest, SculptList.Row.Column.widthFor(Component.literal(entriesText(set.entries().size()))));
+		}
+		return widest;
 	}
 
 	/** "Also used in N places": other places in this world plus places in other worlds; empty when the set is not shared. */

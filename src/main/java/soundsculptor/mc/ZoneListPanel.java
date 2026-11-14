@@ -69,7 +69,11 @@ public final class ZoneListPanel {
 		Point player = new Point(feet.x, feet.y, feet.z);
 		List<Zone> zones = profile.zones();
 		List<SculptList.Row> rows = new ArrayList<>(zones.size() + 1);
-		int setsWidth = SculptList.Row.Column.widthFor(Component.literal(setCount(1)), Component.literal(setCount(PlaceSets.MAX_SETS + 1)));
+		// The set count column is as wide as the widest count in this list, so the shape beside it keeps its room.
+		int setsWidth = SculptList.Row.Column.widthFor(Component.literal(setCount(profile.everywhere())));
+		for (Zone zone : zones) {
+			setsWidth = Math.max(setsWidth, SculptList.Row.Column.widthFor(Component.literal(setCount(zone.sets()))));
+		}
 		rows.add(everywhereRow(profile, setsWidth));
 		if (zones.isEmpty()) {
 			rows.add(noZonesRow());
@@ -102,11 +106,10 @@ public final class ZoneListPanel {
 					new SculptList.Row.Column(() -> shape, 0, 1),
 					new SculptList.Row.Column(() -> sets, setsWidth, 1));
 			List<SculptButton> buttons = new ArrayList<>();
-			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), onOffWidth, () -> setEnabled(zone.id(), !zone.enabled()))
-					.narrationContext(() -> Component.translatable("soundsculptor.zones.enabled")),
+			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(zone.enabled()), onOffWidth, () -> setEnabled(zone.id(), !zone.enabled())),
 					Component.translatable(zone.enabled() ? "soundsculptor.zones.turn_off" : "soundsculptor.zones.turn_on")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.zones.edit"), () -> setScreen(ZoneEditorScreen.edit(host, zone))));
-			buttons.add(setsButton(PlaceRef.zone(zone.id()), Component.literal(name)));
+			buttons.add(setsButton(PlaceRef.zone(zone.id())));
 			SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.zones.move_up"), () -> move(zone.id(), -1));
 			up.active = i > 0;
 			buttons.add(up);
@@ -126,14 +129,13 @@ public final class ZoneListPanel {
 
 	/** Everywhere (FR-8.10): its name, what it applies to, and its Sound Set count; its only button opens its sets. */
 	private SculptList.Row everywhereRow(Profile profile, int setsWidth) {
-		Component name = Component.translatable("soundsculptor.profile.place.everywhere");
-		String nameText = name.getString();
+		String nameText = Component.translatable("soundsculptor.profile.place.everywhere").getString();
 		String scope = Component.translatable("soundsculptor.zones.everywhere.scope").getString();
 		String sets = setCount(profile.everywhere());
 		return new SculptList.Row(PlaceRef.EVERYWHERE, List.of(
 				new SculptList.Row.Column(() -> nameText, 0, 0),
 				new SculptList.Row.Column(() -> scope, 0, 1),
-				new SculptList.Row.Column(() -> sets, setsWidth, 1)), List.of(setsButton(PlaceRef.EVERYWHERE, name)));
+				new SculptList.Row.Column(() -> sets, setsWidth, 1)), List.of(setsButton(PlaceRef.EVERYWHERE)));
 	}
 
 	/**
@@ -146,10 +148,10 @@ public final class ZoneListPanel {
 	}
 
 	/** "Sound Sets": the place's attached sets (FR-8.6). */
-	private SculptButton setsButton(PlaceRef where, Component rowName) {
+	private SculptButton setsButton(PlaceRef where) {
 		Component label = Component.translatable("soundsculptor.zones.sets");
 		int width = Minecraft.getInstance().font.width(label) + SETS_PADDING;
-		return Tooltips.describe(SculptButton.text(label, width, () -> openSets(where)).narrationContext(() -> rowName),
+		return Tooltips.describe(SculptButton.text(label, width, () -> openSets(where)),
 				Component.translatable(where.isEverywhere() ? "soundsculptor.zones.sets.everywhere_tip" : "soundsculptor.zones.sets.tip"));
 	}
 
@@ -160,10 +162,7 @@ public final class ZoneListPanel {
 
 	/** "1 Sound Set", "3 Sound Sets": the place's library sets plus its Quick changes. */
 	private static String setCount(PlaceSets sets) {
-		return setCount(sets.librarySetCount() + (sets.quickChanges() != null ? 1 : 0));
-	}
-
-	private static String setCount(int count) {
+		int count = sets.librarySetCount() + (sets.quickChanges() != null ? 1 : 0);
 		return Component.translatable(count == 1 ? "soundsculptor.zones.set_count.one" : "soundsculptor.zones.set_count", count).getString();
 	}
 

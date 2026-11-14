@@ -56,7 +56,7 @@ Each release ships one jar per supported Minecraft version.
   and the set editor's Save decides.
 - **This sound / Like this** in the entry editor: plain words in the pattern field list the matching sounds; This sound
   uses the sound's exact ID, and Like this lists its groups, closest first, each with how many sounds it matches.
-- Lists fit at 854 × 480 and GUI scales 1 to 4: columns and row buttons are sized from their text, and a long zone
+- In English, lists fit at 854 × 480 and GUI scales 1 to 4: columns and row buttons are sized from their text, and a long zone
   name gives way so a sound's ID stays readable.
 
 ## 0.1.0-alpha (unreleased)

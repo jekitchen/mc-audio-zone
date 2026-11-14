@@ -61,9 +61,10 @@ public final class SetLibraryPanel {
 		shownUsage = usage;
 		Workspace ws = ProfileManager.workspace();
 		String key = ProfileManager.key();
+		int entriesWidth = PlaceSetsPanel.entriesWidth(ws.library().sets());
 		List<SculptList.Row> rows = new ArrayList<>();
 		for (SoundSet set : ws.library().sets()) {
-			rows.add(row(set, ws.profile().placesUsing(set.id()).size(), usage == null ? 0 : usage.otherCount(set.id(), key), usage != null));
+			rows.add(row(set, ws.profile().placesUsing(set.id()).size(), usage == null ? 0 : usage.otherCount(set.id(), key), usage != null, entriesWidth));
 		}
 		list.setRows(rows);
 	}
@@ -75,24 +76,21 @@ public final class SetLibraryPanel {
 		}
 	}
 
-	private SculptList.Row row(SoundSet set, int here, int others, boolean othersCounted) {
+	private SculptList.Row row(SoundSet set, int here, int others, boolean othersCounted, int entriesWidth) {
 		String name = set.name();
 		String entries = PlaceSetsPanel.entriesText(set.entries().size());
 		String usage = usageText(here, others, othersCounted);
-		Component rowName = Component.literal(name);
 		String id = set.id();
 		List<SculptButton> buttons = List.of(
-				SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.sets.edit"), () -> openEditor(id))
-						.narrationContext(() -> rowName),
-				Tooltips.describe(SculptButton.text(DUPLICATE, SculptButton.widthFor(DUPLICATE), () -> duplicate(id))
-						.narrationContext(() -> rowName), Component.translatable("soundsculptor.sets.duplicate.tip")),
-				Tooltips.describe(SculptButton.text(RENAME, SculptButton.widthFor(RENAME), () -> openRename(id))
-						.narrationContext(() -> rowName), Component.translatable("soundsculptor.sets.rename.tip")),
-				SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.sets.delete"), () -> confirmDelete(id))
-						.narrationContext(() -> rowName));
+				SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.sets.edit"), () -> openEditor(id)),
+				Tooltips.describe(SculptButton.text(DUPLICATE, SculptButton.widthFor(DUPLICATE), () -> duplicate(id)),
+						Component.translatable("soundsculptor.sets.duplicate.tip")),
+				Tooltips.describe(SculptButton.text(RENAME, SculptButton.widthFor(RENAME), () -> openRename(id)),
+						Component.translatable("soundsculptor.sets.rename.tip")),
+				SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.sets.delete"), () -> confirmDelete(id)));
 		return new SculptList.Row(id, List.of(
 				new SculptList.Row.Column(() -> name, 0, 0),
-				new SculptList.Row.Column(() -> entries, PlaceSetsPanel.entriesWidth(), 0),
+				new SculptList.Row.Column(() -> entries, entriesWidth, 0),
 				new SculptList.Row.Column(() -> usage, 0, 1)), buttons);
 	}
 

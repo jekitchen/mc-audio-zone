@@ -448,11 +448,11 @@ public final class EntryEditorScreen extends SculptScreen {
 			String id = entry.id();
 			String name = entry.subtitle() == null ? id : entry.subtitle();
 			SculptButton exact = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.rule_editor.this_sound"), PICK_WIDTH,
-					() -> usePattern(id)).narrationContext(() -> Component.literal(name)),
+					() -> usePattern(id)),
 					Component.translatable("soundsculptor.rule_editor.this_sound.tip"));
 			SculptButton[] like = new SculptButton[1];
 			like[0] = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.rule_editor.like_this"), PICK_WIDTH,
-					() -> showFamilies(id, like[0])).narrationContext(() -> Component.literal(name)),
+					() -> showFamilies(id, like[0])),
 					Component.translatable("soundsculptor.rule_editor.like_this.tip"));
 			rows.add(new SculptList.Row(id, List.of(new SculptList.Row.Column(() -> name, 0, 0), new SculptList.Row.Column(() -> id, 0, 1)),
 					List.of(exact, like[0])));

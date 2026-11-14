@@ -80,7 +80,8 @@ import net.minecraft.util.Util;
  *   label to read.</li>
  *   <li>Long place lists (FR-4.11): with a set used in {@value #MANY_ZONES} long-named zones, the delete warning and the
  *   linked-save confirmation keep their buttons on screen and scroll, and every place is still listed and read.</li>
- *   <li>Pseudo-language (PRD 9.3): the same layout check with every Sound Sculptor text about 40% longer, reported.</li>
+ *   <li>Pseudo-language (PRD 9.3): the same layout check with every Sound Sculptor text about 40% longer, reported, and
+ *   held at or under {@value #PSEUDO_CEILING} problems (the Diagnostics timing lines aside) so new ones fail the test.</li>
  * </ul>
  * Grayscale, Sodium, Iris, Sound Physics Remastered and servers stay manual checks.
  */
@@ -104,6 +105,14 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	private static final Component PICKER_SUBTITLE = Component.literal(SET.name());
 	/** Zones using one set, for the long place lists of the delete warning and the linked-save confirmation. */
 	private static final int MANY_ZONES = 40;
+	/** Another server's profile, seeded so the Profiles tab has the same rows every run. */
+	private static final String OTHER_PROFILE = "a11y-other.example.net";
+	/**
+	 * The most pseudo-language layout problems allowed, not counting the Diagnostics timing lines (their live numbers change
+	 * length from run to run): a ratchet at the count this check finds today, all at the narrowest GUI widths. Lower it
+	 * when fixes bring the count down.
+	 */
+	private static final int PSEUDO_CEILING = 114;
 
 	@Override
 	public void runTest(ClientGameTestContext context) {
@@ -129,275 +138,295 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 
 		try (TestSingleplayerContext world = TestWorlds.create(context)) {
 			world.getConnection().waitForChunksRender();
-			String key = context.computeOnClient(mc -> ProfileManager.key());
-			// SET is attached to Everywhere and the first zone, so the set editor's Attached to panel has lines, Attach to…
-			// has a choice, Everywhere's Sound Sets show the pinned Quick changes and a shared set, and Attach set… for the
-			// second zone offers SET.
-			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
-					.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
-							SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))).attach(SET.id()))
-					.withZones(List.of(attached(zone("z1", "Trading hall", key), SET.id()),
-							zone("z2", "Very long zone name for the bee farm by the river", key))), ws.library().put(SET))));
-			// Recently played rows (FR-1.2), so the Sounds tab and the picker show their two-line rows: in a zone with a short
-			// name and one with a long name (cut, and giving way to the ID in a narrow window), heard around the player, and
-			// one heard earlier in the session ("Seen as", FR-3.2).
-			context.runOnClient(mc -> recordRecentPlays());
-
-			// A-4: every control on the Sounds tab, with the Recently played filter on and off, has something to read out,
-			// and so do its search help, its Level pop-up and both steps of Add to set….
-			List<String> silentSounds = context.computeOnClient(mc -> {
-				List<String> silent = new ArrayList<>();
-				for (boolean recentOnly : new boolean[] {true, false}) {
-					SoundSculptorScreen screen = new SoundSculptorScreen();
-					mc.gui.setScreen(screen);
-					screen.selectTab(SoundSculptorScreen.TAB_SOUNDS);
-					screen.sounds().setRecentOnly(recentOnly);
-					silent.addAll(silentControls(screen));
-				}
-				SoundSculptorScreen screen = (SoundSculptorScreen) mc.gui.screen();
-				check(!screen.sounds().list.children().isEmpty(), "with the filter off, every known sound is listed");
-				screen.sounds().openHelp();
-				silent.addAll(silentControls(screen));
-				check(screen.sounds().helpList.getFocused() != null, "the search help takes focus, so arrows and Esc work in it");
-				screen.closeOverlay();
-				screen.sounds().openLevel(VILLAGER);
-				silent.addAll(silentControls(screen));
-				screen.closeOverlay();
-				AddToSetScreen add = new AddToSetScreen(screen, VILLAGER, "Villager mumbles", () -> { });
-				mc.gui.setScreen(add);
-				silent.addAll(silentControls(add));
-				add.chooseSet(SET.id());
-				silent.addAll(silentControls(add));
-				return silent;
-			});
-			check(silentSounds.isEmpty(), "controls without a label on the Sounds tab: " + silentSounds);
-			context.runOnClient(mc -> SoundsPanel.resetRememberedState());
-
-			// A-4 for the Sounds picker (FR-1.7): its checkboxes and Like this… in both filter modes, and the groups pop-up.
-			List<String> silentPicker = context.computeOnClient(mc -> {
-				List<String> silent = new ArrayList<>();
-				for (boolean recentOnly : new boolean[] {true, false}) {
-					SoundPickerScreen picker = new SoundPickerScreen(null, pickerDraft(), PICKER_SUBTITLE);
-					mc.gui.setScreen(picker);
-					picker.sounds().setRecentOnly(recentOnly);
-					silent.addAll(silentControls(picker));
-				}
-				SoundPickerScreen picker = (SoundPickerScreen) mc.gui.screen();
-				check(!picker.sounds().list.children().isEmpty(), "with the filter off, the picker lists every known sound");
-				picker.sounds().openLikeThis(VILLAGER);
-				silent.addAll(silentControls(picker));
-				check(picker.sounds().likeThisList.getFocused() != null, "Like this… takes focus, so arrows, Space and Esc work in it");
-				return silent;
-			});
-			check(silentPicker.isEmpty(), "controls without a label in the Sounds picker: " + silentPicker);
-			context.runOnClient(mc -> SoundsPanel.resetRememberedState());
-
-			// A-4: every control on the Sound Sets, Zones and Profiles tabs has something to read out.
-			for (int tab : new int[] {SoundSculptorScreen.TAB_SETS, SoundSculptorScreen.TAB_ZONES, SoundSculptorScreen.TAB_PROFILES}) {
-				List<String> silent = context.computeOnClient(mc -> {
-					SoundSculptorScreen screen = new SoundSculptorScreen();
-					mc.gui.setScreen(screen);
-					screen.selectTab(tab);
-					return silentControls(screen);
-				});
-				check(silent.isEmpty(), "controls without a label on tab " + tab + ": " + silent);
-			}
-			// A-4 for the sound trace's inline controls (FR-14.4) and its Volume panel.
-			List<String> silentTrace = context.computeOnClient(mc -> {
-				TraceScreen trace = new TraceScreen(null, "minecraft:entity.villager.ambient");
-				mc.gui.setScreen(trace);
-				List<String> silent = new ArrayList<>(silentControls(trace));
-				trace.openVolume(QUICK_R2, QuickEntries.get(ProfileManager.profile(), "r2"));
-				silent.addAll(silentControls(trace));
-				return silent;
-			});
-			check(silentTrace.isEmpty(), "controls without a label in the sound trace: " + silentTrace);
-			// FR-14.4: a shared set's line (SET on Everywhere and Trading hall) lists its places in its tooltip, and the
-			// narrator reads them with the line's button; a "No entry matches" line's Add to Quick changes and its choice.
-			List<String> silentSets = context.computeOnClient(mc -> {
-				TraceScreen trace = new TraceScreen(null, COW);
-				mc.gui.setScreen(trace);
-				SculptList.Row line = trace.setRow(PlaceRef.EVERYWHERE, SET.id());
-				check(line != null && line.tooltip() != null && line.tooltip().getString().startsWith("Used in Everywhere and Trading hall."),
-						"the shared set's line lists its places, was " + (line == null || line.tooltip() == null ? null : line.tooltip().getString()));
-				String read = NarrationCompat.collect(line.buttons().get(0)::updateNarration);
-				check(read.contains("Used in Everywhere and Trading hall"), "the narrator reads the places, was " + read);
-				List<String> silent = new ArrayList<>(silentControls(trace));
-				// SET matches the cow on Everywhere and Quick changes does not: Everywhere's own line offers Add to Quick
-				// changes, read with the line; its choice is labelled, and Esc returns focus to that button.
-				SculptList.Row placeLine = trace.row(new TraceText.PlaceTarget(PlaceRef.EVERYWHERE));
-				check(placeLine != null && placeLine.buttons().size() == 1
-						&& placeLine.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
-						"Everywhere's line offers Add to Quick changes when only a library set matches");
-				String placeSaid = NarrationCompat.collect(placeLine.buttons().get(0)::updateNarration);
-				check(placeSaid.contains(placeLine.narrationText().getString()) && placeSaid.contains("Add to Quick changes"),
-						"Add to Quick changes on Everywhere's line is read with the line, was " + placeSaid);
-				trace.openAddToQuickChanges(PlaceRef.EVERYWHERE);
-				silent.addAll(silentControls(trace));
-				trace.closeOverlay();
-				check(trace.lines.getFocused() == placeLine && placeLine.getFocused() == placeLine.buttons().get(0),
-						"closing the choice returns focus to Everywhere's Add to Quick changes");
-				TraceScreen none = new TraceScreen(null, PIG);
-				mc.gui.setScreen(none);
-				silent.addAll(silentControls(none));
-				SculptList.Row add = none.row(new TraceText.NoEntryTarget(PlaceRef.EVERYWHERE));
-				check(add != null && add.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
-						"the no-match line has a labelled Add to Quick changes");
-				none.openAddToQuickChanges(PlaceRef.EVERYWHERE);
-				silent.addAll(silentControls(none));
-				check(none.getFocused() == none.addQuickMute, "the choice takes focus, so Tab, arrows and Enter work in it");
-				return silent;
-			});
-			check(silentSets.isEmpty(), "controls without a label in the sound trace's set and Add to Quick changes lines: " + silentSets);
-			// A-4 for the set editor, its Attach to… menu, the Quick changes editor and the entry editor.
-			List<String> silentEditors = context.computeOnClient(mc -> {
-				SetEditorScreen editor = SetEditorScreen.edit(null, SET.id());
-				mc.gui.setScreen(editor);
-				List<String> silent = new ArrayList<>(silentControls(editor));
-				editor.attachedPanel().openAttachMenu();
-				silent.addAll(silentControls(editor));
-				SetEditorScreen quick = SetEditorScreen.forQuickChanges(null, PlaceRef.EVERYWHERE);
-				mc.gui.setScreen(quick);
-				silent.addAll(silentControls(quick));
-				EntryEditorScreen entry = EntryEditorScreen.edit(null, SetDraft.of(SET), "e1");
-				mc.gui.setScreen(entry);
-				silent.addAll(silentControls(entry));
-				return silent;
-			});
-			check(silentEditors.isEmpty(), "controls without a label in the set and entry editors: " + silentEditors);
-			// FR-4.8: plain words in the entry editor list sounds with This sound and Like this; the Like this groups show
-			// their counts. Everything is narrated with the sound or group, keeps to the window, and takes focus.
-			List<String> findProblems = context.computeOnClient(mc -> {
-				List<String> problems = new ArrayList<>();
-				EntryEditorScreen entry = EntryEditorScreen.edit(null, SetDraft.of(SET), "e1");
-				mc.gui.setScreen(entry);
-				entry.patternField.setValue("cow");
-				if (!entry.searching() || entry.matchList.findRow(COW) == null) {
-					problems.add("the words should list " + COW);
-					return problems;
-				}
-				SculptList.Row row = entry.matchList.findRow(COW);
-				problems.addAll(silentControls(entry));
-				problems.addAll(check(mc, entry, "entry editor search results"));
-				for (SculptButton button : row.buttons()) {
-					String said = NarrationCompat.collect(button::updateNarration);
-					if (!said.contains("Cow") || !said.contains(button.getMessage().getString())) {
-						problems.add("the " + button.getMessage().getString() + " button is not narrated with the sound: " + said);
-					}
-				}
-				entry.showFamilies(COW, row.buttons().get(1));
-				if (entry.familyButtons().isEmpty()) {
-					problems.add("Like this should list groups");
-				}
-				for (AbstractWidget group : entry.familyButtons()) {
-					String said = NarrationCompat.collect(group::updateNarration);
-					if (!group.getMessage().getString().matches("minecraft:.* · \\d+ sounds?") || !said.contains(group.getMessage().getString())) {
-						problems.add("a group is not narrated with its pattern and count: " + said);
-					}
-					if (group.getX() < 0 || group.getY() < 0 || group.getRight() > entry.width || group.getBottom() > entry.height) {
-						problems.add("a Like this group is outside the window: " + describe(group));
-					}
-				}
-				if (!entry.familyButtons().isEmpty() && entry.getFocused() == null) {
-					problems.add("the Like this list should take focus, so Tab, arrows and Enter work");
-				}
-				return problems;
-			});
-			check(findProblems.isEmpty(), "finding a sound in the entry editor: " + findProblems);
-			// A-4 for a place's Sound Sets (FR-8.6) and Attach set….
-			List<String> silentPlaces = context.computeOnClient(mc -> {
-				List<String> silent = new ArrayList<>();
-				for (PlaceRef where : List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("z1"))) {
-					PlaceSetsScreen places = new PlaceSetsScreen(null, where);
-					mc.gui.setScreen(places);
-					silent.addAll(silentControls(places));
-				}
-				AttachSetScreen attach = new AttachSetScreen(null, PlaceRef.zone("z2"));
-				mc.gui.setScreen(attach);
-				silent.addAll(silentControls(attach));
-				return silent;
-			});
-			check(silentPlaces.isEmpty(), "controls without a label in the Sound Sets of a place: " + silentPlaces);
-			// A-4 for the import's rename screen (FR-11.5a).
-			List<String> silentImport = context.computeOnClient(mc -> {
-				SetRenameOnImportScreen rename = Screens.renameOnImport();
-				mc.gui.setScreen(rename);
-				return silentControls(rename);
-			});
-			check(silentImport.isEmpty(), "controls without a label in the import's rename screen: " + silentImport);
-			// A-4 for the delete warning, the linked-save confirmation and the import's exact-match dialog.
-			List<String> silentDialogs = context.computeOnClient(mc -> {
-				List<String> silent = new ArrayList<>();
-				for (Screens dialog : List.of(Screens.SET_DELETE, Screens.SET_SAVE_CONFIRM_MANY, Screens.IMPORT_EXACT_MATCH)) {
-					Screen opened = dialog.open(mc);
-					mc.gui.setScreen(opened);
-					silent.addAll(silentControls(opened));
-				}
-				return silent;
-			});
-			check(silentDialogs.isEmpty(), "controls without a label in the dialogs: " + silentDialogs);
-
-			// FR-4.11: a set used in 40 long-named zones. The delete warning lists every place; it scrolls so Delete and
-			// Cancel stay on screen; the wheel, Up/Down and Page Up/Down move it; the narrator reads every place.
+			// Another server's profile, so the Profiles tab always has its widest row (Copy, Export, Rename, Reset, Delete),
+			// whatever other tests left behind.
 			context.runOnClient(mc -> {
-				SculptDialog dialog = (SculptDialog) Screens.SET_DELETE_MANY.open(mc);
-				mc.gui.setScreen(dialog);
-				String message = dialog.message().getString();
-				for (int i = 1; i <= MANY_ZONES; i++) {
-					check(message.contains(manyZoneName(i)), "the warning lists every place, missing " + manyZoneName(i));
-				}
-				check(dialog.isScrollable(), "40 places do not fit at " + dialog.width + "x" + dialog.height + ", so the warning scrolls");
-				for (SculptButton button : dialog.buttons()) {
-					check(button.getY() >= 0 && button.getBottom() <= dialog.height, "the buttons stay on screen: " + button.getMessage().getString());
-				}
-				check(dialog.firstVisibleLine() == 0, "it starts at the top");
-			});
-			context.getInput().pressKey(InputConstants.KEY_PAGEDOWN);
-			context.waitTicks(1);
-			context.runOnClient(mc -> {
-				SculptDialog dialog = (SculptDialog) mc.gui.screen();
-				int last = dialog.lineCount() - dialog.visibleLineCount();
-				check(dialog.firstVisibleLine() == Math.min(dialog.visibleLineCount(), last), "Page Down moves a screenful, at " + dialog.firstVisibleLine());
-				int at = dialog.firstVisibleLine();
-				dialog.mouseScrolled(dialog.width / 2.0, dialog.height / 2.0, 0, -1);
-				check(dialog.firstVisibleLine() == Math.min(last, at + 3), "the wheel scrolls down 3 lines, at " + dialog.firstVisibleLine());
-				dialog.scrollBy(1000);
-				check(dialog.firstVisibleLine() == last, "it scrolls to the last line and stops there");
-			});
-			context.getInput().pressKey(InputConstants.KEY_UP);
-			context.waitTicks(1);
-			context.runOnClient(mc -> {
-				SculptDialog dialog = (SculptDialog) mc.gui.screen();
-				check(dialog.firstVisibleLine() == dialog.lineCount() - dialog.visibleLineCount() - 1, "Up moves one line");
-				check(dialog.getNarrationMessage().getString().contains(manyZoneName(MANY_ZONES)), "the narrator reads every place");
-				check(dialog.getFocused() == dialog.buttons().get(1), "Cancel still has focus");
-			});
-			context.takeScreenshot("a11y-delete-many-places");
-			context.setScreen(() -> null);
-
-			// A-3: every screen at every window size and GUI scale.
-			List<String> english = layoutProblems(context);
-			System.out.println("A11Y layout (English): " + english.size() + " problems" + (english.isEmpty() ? "" : "\n  " + String.join("\n  ", english)));
-			check(english.isEmpty(), english.size() + " layout problems in English, first: " + (english.isEmpty() ? "" : english.get(0)));
-
-			// Pseudo-language: the same check with every Sound Sculptor text about 40% longer.
-			context.runOnClient(mc -> Language.inject(new PseudoLanguage(Language.getInstance())));
-			List<String> pseudo;
-			try {
-				pseudo = layoutProblems(context);
-			} finally {
-				context.runOnClient(mc -> Language.inject(((PseudoLanguage) Language.getInstance()).english));
-			}
-			System.out.println("A11Y layout (pseudo-language, text 40% longer): " + pseudo.size() + " problems"
-					+ (pseudo.isEmpty() ? "" : "\n  " + String.join("\n  ", pseudo)));
-
-			context.runOnClient(mc -> {
-				SoundsPanel.resetRememberedState();
-				RecentLog.get().sounds().clear();
-				ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().remove(SET.id())));
+				ProfileManager.saveOther(OTHER_PROFILE, Profile.empty("Hypixel Skyblock"));
 				ProfileManager.flushSaves();
 			});
+			try {
+				checkInWorld(context);
+			} finally {
+				context.runOnClient(mc -> {
+					SoundsPanel.resetRememberedState();
+					RecentLog.get().sounds().clear();
+					ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name()), ws.library().remove(SET.id())));
+					ProfileManager.delete(OTHER_PROFILE);
+					ProfileManager.flushSaves();
+				});
+			}
 		}
+	}
+
+	/** Everything that needs the world: the fixture, the narration checks, and A-3 in English and pseudo-language. */
+	private static void checkInWorld(ClientGameTestContext context) {
+		String key = context.computeOnClient(mc -> ProfileManager.key());
+		// SET is attached to Everywhere and the first zone, so the set editor's Attached to panel has lines, Attach to…
+		// has a choice, Everywhere's Sound Sets show the pinned Quick changes and a shared set, and Attach set… for the
+		// second zone offers SET.
+		context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
+				.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "minecraft:entity.villager.*").withMute(true),
+						SetEntry.of("r2", "minecraft:entity.villager.ambient").withVolume(30))).attach(SET.id()))
+				.withZones(List.of(attached(zone("z1", "Trading hall", key), SET.id()),
+						zone("z2", "Very long zone name for the bee farm by the river", key))), ws.library().put(SET))));
+		// Recently played rows (FR-1.2), so the Sounds tab and the picker show their two-line rows: in a zone with a short
+		// name and one with a long name (cut, and giving way to the ID in a narrow window), heard around the player, and
+		// one heard earlier in the session ("Seen as", FR-3.2).
+		context.runOnClient(mc -> recordRecentPlays());
+
+		// A-4: every control on the Sounds tab, with the Recently played filter on and off, has something to read out,
+		// and so do its search help, its Level pop-up and both steps of Add to set….
+		List<String> silentSounds = context.computeOnClient(mc -> {
+			List<String> silent = new ArrayList<>();
+			for (boolean recentOnly : new boolean[] {true, false}) {
+				SoundSculptorScreen screen = new SoundSculptorScreen();
+				mc.gui.setScreen(screen);
+				screen.selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				screen.sounds().setRecentOnly(recentOnly);
+				silent.addAll(silentControls(screen));
+			}
+			SoundSculptorScreen screen = (SoundSculptorScreen) mc.gui.screen();
+			check(!screen.sounds().list.children().isEmpty(), "with the filter off, every known sound is listed");
+			screen.sounds().openHelp();
+			silent.addAll(silentControls(screen));
+			check(screen.sounds().helpList.getFocused() != null, "the search help takes focus, so arrows and Esc work in it");
+			screen.closeOverlay();
+			screen.sounds().openLevel(VILLAGER);
+			silent.addAll(silentControls(screen));
+			screen.closeOverlay();
+			AddToSetScreen add = new AddToSetScreen(screen, VILLAGER, "Villager mumbles", () -> { });
+			mc.gui.setScreen(add);
+			silent.addAll(silentControls(add));
+			add.chooseSet(SET.id());
+			silent.addAll(silentControls(add));
+			return silent;
+		});
+		check(silentSounds.isEmpty(), "controls without a label on the Sounds tab: " + silentSounds);
+		context.runOnClient(mc -> SoundsPanel.resetRememberedState());
+
+		// A-4 for the Sounds picker (FR-1.7): its checkboxes and Like this… in both filter modes, and the groups pop-up.
+		List<String> silentPicker = context.computeOnClient(mc -> {
+			List<String> silent = new ArrayList<>();
+			for (boolean recentOnly : new boolean[] {true, false}) {
+				SoundPickerScreen picker = new SoundPickerScreen(null, pickerDraft(), PICKER_SUBTITLE);
+				mc.gui.setScreen(picker);
+				picker.sounds().setRecentOnly(recentOnly);
+				silent.addAll(silentControls(picker));
+			}
+			SoundPickerScreen picker = (SoundPickerScreen) mc.gui.screen();
+			check(!picker.sounds().list.children().isEmpty(), "with the filter off, the picker lists every known sound");
+			picker.sounds().openLikeThis(VILLAGER);
+			silent.addAll(silentControls(picker));
+			check(picker.sounds().likeThisList.getFocused() != null, "Like this… takes focus, so arrows, Space and Esc work in it");
+			return silent;
+		});
+		check(silentPicker.isEmpty(), "controls without a label in the Sounds picker: " + silentPicker);
+		context.runOnClient(mc -> SoundsPanel.resetRememberedState());
+
+		// A-4: every control on the Sound Sets, Zones and Profiles tabs has something to read out.
+		for (int tab : new int[] {SoundSculptorScreen.TAB_SETS, SoundSculptorScreen.TAB_ZONES, SoundSculptorScreen.TAB_PROFILES}) {
+			List<String> silent = context.computeOnClient(mc -> {
+				SoundSculptorScreen screen = new SoundSculptorScreen();
+				mc.gui.setScreen(screen);
+				screen.selectTab(tab);
+				return silentControls(screen);
+			});
+			check(silent.isEmpty(), "controls without a label on tab " + tab + ": " + silent);
+		}
+		// A-4 for the sound trace's inline controls (FR-14.4) and its Volume panel.
+		List<String> silentTrace = context.computeOnClient(mc -> {
+			TraceScreen trace = new TraceScreen(null, "minecraft:entity.villager.ambient");
+			mc.gui.setScreen(trace);
+			List<String> silent = new ArrayList<>(silentControls(trace));
+			trace.openVolume(QUICK_R2, QuickEntries.get(ProfileManager.profile(), "r2"));
+			silent.addAll(silentControls(trace));
+			return silent;
+		});
+		check(silentTrace.isEmpty(), "controls without a label in the sound trace: " + silentTrace);
+		// FR-14.4: a shared set's line (SET on Everywhere and Trading hall) lists its places in its tooltip, and the
+		// narrator reads them with the line's button; a "No entry matches" line's Add to Quick changes and its choice.
+		List<String> silentSets = context.computeOnClient(mc -> {
+			TraceScreen trace = new TraceScreen(null, COW);
+			mc.gui.setScreen(trace);
+			SculptList.Row line = trace.setRow(PlaceRef.EVERYWHERE, SET.id());
+			check(line != null && line.tooltip() != null && line.tooltip().getString().startsWith("Used in Everywhere and Trading hall."),
+					"the shared set's line lists its places, was " + (line == null || line.tooltip() == null ? null : line.tooltip().getString()));
+			String read = NarrationCompat.collect(line.buttons().get(0)::updateNarration);
+			check(read.contains("Used in Everywhere and Trading hall"), "the narrator reads the places, was " + read);
+			List<String> silent = new ArrayList<>(silentControls(trace));
+			// SET matches the cow on Everywhere and Quick changes does not: Everywhere's own line offers Add to Quick
+			// changes, read with the line; its choice is labelled, and Esc returns focus to that button.
+			SculptList.Row placeLine = trace.row(new TraceText.PlaceTarget(PlaceRef.EVERYWHERE));
+			check(placeLine != null && placeLine.buttons().size() == 1
+					&& placeLine.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
+					"Everywhere's line offers Add to Quick changes when only a library set matches");
+			String placeSaid = NarrationCompat.collect(placeLine.buttons().get(0)::updateNarration);
+			check(placeSaid.contains(placeLine.narrationText().getString()) && placeSaid.contains("Add to Quick changes"),
+					"Add to Quick changes on Everywhere's line is read with the line, was " + placeSaid);
+			trace.openAddToQuickChanges(PlaceRef.EVERYWHERE);
+			silent.addAll(silentControls(trace));
+			trace.closeOverlay();
+			check(trace.lines.getFocused() == placeLine && placeLine.getFocused() == placeLine.buttons().get(0),
+					"closing the choice returns focus to Everywhere's Add to Quick changes");
+			TraceScreen none = new TraceScreen(null, PIG);
+			mc.gui.setScreen(none);
+			silent.addAll(silentControls(none));
+			SculptList.Row add = none.row(new TraceText.NoEntryTarget(PlaceRef.EVERYWHERE));
+			check(add != null && add.buttons().get(0).getMessage().getString().equals("Add to Quick changes"),
+					"the no-match line has a labelled Add to Quick changes");
+			none.openAddToQuickChanges(PlaceRef.EVERYWHERE);
+			silent.addAll(silentControls(none));
+			check(none.getFocused() == none.addQuickMute, "the choice takes focus, so Tab, arrows and Enter work in it");
+			return silent;
+		});
+		check(silentSets.isEmpty(), "controls without a label in the sound trace's set and Add to Quick changes lines: " + silentSets);
+		// A-4 for the set editor, its Attach to… menu, the Quick changes editor and the entry editor.
+		List<String> silentEditors = context.computeOnClient(mc -> {
+			SetEditorScreen editor = SetEditorScreen.edit(null, SET.id());
+			mc.gui.setScreen(editor);
+			List<String> silent = new ArrayList<>(silentControls(editor));
+			editor.attachedPanel().openAttachMenu();
+			silent.addAll(silentControls(editor));
+			SetEditorScreen quick = SetEditorScreen.forQuickChanges(null, PlaceRef.EVERYWHERE);
+			mc.gui.setScreen(quick);
+			silent.addAll(silentControls(quick));
+			EntryEditorScreen entry = EntryEditorScreen.edit(null, SetDraft.of(SET), "e1");
+			mc.gui.setScreen(entry);
+			silent.addAll(silentControls(entry));
+			return silent;
+		});
+		check(silentEditors.isEmpty(), "controls without a label in the set and entry editors: " + silentEditors);
+		// FR-4.8: plain words in the entry editor list sounds with This sound and Like this; the Like this groups show
+		// their counts. Everything is narrated with the sound or group, keeps to the window, and takes focus.
+		List<String> findProblems = context.computeOnClient(mc -> {
+			List<String> problems = new ArrayList<>();
+			EntryEditorScreen entry = EntryEditorScreen.edit(null, SetDraft.of(SET), "e1");
+			mc.gui.setScreen(entry);
+			entry.patternField.setValue("cow");
+			if (!entry.searching() || entry.matchList.findRow(COW) == null) {
+				problems.add("the words should list " + COW);
+				return problems;
+			}
+			SculptList.Row row = entry.matchList.findRow(COW);
+			problems.addAll(silentControls(entry));
+			problems.addAll(check(mc, entry, "entry editor search results"));
+			for (SculptButton button : row.buttons()) {
+				String said = NarrationCompat.collect(button::updateNarration);
+				if (!said.contains("Cow") || !said.contains(button.getMessage().getString())) {
+					problems.add("the " + button.getMessage().getString() + " button is not narrated with the sound: " + said);
+				}
+			}
+			entry.showFamilies(COW, row.buttons().get(1));
+			if (entry.familyButtons().isEmpty()) {
+				problems.add("Like this should list groups");
+			}
+			for (AbstractWidget group : entry.familyButtons()) {
+				String said = NarrationCompat.collect(group::updateNarration);
+				if (!group.getMessage().getString().matches("minecraft:.* · \\d+ sounds?") || !said.contains(group.getMessage().getString())) {
+					problems.add("a group is not narrated with its pattern and count: " + said);
+				}
+				if (group.getX() < 0 || group.getY() < 0 || group.getRight() > entry.width || group.getBottom() > entry.height) {
+					problems.add("a Like this group is outside the window: " + describe(group));
+				}
+			}
+			if (!entry.familyButtons().isEmpty() && entry.getFocused() == null) {
+				problems.add("the Like this list should take focus, so Tab, arrows and Enter work");
+			}
+			return problems;
+		});
+		check(findProblems.isEmpty(), "finding a sound in the entry editor: " + findProblems);
+		// A-4 for a place's Sound Sets (FR-8.6) and Attach set….
+		List<String> silentPlaces = context.computeOnClient(mc -> {
+			List<String> silent = new ArrayList<>();
+			for (PlaceRef where : List.of(PlaceRef.EVERYWHERE, PlaceRef.zone("z1"))) {
+				PlaceSetsScreen places = new PlaceSetsScreen(null, where);
+				mc.gui.setScreen(places);
+				silent.addAll(silentControls(places));
+			}
+			AttachSetScreen attach = new AttachSetScreen(null, PlaceRef.zone("z2"));
+			mc.gui.setScreen(attach);
+			silent.addAll(silentControls(attach));
+			return silent;
+		});
+		check(silentPlaces.isEmpty(), "controls without a label in the Sound Sets of a place: " + silentPlaces);
+		// A-4 for the import's rename screen (FR-11.5a).
+		List<String> silentImport = context.computeOnClient(mc -> {
+			SetRenameOnImportScreen rename = Screens.renameOnImport();
+			mc.gui.setScreen(rename);
+			return silentControls(rename);
+		});
+		check(silentImport.isEmpty(), "controls without a label in the import's rename screen: " + silentImport);
+		// A-4 for the delete warning, the linked-save confirmation and the import's exact-match dialog.
+		List<String> silentDialogs = context.computeOnClient(mc -> {
+			List<String> silent = new ArrayList<>();
+			for (Screens dialog : List.of(Screens.SET_DELETE, Screens.SET_SAVE_CONFIRM_MANY, Screens.IMPORT_EXACT_MATCH)) {
+				Screen opened = dialog.open(mc);
+				mc.gui.setScreen(opened);
+				silent.addAll(silentControls(opened));
+			}
+			return silent;
+		});
+		check(silentDialogs.isEmpty(), "controls without a label in the dialogs: " + silentDialogs);
+
+		// FR-4.11: a set used in 40 long-named zones. The delete warning lists every place; it scrolls so Delete and
+		// Cancel stay on screen; the wheel, Up/Down and Page Up/Down move it; the narrator reads every place.
+		context.runOnClient(mc -> {
+			SculptDialog dialog = (SculptDialog) Screens.SET_DELETE_MANY.open(mc);
+			mc.gui.setScreen(dialog);
+			String message = dialog.message().getString();
+			for (int i = 1; i <= MANY_ZONES; i++) {
+				check(message.contains(manyZoneName(i)), "the warning lists every place, missing " + manyZoneName(i));
+			}
+			check(dialog.isScrollable(), "40 places do not fit at " + dialog.width + "x" + dialog.height + ", so the warning scrolls");
+			for (SculptButton button : dialog.buttons()) {
+				check(button.getY() >= 0 && button.getBottom() <= dialog.height, "the buttons stay on screen: " + button.getMessage().getString());
+			}
+			check(dialog.firstVisibleLine() == 0, "it starts at the top");
+		});
+		context.getInput().pressKey(InputConstants.KEY_PAGEDOWN);
+		context.waitTicks(1);
+		context.runOnClient(mc -> {
+			SculptDialog dialog = (SculptDialog) mc.gui.screen();
+			int last = dialog.lineCount() - dialog.visibleLineCount();
+			check(dialog.firstVisibleLine() == Math.min(dialog.visibleLineCount(), last), "Page Down moves a screenful, at " + dialog.firstVisibleLine());
+			int at = dialog.firstVisibleLine();
+			dialog.mouseScrolled(dialog.width / 2.0, dialog.height / 2.0, 0, -1);
+			check(dialog.firstVisibleLine() == Math.min(last, at + 3), "the wheel scrolls down 3 lines, at " + dialog.firstVisibleLine());
+			dialog.scrollBy(1000);
+			check(dialog.firstVisibleLine() == last, "it scrolls to the last line and stops there");
+		});
+		context.getInput().pressKey(InputConstants.KEY_UP);
+		context.waitTicks(1);
+		context.runOnClient(mc -> {
+			SculptDialog dialog = (SculptDialog) mc.gui.screen();
+			check(dialog.firstVisibleLine() == dialog.lineCount() - dialog.visibleLineCount() - 1, "Up moves one line");
+			check(dialog.getNarrationMessage().getString().contains(manyZoneName(MANY_ZONES)), "the narrator reads every place");
+			check(dialog.getFocused() == dialog.buttons().get(1), "Cancel still has focus");
+		});
+		context.takeScreenshot("a11y-delete-many-places");
+		context.setScreen(() -> null);
+
+		// A-3: every screen at every window size and GUI scale.
+		List<String> english = layoutProblems(context);
+		System.out.println("A11Y layout (English): " + english.size() + " problems" + (english.isEmpty() ? "" : "\n  " + String.join("\n  ", english)));
+		check(english.isEmpty(), english.size() + " layout problems in English, first: " + (english.isEmpty() ? "" : english.get(0)));
+
+		// Pseudo-language: the same check with every Sound Sculptor text about 40% longer.
+		context.runOnClient(mc -> Language.inject(new PseudoLanguage(Language.getInstance())));
+		List<String> pseudo;
+		try {
+			pseudo = layoutProblems(context);
+		} finally {
+			context.runOnClient(mc -> Language.inject(((PseudoLanguage) Language.getInstance()).english));
+		}
+		System.out.println("A11Y layout (pseudo-language, text 40% longer): " + pseudo.size() + " problems"
+				+ (pseudo.isEmpty() ? "" : "\n  " + String.join("\n  ", pseudo)));
+		// The Diagnostics timing lines ("… µs") show live numbers whose length changes from run to run, so whether they are
+		// cut does too: they are reported above but not counted against the ceiling.
+		long gated = pseudo.stream().filter(p -> !(p.contains("SETTINGS_DIAGNOSTICS: label cut off") && p.contains("µ"))).count();
+		System.out.println("A11Y layout (pseudo-language) counted against the ceiling: " + gated + " of at most " + PSEUDO_CEILING);
+		check(gated <= PSEUDO_CEILING, "pseudo-language layout problems rose to " + gated + " (ceiling " + PSEUDO_CEILING
+				+ "): fix the new ones, or lower the ceiling when the count falls");
 	}
 
 	/** Every screen, tab and settings page, at every window size and GUI scale. */

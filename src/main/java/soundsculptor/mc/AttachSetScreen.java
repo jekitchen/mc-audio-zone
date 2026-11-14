@@ -89,9 +89,8 @@ public final class AttachSetScreen extends SculptScreen {
 			String name = set.name();
 			String entries = PlaceSetsPanel.entriesText(set.entries().size());
 			String used = SetLibraryPanel.usageText(ws.profile().placesUsing(id).size(), usage == null ? 0 : usage.otherCount(id, key), usage != null);
-			Component rowName = Component.literal(name);
 			SculptButton attach = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.attach_set.attach"), ATTACH_WIDTH,
-					() -> attach(id)).narrationContext(() -> rowName), Component.translatable("soundsculptor.attach_set.attach.tip"));
+					() -> attach(id)), Component.translatable("soundsculptor.attach_set.attach.tip"));
 			rows.add(new SculptList.Row(id, List.of(
 					new SculptList.Row.Column(() -> name, 0, 0),
 					new SculptList.Row.Column(() -> entries, ENTRIES_WIDTH, 0),

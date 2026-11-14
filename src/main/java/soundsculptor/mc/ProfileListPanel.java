@@ -3,9 +3,7 @@ package soundsculptor.mc;
 import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileOps;
 import soundsculptor.core.profile.ProfileSummary;
-import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.Workspace;
-import soundsculptor.core.zones.Precedence;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
@@ -84,9 +82,16 @@ public final class ProfileListPanel {
 		sorted.sort(Comparator.comparing((ProfileManager.Stored s) -> s.profile() == null)
 				.thenComparing(s -> s.profile() == null ? null : summary(s, connected), Comparator.nullsLast(ProfileSummary.ORDER))
 				.thenComparing(ProfileManager.Stored::key));
+		// The counts column is as wide as the widest count in this list, so the key beside it keeps its room.
+		int countsWidth = 0;
+		for (ProfileManager.Stored s : sorted) {
+			if (s.profile() != null) {
+				countsWidth = Math.max(countsWidth, SculptList.Row.Column.widthFor(Component.literal(countsText(summary(s, connected)))));
+			}
+		}
 		List<SculptList.Row> rows = new ArrayList<>(sorted.size());
 		for (ProfileManager.Stored s : sorted) {
-			rows.add(row(s, connected));
+			rows.add(row(s, connected, countsWidth));
 		}
 		list.setRows(rows);
 	}
@@ -95,7 +100,7 @@ public final class ProfileListPanel {
 		return ProfileSummary.of(s.key(), s.profile(), connected);
 	}
 
-	private SculptList.Row row(ProfileManager.Stored s, String connected) {
+	private SculptList.Row row(ProfileManager.Stored s, String connected, int countsWidth) {
 		List<SculptButton> buttons = new ArrayList<>();
 		String keyText = s.keyKnown() ? s.key()
 				: Component.translatable("soundsculptor.profiles.key_unknown", s.key()).getString();
@@ -116,22 +121,20 @@ public final class ProfileListPanel {
 				? Component.translatable("soundsculptor.profiles.never_joined").getString()
 				: Component.translatable("soundsculptor.profiles.joined",
 						LocalDate.ofInstant(summary.lastJoined(), ZoneId.systemDefault()).toString()).getString();
-		String counts = Component.translatable("soundsculptor.profiles.counts", summary.setCount(), summary.zoneCount()).getString();
-		Component rowName = Component.literal(summary.displayName());
+		String counts = countsText(summary);
 		if (ProfileManager.isLoaded() && !summary.connected() && s.keyKnown()) {
 			Component copy = Component.translatable("soundsculptor.profiles.copy");
-			buttons.add(Tooltips.describe(SculptButton.text(copy, SculptButton.widthFor(copy), () -> confirmCopy(s))
-					.narrationContext(() -> rowName), Component.translatable("soundsculptor.profiles.copy.tip")));
+			buttons.add(Tooltips.describe(SculptButton.text(copy, SculptButton.widthFor(copy), () -> confirmCopy(s)),
+					Component.translatable("soundsculptor.profiles.copy.tip")));
 		}
 		if (s.keyKnown()) {
 			Component export = Component.translatable("soundsculptor.transfer.export");
 			buttons.add(Tooltips.describe(SculptButton.text(export, SculptButton.widthFor(export),
-					() -> ProfileTransfer.exportWithDialog(host, s.key(), s.profile())).narrationContext(() -> rowName),
+					() -> ProfileTransfer.exportWithDialog(host, s.key(), s.profile())),
 					Component.translatable("soundsculptor.transfer.export.tip")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.profiles.rename"),
-					() -> setScreen(new ProfileRenameScreen(host, s.key(), s.profile()))).narrationContext(() -> rowName));
-			buttons.add(SculptButton.icon(RESET_ICON, Component.translatable("soundsculptor.profiles.reset"), () -> confirmReset(s))
-					.narrationContext(() -> rowName));
+					() -> setScreen(new ProfileRenameScreen(host, s.key(), s.profile()))));
+			buttons.add(SculptButton.icon(RESET_ICON, Component.translatable("soundsculptor.profiles.reset"), () -> confirmReset(s)));
 		}
 		SculptButton delete = deleteButton(s, summary.displayName());
 		if (!summary.canDelete()) {
@@ -143,7 +146,7 @@ public final class ProfileListPanel {
 				new SculptList.Row.Column(() -> name, 0, 0),
 				new SculptList.Row.Column(() -> when, whenWidth(), 0),
 				new SculptList.Row.Column(() -> keyText, 0, 1),
-				new SculptList.Row.Column(() -> counts, countsWidth(), 1)), buttons);
+				new SculptList.Row.Column(() -> counts, countsWidth, 1)), buttons);
 	}
 
 	/** Fits "Never joined" and "Joined 2026-11-12". */
@@ -152,14 +155,13 @@ public final class ProfileListPanel {
 				Component.translatable("soundsculptor.profiles.joined", SAMPLE_DATE));
 	}
 
-	/** Fits "Sound Sets: 256 · Zones: 64", the most a profile can have. */
-	private static int countsWidth() {
-		return SculptList.Row.Column.widthFor(Component.translatable("soundsculptor.profiles.counts", SetLibrary.MAX_SETS, Precedence.MAX_ZONES));
+	/** "Sound Sets: 4 · Zones: 2". */
+	private static String countsText(ProfileSummary summary) {
+		return Component.translatable("soundsculptor.profiles.counts", summary.setCount(), summary.zoneCount()).getString();
 	}
 
 	private SculptButton deleteButton(ProfileManager.Stored s, String name) {
-		return SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.profiles.delete"), () -> confirmDelete(s, name))
-				.narrationContext(() -> Component.literal(name));
+		return SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.profiles.delete"), () -> confirmDelete(s, name));
 	}
 
 	/** The profiles as last listed (tests). */

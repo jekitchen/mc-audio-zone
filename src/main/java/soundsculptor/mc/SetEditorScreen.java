@@ -242,7 +242,7 @@ public final class SetEditorScreen extends SculptScreen {
 			String details = entry.pattern().isExact() ? join(target, details(entry, known)) : details(entry, known);
 			List<SculptButton> buttons = new ArrayList<>();
 			buttons.add(Tooltips.describe(SculptButton.text(SculptToggle.stateText(entry.enabled()), ON_OFF_WIDTH,
-					() -> setEntryEnabled(id, !entry.enabled())).narrationContext(() -> Component.translatable("soundsculptor.set_editor.entry")),
+					() -> setEntryEnabled(id, !entry.enabled())),
 					Component.translatable(entry.enabled() ? "soundsculptor.set_editor.turn_off" : "soundsculptor.set_editor.turn_on")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.set_editor.edit"), () -> editEntry(id)));
 			SculptButton up = SculptButton.icon(UP_ICON, Component.translatable("soundsculptor.set_editor.move_up"), () -> moveEntry(id, -1));

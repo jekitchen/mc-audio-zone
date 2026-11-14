@@ -102,7 +102,7 @@ public final class AddToSetScreen extends SculptScreen {
 		body.fill(list);
 		Component chooseLabel = Component.translatable("soundsculptor.add_to_set.choose");
 		int chooseWidth = SculptButton.widthFor(chooseLabel);
-		int entriesWidth = PlaceSetsPanel.entriesWidth();
+		int entriesWidth = PlaceSetsPanel.entriesWidth(ProfileManager.library().sets());
 		List<SculptList.Row> rows = new ArrayList<>();
 		for (SoundSet set : ProfileManager.library().sets()) {
 			String id = set.id();

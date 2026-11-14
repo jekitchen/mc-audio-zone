@@ -223,7 +223,6 @@ public final class PickerClientGameTest implements FabricClientGameTest {
 		}
 	}
 
-	/** Picks that would pass 512 entries show the limit; the picker stays open and the draft is unchanged. */
 	/**
 	 * The picker remembers its own filter and search, so using it leaves the Sounds tab as the player left it. Its header
 	 * names the set as the set editor does: the saved name while a new one is only typed, and the place for Quick changes.
@@ -278,6 +277,7 @@ public final class PickerClientGameTest implements FabricClientGameTest {
 		}
 	}
 
+	/** Picks that would pass 512 entries show the limit; the picker stays open and the draft is unchanged. */
 	private static void overLimitShowsMessage(ClientGameTestContext context) {
 		List<SetEntry> many = new ArrayList<>();
 		for (int i = 1; i <= SoundSet.MAX_ENTRIES - 2; i++) {
