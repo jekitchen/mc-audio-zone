@@ -41,7 +41,7 @@ class ApplyToTest {
 	void everywhereIsAlwaysFirstAndAloneWithNoZones() {
 		List<ApplyTarget> choices = ApplyTo.choices(profile(), WORLD, OVERWORLD, HOME);
 		assertEquals(List.of(ApplyTarget.EVERYWHERE), choices);
-		assertEquals("soundsculptor.recent.apply_to.everywhere", choices.get(0).translationKey());
+		assertEquals("soundsculptor.sounds.apply_to.everywhere", choices.get(0).translationKey());
 		assertEquals(List.of(), choices.get(0).args());
 	}
 
@@ -80,7 +80,7 @@ class ApplyToTest {
 		Zone bubble = sphere("bubble", "anywhere", "minecraft:the_end", new Point(0, 0, 0), 8).asBubble();
 		List<ApplyTarget> choices = ApplyTo.choices(profile(bubble), WORLD, NETHER, HOME);
 		assertEquals(List.of("everywhere", "bubble"), ids(choices));
-		assertEquals("soundsculptor.recent.apply_to.bubble", choices.get(1).translationKey());
+		assertEquals("soundsculptor.sounds.apply_to.bubble", choices.get(1).translationKey());
 		assertEquals(List.of("Zone bubble"), choices.get(1).args());
 	}
 
@@ -105,7 +105,7 @@ class ApplyToTest {
 	@Test
 	void zoneLabelsUseTheZoneName() {
 		ApplyTarget target = ApplyTo.choices(profile(sphere("z1", WORLD, OVERWORLD, HOME, 5)), WORLD, OVERWORLD, HOME).get(1);
-		assertEquals("soundsculptor.recent.apply_to.zone", target.translationKey());
+		assertEquals("soundsculptor.sounds.apply_to.zone", target.translationKey());
 		assertEquals(List.of("Zone z1"), target.args());
 	}
 

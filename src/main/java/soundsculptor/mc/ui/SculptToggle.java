@@ -49,6 +49,17 @@ public class SculptToggle extends AbstractButton {
 		return Component.translatable(on ? "soundsculptor.ui.on" : "soundsculptor.ui.off");
 	}
 
+	/** The width of a toggle that fits "Label: On" and "Label: Off", so it keeps its size when pressed. */
+	public static int widthFor(Component label) {
+		net.minecraft.client.gui.Font font = net.minecraft.client.Minecraft.getInstance().font;
+		int on = font.width(Component.translatable("soundsculptor.ui.toggle", label, stateText(true)));
+		int off = font.width(Component.translatable("soundsculptor.ui.toggle", label, stateText(false)));
+		return Math.max(on, off) + TEXT_PADDING;
+	}
+
+	/** Room around the text (vanilla's button border plus a little). */
+	private static final int TEXT_PADDING = 12;
+
 	@Override
 	protected void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
 		extractDefaultSprite(g);

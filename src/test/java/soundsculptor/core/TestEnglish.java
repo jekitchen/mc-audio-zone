@@ -170,7 +170,12 @@ public final class TestEnglish implements Translator {
 			Map.entry("soundsculptor.trace.zone_reason.only_zone", "Only zone"),
 			Map.entry("soundsculptor.trace.zone_reason.closest", "Closest anchor"),
 			Map.entry("soundsculptor.trace.zone_reason.tie_smaller_zone", "Tie on distance; smaller zone wins"),
-			Map.entry("soundsculptor.trace.zone_reason.tie_list_order", "Tie on distance and size; higher in the list")));
+			Map.entry("soundsculptor.trace.zone_reason.tie_list_order", "Tie on distance and size; higher in the list"),
+			// Like this groups (FR-4.8)
+			Map.entry("soundsculptor.rule_editor.family", "%1$s · %2$s sounds"),
+			Map.entry("soundsculptor.rule_editor.family.one", "%1$s · 1 sound"),
+			Map.entry("soundsculptor.add_to_set.matches", "Matches %s sounds"),
+			Map.entry("soundsculptor.add_to_set.matches.one", "Matches 1 sound")));
 
 	@Override
 	public String translate(String key, Object... args) {

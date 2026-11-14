@@ -3,6 +3,7 @@ package soundsculptor.gametest;
 import soundsculptor.core.recent.SortOrder;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundSculptorSettings;
+import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.RecentLog;
 import soundsculptor.mc.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptList;
@@ -21,8 +22,9 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Automated version of the M3 milestone test (PRD 11.1: FR-1 acceptance criteria rows 1, 2, 4 and 5) plus the
- * Recently Played tab's controls: Pause (and P), sort, filter, refresh rate, keyboard access and narration.
+ * Automated version of the M3 milestone test (PRD 11.1: FR-1 acceptance criteria rows 1, 2, 4 and 5) on the Sounds
+ * tab with the Recently played filter on, plus its controls: Pause (and P), sort, search, refresh rate, keyboard access
+ * and narration.
  */
 public final class M3ClientGameTest implements FabricClientGameTest {
 	private static final String VILLAGER = "minecraft:entity.villager.ambient";
@@ -36,18 +38,17 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> {
 				RecentLog.get().sounds().clear();
 				SoundSculptorSettings.setShowDistance(true);
+				SoundsPanel.resetRememberedState();
 			});
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
-			context.runOnClient(mc -> {
-				screen(mc).selectTab(SoundSculptorScreen.TAB_RECENT);
-				screen(mc).setPaused(false);
-			});
-			check(context.computeOnClient(mc -> screen(mc).recentList.children().isEmpty()), "the list should start empty in a new world");
+			context.runOnClient(mc -> screen(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS));
+			check(context.computeOnClient(mc -> sounds(mc).isRecentOnly()), "the Recently played filter is on when the tab first opens");
+			check(context.computeOnClient(mc -> sounds(mc).list.children().isEmpty()), "the list should start empty in a new world");
 			context.takeScreenshot("m3-empty");
 
-			// AC 4: the Recently Played tab does not pause the game.
-			check(!context.computeOnClient(mc -> screen(mc).isPauseScreen()), "Recently Played must not pause the game");
+			// AC 4: the Sounds tab does not pause the game.
+			check(!context.computeOnClient(mc -> screen(mc).isPauseScreen()), "the Sounds tab must not pause the game");
 			long before = context.computeOnClient(mc -> mc.level.getGameTime());
 			context.waitTicks(20);
 			long after = context.computeOnClient(mc -> mc.level.getGameTime());
@@ -81,44 +82,47 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 			check(rowTexts(context, "minecraft:ui.button.click") == null, "UI sounds must never be listed");
 
 			// Pause freezes the list; P (with the list focused) resumes it.
-			context.runOnClient(mc -> screen(mc).setPaused(true));
+			context.runOnClient(mc -> sounds(mc).setPaused(true));
 			play(context, ANVIL, SoundSource.BLOCKS, 2.0);
 			check(rowTexts(context, ANVIL) == null, "a paused list must not change");
-			context.runOnClient(mc -> screen(mc).setFocused(screen(mc).filterField));
-			context.getInput().pressKey(InputConstants.KEY_TAB);
+			// Tab order: search field, ?, Recently played, Apply to, Pause, Sort, then the list.
+			context.runOnClient(mc -> screen(mc).setFocused(sounds(mc).searchField));
+			for (int i = 0; i < 6; i++) {
+				context.getInput().pressKey(InputConstants.KEY_TAB);
+			}
 			context.waitTicks(2);
-			check(context.computeOnClient(mc -> screen(mc).getFocused() == screen(mc).recentList), "Tab from the filter should enter the list");
+			check(context.computeOnClient(mc -> screen(mc).getFocused() == sounds(mc).list), "Tab from the search field should reach the list after the toolbar");
 			context.getInput().pressKey(InputConstants.KEY_P);
 			context.waitTicks(SETTLE);
-			check(!context.computeOnClient(mc -> screen(mc).isListPaused()), "P with the list focused should resume");
+			check(!context.computeOnClient(mc -> sounds(mc).isPaused()), "P with the list focused should resume");
 			check(rowTexts(context, ANVIL) != null, "after resuming, the anvil sound should appear");
 
 			// Keyboard focus and narration of a read-only row.
-			String narration = context.computeOnClient(mc -> NarrationCompat.collect(screen(mc).recentList::updateNarration));
+			String narration = context.computeOnClient(mc -> NarrationCompat.collect(sounds(mc).list::updateNarration));
 			// Focus stays on the same sound when newer rows arrive above it, so the position can be 1 or 2.
 			check(narration.matches("(?s).*row [12] out of 2.*") && (narration.contains("Anvil landed") || narration.contains("Villager mumbles"))
 					&& narration.contains("Friendly Mobs") == narration.contains("Villager mumbles"),
 					"the focused row should be narrated with its text and position, was: " + narration);
 
 			// Refresh at most 4 times per second (FR-1.6).
-			int refreshesBefore = context.computeOnClient(mc -> screen(mc).refreshCount);
+			int refreshesBefore = context.computeOnClient(mc -> sounds(mc).refreshCount);
 			context.waitTicks(40);
-			int refreshes = context.computeOnClient(mc -> screen(mc).refreshCount) - refreshesBefore;
+			int refreshes = context.computeOnClient(mc -> sounds(mc).refreshCount) - refreshesBefore;
 			check(refreshes >= 6 && refreshes <= 9, "expected about 8 refreshes in 2 seconds, got " + refreshes);
 
 			// Sort: by play count the villager (2 plays) is first; by name "Anvil landed" is first.
-			context.runOnClient(mc -> screen(mc).setSort(SortOrder.PLAY_COUNT));
+			context.runOnClient(mc -> sounds(mc).setSort(SortOrder.PLAY_COUNT));
 			check(firstRowKey(context).equals(VILLAGER), "by play count the villager (2 plays) comes first");
-			context.runOnClient(mc -> screen(mc).setSort(SortOrder.NAME));
+			context.runOnClient(mc -> sounds(mc).setSort(SortOrder.NAME));
 			check(firstRowKey(context).equals(ANVIL), "by name 'Anvil landed' comes first");
-			context.runOnClient(mc -> screen(mc).setSort(SortOrder.MOST_RECENT));
+			context.runOnClient(mc -> sounds(mc).setSort(SortOrder.MOST_RECENT));
 
-			// Filter.
-			context.runOnClient(mc -> screen(mc).filterField.setValue("villager"));
+			// Search with the filter on.
+			context.runOnClient(mc -> sounds(mc).searchField.setValue("villager"));
 			context.waitTicks(SETTLE);
-			check(context.computeOnClient(mc -> screen(mc).recentList.children().size()) == 1 && rowTexts(context, VILLAGER) != null,
-					"filtering by 'villager' should leave only the villager row");
-			context.runOnClient(mc -> screen(mc).filterField.setValue(""));
+			check(context.computeOnClient(mc -> sounds(mc).list.children().size()) == 1 && rowTexts(context, VILLAGER) != null,
+					"searching for 'villager' should leave only the villager row");
+			context.runOnClient(mc -> sounds(mc).searchField.setValue(""));
 			context.waitTicks(SETTLE);
 			context.takeScreenshot("m3-recently-played");
 
@@ -136,13 +140,13 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> screen(mc).selectTab(SoundSculptorScreen.TAB_SETTINGS));
 			context.waitTicks(2);
 			context.takeScreenshot("m3-settings");
-			context.runOnClient(mc -> screen(mc).selectTab(SoundSculptorScreen.TAB_RECENT));
+			context.runOnClient(mc -> screen(mc).selectTab(SoundSculptorScreen.TAB_SOUNDS));
 			context.setScreen(() -> null);
 		}
 	}
 
 	private static String firstRowKey(ClientGameTestContext context) {
-		return context.computeOnClient(mc -> (String) screen(mc).recentList.children().get(0).key());
+		return context.computeOnClient(mc -> (String) sounds(mc).list.children().get(0).key());
 	}
 
 	/** Plays a sound {@code blocksAway} east of the listener, then waits for the list to refresh. */
@@ -159,7 +163,7 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 	/** The column texts of the row for {@code id}, or null if it is not listed. */
 	private static List<String> rowTexts(ClientGameTestContext context, String id) {
 		return context.computeOnClient(mc -> {
-			SculptList.Row row = screen(mc).recentList.findRow(id);
+			SculptList.Row row = sounds(mc).list.findRow(id);
 			return row == null ? null : row.columnTexts();
 		});
 	}
@@ -167,6 +171,10 @@ public final class M3ClientGameTest implements FabricClientGameTest {
 	private static SoundSculptorScreen screen(Minecraft mc) {
 		check(mc.gui.screen() instanceof SoundSculptorScreen, "expected the Sound Sculptor screen, found " + mc.gui.screen());
 		return (SoundSculptorScreen) mc.gui.screen();
+	}
+
+	private static SoundsPanel sounds(Minecraft mc) {
+		return screen(mc).sounds();
 	}
 
 	private static void check(boolean condition, String message) {

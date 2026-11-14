@@ -95,11 +95,30 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 		return Math.max(1, getHeight() / ROW_HEIGHT);
 	}
 
+	/**
+	 * Where {@code row}'s buttons and columns go in this list now, without drawing it: for the layout check (A-3). The
+	 * content area is vanilla's (the row inset by 2 px each side, as {@code Entry.getContentX} and
+	 * {@code getContentWidth}).
+	 */
+	public Row.Layout layout(Row row) {
+		return row.layout(getRowLeft() + 2, getRowWidth() - 4);
+	}
+
 	// ---- Layout and drawing ----
 
 	@Override
 	public int getRowWidth() {
 		return getWidth() - scrollbarWidth() - 4;
+	}
+
+	/**
+	 * Where the next added row goes. Vanilla adds up the height of every row already in the list, so filling a list of
+	 * n rows took n² steps (about 6 ms for the 2,000 rows of the Sounds tab's full list, PRD 9.1). Every row here is
+	 * {@link #ROW_HEIGHT} tall, so it is one multiplication.
+	 */
+	@Override
+	public int getNextY() {
+		return getY() + 2 - (int) scrollAmount() + children().size() * defaultEntryHeight;
 	}
 
 	@Override
@@ -139,11 +158,13 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 		return pathTo(row, buttonIndex);
 	}
 
-	/** Moves keyboard focus to the row's first button (or its focus target), e.g. when the list opens in an overlay. */
-	public void focusRow(Row row) {
-		if (Minecraft.getInstance().gui.screen() instanceof SculptScreen screen) {
-			screen.focusPath(pathTo(row, 0));
-		}
+	/**
+	 * Moves keyboard focus to the row's first button (or its focus target), e.g. when the list opens in an overlay.
+	 *
+	 * @param host the screen the list is on, which need not be the screen showing yet (a pop-up opened while building)
+	 */
+	public void focusRow(SculptScreen host, Row row) {
+		host.focusPath(pathTo(row, 0));
 	}
 
 	private ComponentPath pathTo(Row row, int buttonIndex) {
@@ -221,13 +242,38 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 	public static class Row extends ContainerObjectSelectionList.Entry<Row> {
 		static final int SWATCH_SIZE = 12;
 
+		/** The least the rest column (width 0) gets while a {@linkplain Column#shrinks shrinking} column can give way. */
+		public static final int REST_MIN_WIDTH = 80;
+		/** The least a {@linkplain Column#shrinks shrinking} column gives way to. */
+		public static final int SHRINK_MIN_WIDTH = 40;
+
 		/**
-		 * A text column. {@code width} 0 means "take the remaining space" (at most one such column per line).
+		 * A text column. {@code width} 0 means "take the remaining space" (at most one such column per line): the rest
+		 * column, which holds the row's long text (a name, an ID, a pattern) and is cut with "…" when it does not fit.
+		 * A fixed width should fit every text the column can show ({@link #widthFor}), so rows line up and nothing is cut.
 		 * {@code line} 0 is the main line; line 1 is a second, dimmer line underneath.
+		 *
+		 * @param shrinks the column shows something the player named (a zone), which may be longer than its width: it is
+		 *                cut with "…" like the rest column, and in a narrow row it gives way (down to
+		 *                {@value #SHRINK_MIN_WIDTH} px) so the rest column keeps {@value #REST_MIN_WIDTH} px
 		 */
-		public record Column(Supplier<String> text, int width, int line) {
+		public record Column(Supplier<String> text, int width, int line, boolean shrinks) {
+			public Column(Supplier<String> text, int width, int line) {
+				this(text, width, line, false);
+			}
+
 			public Column(Supplier<String> text, int width) {
 				this(text, width, 0);
+			}
+
+			/** The width a fixed column needs for the widest of {@code texts}: e.g. every status it can show. */
+			public static int widthFor(Component... texts) {
+				Font font = Minecraft.getInstance().font;
+				int widest = 0;
+				for (Component text : texts) {
+					widest = Math.max(widest, font.width(text));
+				}
+				return widest;
 			}
 		}
 
@@ -326,24 +372,19 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 			}
 			int x = getContentX();
 			int y = getContentY();
-			int width = getContentWidth();
 			int height = getContentHeight();
 			if (getFocused() != null) {
 				Draw.fill(g, getX(), getY(), getWidth(), getHeight(), Theme.ROW_FOCUSED);
 			} else if (hovered) {
 				Draw.fill(g, getX(), getY(), getWidth(), getHeight(), Theme.ROW_HOVER);
 			}
+			Layout layout = layout(x, getContentWidth());
 
 			// Buttons, right-aligned.
-			int buttonsWidth = 0;
-			for (SculptButton button : buttons) {
-				buttonsWidth += button.getWidth() + Theme.GAP;
-			}
-			int bx = x + width - buttonsWidth + Theme.GAP;
-			for (SculptButton button : buttons) {
-				button.setPosition(bx, y + (height - button.getHeight()) / 2);
+			for (int i = 0; i < buttons.size(); i++) {
+				SculptButton button = buttons.get(i);
+				button.setPosition(layout.buttonX().get(i), y + (height - button.getHeight()) / 2);
 				button.extractRenderState(g, mouseX, mouseY, partialTick);
-				bx += button.getWidth() + Theme.GAP;
 			}
 
 			if (focusTarget != null) {
@@ -353,48 +394,103 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 
 			// Color square, then text columns, line by line.
 			Font font = Minecraft.getInstance().font;
-			int textLeft = x;
 			if (swatch >= 0) {
 				int size = SWATCH_SIZE;
 				int sy = y + (height - size) / 2;
 				Draw.fill(g, x, sy, size, size, Theme.SEPARATOR);
 				Draw.fill(g, x + 1, sy + 1, size - 2, size - 2, 0xFF000000 | swatch);
-				textLeft = x + size + Theme.GAP;
 			}
-			int textRight = x + width - buttonsWidth - Theme.GAP;
 			boolean twoLines = columns.stream().anyMatch(column -> column.line() == 1);
 			boolean cutShown = false;
-			for (int line = 0; line <= 1; line++) {
-				int fixed = 0;
-				for (Column column : columns) {
-					if (column.line() == line) {
-						fixed += column.width() + Theme.GAP;
-					}
-				}
+			for (Placed placed : layout.columns()) {
+				int line = placed.column().line();
 				int textY = twoLines
 						? y + 1 + line * (font.lineHeight + 2)
 						: y + (height - font.lineHeight) / 2 + 1;
 				int color = line == 0 ? Theme.TEXT : Theme.TEXT_DIM;
+				int cx = placed.x();
+				String text = placed.column().text().get();
+				boolean cut = Draw.truncatedText(g, font, text, cx, textY, placed.width(), color);
+				if (cut && hovered && mouseX >= cx && mouseX < cx + placed.width()
+						&& mouseY >= textY && mouseY < textY + font.lineHeight) {
+					Draw.tooltip(g, font, Component.literal(text), mouseX, mouseY);
+					cutShown = true;
+				}
+			}
+			if (tooltip != null && !cutShown && hovered && mouseX >= layout.textLeft() && mouseX < layout.textRight()) {
+				g.setTooltipForNextFrame(font, Tooltip.splitTooltip(Minecraft.getInstance(), tooltip), mouseX, mouseY);
+			}
+		}
+
+		/**
+		 * Where the row's parts go in a row whose content starts at {@code x} and is {@code width} wide: the buttons
+		 * right-aligned, then the color square and the text columns in the space left of them. A fixed column gets its
+		 * width while there is room and less when there is not; the rest column (width 0) gets what its line has left,
+		 * and a shrinking column gives way to keep it {@value #REST_MIN_WIDTH} px wide. Drawing and the layout check
+		 * (A-3) both use this, so the check sees what the player sees.
+		 */
+		public Layout layout(int x, int width) {
+			int buttonsWidth = 0;
+			for (SculptButton button : buttons) {
+				buttonsWidth += button.getWidth() + Theme.GAP;
+			}
+			List<Integer> buttonX = new ArrayList<>(buttons.size());
+			int bx = x + width - buttonsWidth + Theme.GAP;
+			for (SculptButton button : buttons) {
+				buttonX.add(bx);
+				bx += button.getWidth() + Theme.GAP;
+			}
+			int textLeft = swatch >= 0 ? x + SWATCH_SIZE + Theme.GAP : x;
+			int textRight = x + width - buttonsWidth - Theme.GAP;
+			List<Placed> placed = new ArrayList<>(columns.size());
+			int[] widths = new int[columns.size()];
+			for (int line = 0; line <= 1; line++) {
+				int fixed = 0;
+				boolean hasRest = false;
+				for (int i = 0; i < columns.size(); i++) {
+					Column column = columns.get(i);
+					if (column.line() == line) {
+						widths[i] = column.width();
+						fixed += column.width() + Theme.GAP;
+						hasRest |= column.width() == 0;
+					}
+				}
+				int deficit = hasRest ? REST_MIN_WIDTH - (textRight - textLeft - fixed) : 0;
+				for (int i = 0; i < columns.size() && deficit > 0; i++) {
+					Column column = columns.get(i);
+					if (column.line() == line && column.shrinks()) {
+						int give = Math.min(deficit, Math.max(0, column.width() - SHRINK_MIN_WIDTH));
+						widths[i] -= give;
+						fixed -= give;
+						deficit -= give;
+					}
+				}
 				int cx = textLeft;
-				for (Column column : columns) {
+				for (int i = 0; i < columns.size(); i++) {
+					Column column = columns.get(i);
 					if (column.line() != line) {
 						continue;
 					}
-					int columnWidth = column.width() > 0 ? column.width() : Math.max(0, textRight - textLeft - fixed);
+					int columnWidth = column.width() > 0 ? widths[i] : Math.max(0, textRight - textLeft - fixed);
 					columnWidth = Math.min(columnWidth, Math.max(0, textRight - cx));
-					String text = column.text().get();
-					boolean cut = Draw.truncatedText(g, font, text, cx, textY, columnWidth, color);
-					if (cut && hovered && mouseX >= cx && mouseX < cx + columnWidth
-							&& mouseY >= textY && mouseY < textY + font.lineHeight) {
-						Draw.tooltip(g, font, Component.literal(text), mouseX, mouseY);
-						cutShown = true;
-					}
+					placed.add(new Placed(column, cx, columnWidth));
 					cx += columnWidth + Theme.GAP;
 				}
 			}
-			if (tooltip != null && !cutShown && hovered && mouseX >= textLeft && mouseX < textRight) {
-				g.setTooltipForNextFrame(font, Tooltip.splitTooltip(Minecraft.getInstance(), tooltip), mouseX, mouseY);
-			}
+			return new Layout(textLeft, textRight, List.copyOf(buttonX), List.copyOf(placed));
+		}
+
+		/**
+		 * A row's parts as {@link #layout} places them.
+		 *
+		 * @param buttonX the left edge of each button, in {@link #buttons()} order
+		 * @param columns each text column with where it starts and the width it gets, line 0 first
+		 */
+		public record Layout(int textLeft, int textRight, List<Integer> buttonX, List<Placed> columns) {
+		}
+
+		/** A text column as placed: its left edge and the width it gets (less than it asks for in a narrow row). */
+		public record Placed(Column column, int x, int width) {
 		}
 
 		/** The list this row is in (set when the row is added), for the drawn-rows counter. */

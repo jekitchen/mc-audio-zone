@@ -60,7 +60,7 @@ public final class ProfileImportScreen extends SculptScreen {
 			String name = file.getFileName().toString();
 			String modified = modified(file);
 			SculptButton button = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.transfer.import"), IMPORT_WIDTH,
-					() -> choose(file)).narrationContext(() -> Component.literal(name)),
+					() -> choose(file)),
 					Component.translatable("soundsculptor.transfer.import.tip"));
 			rows.add(new SculptList.Row(name, List.of(
 					new SculptList.Row.Column(() -> name, 0, 0),

@@ -149,7 +149,7 @@ class QuickChangesTest {
 		assertSame(both.library(), result.after().library());
 
 		UndoSlot<Workspace> undo = new UndoSlot<>();
-		undo.offer(result.before(), result.after(), "soundsculptor.recent.toast.unmuted", List.of(COW), 1000);
+		undo.offer(result.before(), result.after(), "soundsculptor.sounds.toast.unmuted", List.of(COW), 1000);
 		Workspace undone = undo.undo(result.after(), 2000).orElseThrow();
 		assertEquals(both, undone, "Undo restores the Quick changes mute and leaves the library mute");
 		assertTrue(QuickActions.isMuted(undone, EVERYWHERE, COW));

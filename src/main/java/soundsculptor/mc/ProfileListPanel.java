@@ -26,9 +26,8 @@ import net.minecraft.resources.Identifier;
  * the tab). Works outside a world too (from Mod Menu), without Copy and Import.
  */
 public final class ProfileListPanel {
-	private static final int WHEN_WIDTH = 110;
-	private static final int COPY_WIDTH = 44;
-	private static final int EXPORT_WIDTH = 50;
+	/** A date as the rows show it ("Joined 2026-11-12"): every date is as long. */
+	private static final String SAMPLE_DATE = "2026-11-12";
 	private static final Identifier EDIT_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/edit");
 	private static final Identifier RESET_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/reset");
 	private static final Identifier DELETE_ICON = Identifier.fromNamespaceAndPath("soundsculptor", "icon/delete");
@@ -83,9 +82,16 @@ public final class ProfileListPanel {
 		sorted.sort(Comparator.comparing((ProfileManager.Stored s) -> s.profile() == null)
 				.thenComparing(s -> s.profile() == null ? null : summary(s, connected), Comparator.nullsLast(ProfileSummary.ORDER))
 				.thenComparing(ProfileManager.Stored::key));
+		// The counts column is as wide as the widest count in this list, so the key beside it keeps its room.
+		int countsWidth = 0;
+		for (ProfileManager.Stored s : sorted) {
+			if (s.profile() != null) {
+				countsWidth = Math.max(countsWidth, SculptList.Row.Column.widthFor(Component.literal(countsText(summary(s, connected)))));
+			}
+		}
 		List<SculptList.Row> rows = new ArrayList<>(sorted.size());
 		for (ProfileManager.Stored s : sorted) {
-			rows.add(row(s, connected));
+			rows.add(row(s, connected, countsWidth));
 		}
 		list.setRows(rows);
 	}
@@ -94,7 +100,7 @@ public final class ProfileListPanel {
 		return ProfileSummary.of(s.key(), s.profile(), connected);
 	}
 
-	private SculptList.Row row(ProfileManager.Stored s, String connected) {
+	private SculptList.Row row(ProfileManager.Stored s, String connected, int countsWidth) {
 		List<SculptButton> buttons = new ArrayList<>();
 		String keyText = s.keyKnown() ? s.key()
 				: Component.translatable("soundsculptor.profiles.key_unknown", s.key()).getString();
@@ -115,20 +121,20 @@ public final class ProfileListPanel {
 				? Component.translatable("soundsculptor.profiles.never_joined").getString()
 				: Component.translatable("soundsculptor.profiles.joined",
 						LocalDate.ofInstant(summary.lastJoined(), ZoneId.systemDefault()).toString()).getString();
-		String counts = Component.translatable("soundsculptor.profiles.counts", summary.setCount(), summary.zoneCount()).getString();
-		Component rowName = Component.literal(summary.displayName());
+		String counts = countsText(summary);
 		if (ProfileManager.isLoaded() && !summary.connected() && s.keyKnown()) {
-			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.profiles.copy"), COPY_WIDTH, () -> confirmCopy(s))
-					.narrationContext(() -> rowName), Component.translatable("soundsculptor.profiles.copy.tip")));
+			Component copy = Component.translatable("soundsculptor.profiles.copy");
+			buttons.add(Tooltips.describe(SculptButton.text(copy, SculptButton.widthFor(copy), () -> confirmCopy(s)),
+					Component.translatable("soundsculptor.profiles.copy.tip")));
 		}
 		if (s.keyKnown()) {
-			buttons.add(Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.transfer.export"), EXPORT_WIDTH,
-					() -> ProfileTransfer.exportWithDialog(host, s.key(), s.profile())).narrationContext(() -> rowName),
+			Component export = Component.translatable("soundsculptor.transfer.export");
+			buttons.add(Tooltips.describe(SculptButton.text(export, SculptButton.widthFor(export),
+					() -> ProfileTransfer.exportWithDialog(host, s.key(), s.profile())),
 					Component.translatable("soundsculptor.transfer.export.tip")));
 			buttons.add(SculptButton.icon(EDIT_ICON, Component.translatable("soundsculptor.profiles.rename"),
-					() -> setScreen(new ProfileRenameScreen(host, s.key(), s.profile()))).narrationContext(() -> rowName));
-			buttons.add(SculptButton.icon(RESET_ICON, Component.translatable("soundsculptor.profiles.reset"), () -> confirmReset(s))
-					.narrationContext(() -> rowName));
+					() -> setScreen(new ProfileRenameScreen(host, s.key(), s.profile()))));
+			buttons.add(SculptButton.icon(RESET_ICON, Component.translatable("soundsculptor.profiles.reset"), () -> confirmReset(s)));
 		}
 		SculptButton delete = deleteButton(s, summary.displayName());
 		if (!summary.canDelete()) {
@@ -138,14 +144,24 @@ public final class ProfileListPanel {
 		buttons.add(delete);
 		return new SculptList.Row(s.key(), List.of(
 				new SculptList.Row.Column(() -> name, 0, 0),
-				new SculptList.Row.Column(() -> when, WHEN_WIDTH, 0),
+				new SculptList.Row.Column(() -> when, whenWidth(), 0),
 				new SculptList.Row.Column(() -> keyText, 0, 1),
-				new SculptList.Row.Column(() -> counts, WHEN_WIDTH, 1)), buttons);
+				new SculptList.Row.Column(() -> counts, countsWidth, 1)), buttons);
+	}
+
+	/** Fits "Never joined" and "Joined 2026-11-12". */
+	private static int whenWidth() {
+		return SculptList.Row.Column.widthFor(Component.translatable("soundsculptor.profiles.never_joined"),
+				Component.translatable("soundsculptor.profiles.joined", SAMPLE_DATE));
+	}
+
+	/** "Sound Sets: 4 · Zones: 2". */
+	private static String countsText(ProfileSummary summary) {
+		return Component.translatable("soundsculptor.profiles.counts", summary.setCount(), summary.zoneCount()).getString();
 	}
 
 	private SculptButton deleteButton(ProfileManager.Stored s, String name) {
-		return SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.profiles.delete"), () -> confirmDelete(s, name))
-				.narrationContext(() -> Component.literal(name));
+		return SculptButton.icon(DELETE_ICON, Component.translatable("soundsculptor.profiles.delete"), () -> confirmDelete(s, name));
 	}
 
 	/** The profiles as last listed (tests). */

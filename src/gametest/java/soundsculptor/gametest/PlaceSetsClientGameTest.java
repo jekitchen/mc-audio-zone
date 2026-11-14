@@ -110,7 +110,12 @@ public final class PlaceSetsClientGameTest implements FabricClientGameTest {
 
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);
-			context.runOnClient(mc -> ((SoundSculptorScreen) mc.gui.screen()).toggleMute(COW));
+			context.runOnClient(mc -> {
+				SoundSculptorScreen main = (SoundSculptorScreen) mc.gui.screen();
+				soundsculptor.mc.SoundsPanel.resetRememberedState();
+				main.selectTab(SoundSculptorScreen.TAB_SOUNDS);
+				main.sounds().toggleMute(COW);
+			});
 			check(context.computeOnClient(mc -> ProfileManager.profile().everywhere().attached().get(0).enabled()),
 					"Mute on a sound row switches Quick changes back on");
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, COW)), "and the sound is muted");
