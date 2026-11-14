@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -470,5 +471,20 @@ class TraceEditorTest {
 
 		TraceEditResult cleared = ok(TraceEditor.edit(context(PLAY), start, inQuick(PlaceRef.EVERYWHERE, "e1"), new EntryEdit.Mute(null)));
 		assertFalse(cleared.after().profile().everywhere().quickEntries().get(0).enabled(), "clearing a value leaves the entry off");
+	}
+
+	/**
+	 * PutBack replaces the entry it is given, so it is only for Quick changes through QuickActions.apply; an entry line
+	 * refuses it loudly instead of overwriting an unrelated entry.
+	 */
+	@Test
+	void anEntryLineRefusesPutBack() {
+		Workspace start = ws(List.of(farm()), PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", AMBIENT).withMute(true)))
+				.attach("farm"));
+		EntryEdit putBack = new EntryEdit.PutBack(SetEntry.of("other", "*pig*").withVolume(10), false);
+		assertThrows(IllegalArgumentException.class,
+				() -> TraceEditor.edit(context(PLAY), start, inQuick(PlaceRef.EVERYWHERE, "e1"), putBack));
+		assertThrows(IllegalArgumentException.class,
+				() -> TraceEditor.edit(context(PLAY), start, inLibrary(PlaceRef.EVERYWHERE, "farm", "e1"), putBack));
 	}
 }

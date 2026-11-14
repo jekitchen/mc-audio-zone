@@ -522,9 +522,43 @@ class QuickChangesTest {
 		EntryEdit unmute = memory.toggleMute("w", muted, EVERYWHERE, COW, true);
 		QuickActionResult result = QuickActions.apply(muted, EVERYWHERE, COW, unmute);
 		assertEquals(start, result.after());
+		memory.applied("w", EVERYWHERE, COW, unmute, result.before(), result.after());
 		UndoSlot<Workspace> undo = new UndoSlot<>();
 		undo.offer(result.before(), result.after(), "soundsculptor.sounds.toast.unmuted", List.of(COW), 1000);
-		assertEquals(muted, undo.undo(result.after(), 2000).orElseThrow(), "Undo of Unmute brings the mute back");
+		Workspace undone = undo.undo(result.after(), 2000).orElseThrow();
+		assertEquals(muted, undone, "Undo of Unmute brings the mute back");
+		assertEquals(start, press(undone, memory, "w"), "a second Unmute after the Undo still puts the entry back exactly");
+	}
+
+	/**
+	 * Quick changes switched off with an entry of its own: Mute switches it on (FR-8.6), and the Unmute that follows
+	 * switches it back off, so the entry the player had switched off with it stops applying again.
+	 */
+	@Test
+	void muteThenUnmuteSwitchesQuickChangesBackOff() {
+		Workspace start = ws(quickOff(SetEntry.of("e1", PIG).withMute(true)));
+		assertFalse(QuickActions.isMuted(start, EVERYWHERE, PIG));
+		MuteMemory memory = new MuteMemory();
+		Workspace muted = press(start, memory, "w");
+		assertTrue(quickOn(muted.profile().everywhere()));
+		assertTrue(QuickActions.isMuted(muted, EVERYWHERE, PIG), "with Quick changes on, its pig mute applies");
+		Workspace unmuted = press(muted, memory, "w");
+		assertEquals(start, unmuted, "Mute then Unmute leaves Quick changes switched off, as it was");
+		assertFalse(QuickActions.isMuted(unmuted, EVERYWHERE, PIG));
+		assertMuteThenUnmuteRestores(ws(quickOff(SetEntry.of("e1", PIG).withMute(true), SetEntry.of("e2", COW).withVolume(40))));
+	}
+
+	/** Once something else at the place changed after the Mute, Unmute puts only the entry back: Quick changes stays on. */
+	@Test
+	void quickChangesStaysOnWhenThePlaceChangedSinceTheMute() {
+		Workspace start = ws(quickOff(SetEntry.of("e1", PIG).withMute(true)));
+		MuteMemory memory = new MuteMemory();
+		Workspace muted = press(start, memory, "w");
+		Workspace changed = apply(muted, EVERYWHERE, "minecraft:entity.hen.ambient", new EntryEdit.Volume(30));
+		Workspace unmuted = press(changed, memory, "w");
+		assertNull(quickEntry(unmuted, EVERYWHERE, COW), "the entry the Mute made is gone");
+		assertTrue(quickOn(unmuted.profile().everywhere()), "the player used Quick changes since, so it stays on");
+		assertEquals(30, quickEntry(unmuted, EVERYWHERE, "minecraft:entity.hen.ambient").volume());
 	}
 
 	/** The memory is only for the entry that Mute left: once the entry changed, Unmute works as without it. */

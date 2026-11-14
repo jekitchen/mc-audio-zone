@@ -22,9 +22,14 @@ import soundsculptor.core.trace.TraceEditError;
  *
  * <p>An edit that clears a value never adds an entry or turns one on, an entry left setting nothing is removed, and an
  * empty Quick changes set is removed. An edit that sets a value switches the place's Quick changes back on if the
- * player had switched it off (FR-8.6), so Mute never silently does nothing. Mute followed by Unmute leaves the profile
- * as it was when the row's button goes through {@link MuteMemory}, which puts the entry back exactly; {@link #toggleMute}
- * alone has only the entry to go by.
+ * player had switched it off (FR-8.6), so Mute never silently does nothing.
+ *
+ * <p>Mute followed by Unmute leaves the place exactly as it was when the row's button goes through {@link MuteMemory}:
+ * Unmute puts the sound's entry back as it was before the Mute (its own Cue included, or no entry), and switches Quick
+ * changes back off if the Mute switched it on and nothing else at the place changed since. This holds within one
+ * session, also after Undo of the Unmute, while the entry is still what the Mute left. After a restart, or once the
+ * entry changed, Unmute is the plain {@link #toggleMute}, which has only the entry to go by: it clears the mute and a
+ * Cue equal to the default, or writes "Not muted", and leaves Quick changes switched on.
  */
 public final class QuickActions {
 	private QuickActions() {
@@ -144,10 +149,14 @@ public final class QuickActions {
 		SoundSet quick = quickOf(place);
 		SetEntry old = singleSoundEntry(quick, soundId);
 		if (edit instanceof EntryEdit.PutBack putBack) {
-			// The entry exactly as it was before a quick Mute, on or off, or none: nothing else is switched.
+			// The entry exactly as it was before a quick Mute, on or off, or none (EntryEdit.PutBack is only applied here),
+			// and Quick changes switched back off if that Mute switched it on.
 			SoundSet changedSet = putBack.entry() != null ? quick.putEntry(putBack.entry())
 					: old != null ? quick.removeEntry(old.id()) : quick;
 			PlaceSets after = place.withQuickChanges(changedSet.entries().isEmpty() ? null : changedSet);
+			if (putBack.quickOff() && after.quickChanges() != null) {
+				after = after.setEnabled(SoundSet.QUICK_ID, false);
+			}
 			return after.equals(place) ? null : after;
 		}
 		boolean setsSomething = setsAnything(edit.apply(SetEntry.of("probe", soundId)));

@@ -137,12 +137,18 @@ public sealed interface EntryEdit {
 
 	/**
 	 * Quick action Unmute right after a quick Mute ({@link soundsculptor.core.quick.MuteMemory}): puts back the
-	 * sound's single-sound entry exactly as it was before that Mute, or removes it when there was none, so Mute then
-	 * Unmute leaves the profile as it was, the entry's own Cue included. Only for Quick changes.
+	 * sound's single-sound entry exactly as it was before that Mute, or removes it when there was none, and switches the
+	 * place's Quick changes back off if that Mute had switched it on, so Mute then Unmute leaves the profile as it was.
 	 *
-	 * @param entry the entry as it was, or {@code null} if the Mute created it
+	 * <p>Only for {@code QuickActions.apply}, which handles it on its own (the entry is put back as it was, not edited):
+	 * {@link #apply} ignores the entry it is given whenever {@code entry} is set, so applied anywhere else it would
+	 * replace an unrelated entry. {@code TraceEditor.edit} refuses it for that reason.
+	 *
+	 * @param entry    the entry as it was, or {@code null} if the Mute created it
+	 * @param quickOff whether to switch the place's Quick changes back off (the Mute switched it on, and nothing else
+	 *                 at the place changed since)
 	 */
-	record PutBack(SetEntry entry) implements EntryEdit {
+	record PutBack(SetEntry entry, boolean quickOff) implements EntryEdit {
 		@Override
 		public TraceEditError validate() {
 			return null;
