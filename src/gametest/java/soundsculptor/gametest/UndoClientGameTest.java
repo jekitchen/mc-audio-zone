@@ -15,7 +15,7 @@ import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.ProfileManager;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptScreen;
 import com.mojang.blaze3d.platform.InputConstants;

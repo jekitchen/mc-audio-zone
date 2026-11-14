@@ -5,7 +5,7 @@ import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundSculptorSettings;
 import soundsculptor.mc.SoundsPanel;
 import soundsculptor.mc.RecentLog;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptList;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;

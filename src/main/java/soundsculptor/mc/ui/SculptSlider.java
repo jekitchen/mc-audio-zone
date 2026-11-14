@@ -1,6 +1,7 @@
 package soundsculptor.mc.ui;
 
 import soundsculptor.core.ui.SliderModel;
+import soundsculptor.mc.compat.Keys;
 import java.util.function.DoubleConsumer;
 import java.util.function.DoubleFunction;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -8,7 +9,6 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
-import com.mojang.blaze3d.platform.InputConstants;
 
 /**
  * Slider (PRD 6.2) on top of vanilla's slider. Keyboard: Left/Right move by one step, Shift+Left/Right by the fine
@@ -57,12 +57,13 @@ public class SculptSlider extends AbstractSliderButton {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		double before = model.value();
-		switch (event.key()) {
-			case InputConstants.KEY_LEFT -> model.stepBy(-1, event.hasShiftDown());
-			case InputConstants.KEY_RIGHT -> model.stepBy(1, event.hasShiftDown());
-			default -> {
-				return super.keyPressed(event);
-			}
+		int key = event.key();
+		if (key == Keys.LEFT) {
+			model.stepBy(-1, event.hasShiftDown());
+		} else if (key == Keys.RIGHT) {
+			model.stepBy(1, event.hasShiftDown());
+		} else {
+			return super.keyPressed(event);
 		}
 		syncFromModel(before);
 		return true;

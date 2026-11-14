@@ -1,6 +1,11 @@
 package soundsculptor.mc.ui;
 
 import soundsculptor.core.ui.Truncation;
+import soundsculptor.mc.compat.RuntimeLookup;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
+import java.lang.reflect.Field;
 import net.minecraft.client.gui.ActiveTextCollector;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -17,6 +22,15 @@ import net.minecraft.util.FormattedCharSequence;
  * <p>Coordinates are GUI pixels; colors are ARGB.
  */
 public final class Draw {
+	/**
+	 * {@code blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, height)} as
+	 * {@code (GuiGraphicsExtractor, Identifier, int, int, int, int) -> void}. Found by name when this class loads because
+	 * the pipeline's type moved package in 26.3 ({@code com.mojang.blaze3d.pipeline.RenderPipeline} to
+	 * {@code com.mojang.renderpearl.api.pipeline.RenderPipeline}), and naming it in code would tie the jar to one
+	 * version (docs/PORTING.md, "One jar for every version").
+	 */
+	private static final MethodHandle BLIT_GUI_SPRITE = guiSpriteBlitter();
+
 	private Draw() {
 	}
 
@@ -68,7 +82,20 @@ public final class Draw {
 
 	/** A sprite from the GUI atlas, e.g. {@code soundsculptor:icon/mute} for textures/gui/sprites/icon/mute.png. */
 	public static void sprite(GuiGraphicsExtractor g, Identifier sprite, int x, int y, int width, int height) {
-		g.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, height);
+		try {
+			BLIT_GUI_SPRITE.invokeExact(g, sprite, x, y, width, height);
+		} catch (RuntimeException | Error e) {
+			throw e;
+		} catch (Throwable t) {
+			throw new IllegalStateException(t);
+		}
+	}
+
+	private static MethodHandle guiSpriteBlitter() {
+		Field pipeline = RuntimeLookup.staticField(RenderPipelines.class, "GUI_TEXTURED");
+		MethodHandle blitSprite = RuntimeLookup.virtualMethod(GuiGraphicsExtractor.class, "blitSprite", MethodType.methodType(
+				void.class, pipeline.getType(), Identifier.class, int.class, int.class, int.class, int.class));
+		return MethodHandles.insertArguments(blitSprite, 1, RuntimeLookup.staticValue(RenderPipelines.class, "GUI_TEXTURED"));
 	}
 
 	/** Restricts drawing to a rectangle until {@link #popClip}. Calls nest. */

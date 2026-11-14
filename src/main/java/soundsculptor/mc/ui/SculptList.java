@@ -1,6 +1,5 @@
 package soundsculptor.mc.ui;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -19,6 +18,7 @@ import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
+import soundsculptor.mc.compat.Keys;
 
 /**
  * Scrolling list (PRD 6.2, 6.3) on top of vanilla's container list, whose rows hold their own buttons.
@@ -201,10 +201,10 @@ public class SculptList extends ContainerObjectSelectionList<SculptList.Row> {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		int key = event.key();
-		if ((key == InputConstants.KEY_PAGEUP || key == InputConstants.KEY_PAGEDOWN) && getFocused() != null) {
+		if ((key == Keys.PAGE_UP || key == Keys.PAGE_DOWN) && getFocused() != null) {
 			Row current = getFocused();
 			int page = visibleRowCount();
-			int index = indexOf(current) + (key == InputConstants.KEY_PAGEDOWN ? page : -page);
+			int index = indexOf(current) + (key == Keys.PAGE_DOWN ? page : -page);
 			Row target = children().get(Math.max(0, Math.min(children().size() - 1, index)));
 			if (target != current && Minecraft.getInstance().gui.screen() instanceof SculptScreen screen) {
 				screen.focusPath(pathTo(target, current.focusedButtonIndex()));

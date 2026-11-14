@@ -1,4 +1,4 @@
-package soundsculptor.mc.compat;
+package soundsculptor.gametest.compat;
 
 import net.minecraft.client.input.KeyEvent;
 

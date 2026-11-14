@@ -12,6 +12,7 @@ import soundsculptor.mc.SoundLogger;
 import soundsculptor.mc.WorldSession;
 import soundsculptor.mc.ZoneMarking;
 import soundsculptor.mc.ZoneOutlines;
+import soundsculptor.mc.compat.Keys;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -33,10 +34,10 @@ public final class SoundSculptorClient implements ClientModInitializer {
 	 * Default key for opening the Sound Sculptor screen (FR-12.2). K was the PRD's first choice but clashes
 	 * with Iris ("Toggle shaders"); see the Decisions Log in docs/PRD.md.
 	 */
-	public static final int DEFAULT_OPEN_KEY = InputConstants.KEY_SEMICOLON;
+	public static final int DEFAULT_OPEN_KEY = Keys.SEMICOLON;
 
 	/** Default key for Bypass (FR-13.1); unused by vanilla and by the popular mods checked at M0. */
-	public static final int DEFAULT_BYPASS_KEY = InputConstants.KEY_F10;
+	public static final int DEFAULT_BYPASS_KEY = Keys.F10;
 
 	public static final KeyMapping.Category KEY_CATEGORY =
 			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
@@ -56,7 +57,7 @@ public final class SoundSculptorClient implements ClientModInitializer {
 		bypassKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.soundsculptor.bypass", DEFAULT_BYPASS_KEY, KEY_CATEGORY));
 		cancelMarkingKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-				"key.soundsculptor.cancel_marking", InputConstants.KEY_BACKSPACE, KEY_CATEGORY));
+				"key.soundsculptor.cancel_marking", Keys.BACKSPACE, KEY_CATEGORY));
 		outlinesKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.soundsculptor.outlines", InputConstants.UNKNOWN.getValue(), KEY_CATEGORY));
 

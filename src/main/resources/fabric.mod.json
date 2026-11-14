@@ -32,7 +32,7 @@
 	],
 	"depends": {
 		"fabricloader": ">=0.20.1",
-		"minecraft": "~${minecraft_version}",
+		"minecraft": "${minecraft_dependency}",
 		"java": ">=25",
 		"fabric-api": "*"
 	},

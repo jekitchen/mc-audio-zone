@@ -8,7 +8,7 @@ import soundsculptor.core.zones.Shape;
 import soundsculptor.core.zones.Zone;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundsPanel;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ProfileManager;
 import soundsculptor.mc.EntryEditorScreen;
 import soundsculptor.mc.SetEditorScreen;

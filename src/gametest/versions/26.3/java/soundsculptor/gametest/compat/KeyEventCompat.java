@@ -1,4 +1,4 @@
-package soundsculptor.mc.compat;
+package soundsculptor.gametest.compat;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.input.KeyEvent;
