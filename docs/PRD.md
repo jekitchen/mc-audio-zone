@@ -919,7 +919,7 @@ Build each case in AZ Test using a cow or villager in a boat as the source, then
 - [ ] Grayscale screenshot check: statuses, zone modes and cues still distinguishable.
 - [ ] Sodium; Iris with a shader pack; Sound Physics Remastered; Mod Menu present and absent.
 - [ ] Vanilla server, Realms (if available) and singleplayer all work with nothing on the server.
-- [ ] Pseudo-language build: no clipped text.
+- [ ] Pseudo-language build: no clipped text. For the alpha (English only) this check is reported, not required: controls and hints already fit text 40% longer, and the remaining list rows at the narrowest widths are fixed in M16, before any translation ships.
 - [ ] Every test above passes on each supported Minecraft version (26.2 and 26.3 for the first release).
 
 ## 12. Risks and assumptions
@@ -1128,3 +1128,4 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-13 | UI wording settled in M8d: the row action that sets a sound's level is "Level…" (FR-4.3 says Level), and the set editor has **Type a pattern…** next to Add sounds… so typed patterns stay reachable (FR-4.8) | Builder's call |
 | 2026-11-13 | Personal bubble zones and sphere shapes are dropped: every zone is a fixed box (MVP) or cylinder (v1); Everywhere plus a set covers the calm-building case (US-6); Copy from carries Everywhere's sets, its Quick changes and settings only; P9 removed. The mod is unreleased, so older sphere zones are not kept. A 'within N blocks of me' range on a set or Everywhere could cover 'only sounds near me' later. | Project owner |
 | 2026-11-14 | One jar for Minecraft 26.2 and 26.3 instead of one per version. Each version is still built and tested on its own, and CI requires both builds to be the same jar byte for byte; version differences go through helpers that look them up when the game starts (key codes, `RenderPipeline`, opening a folder). Replaces the M0 decision of one jar per version | Project owner |
+| 2026-11-14 | The 11.5 pseudo-language item is reported, not required, for the English-only alpha, as decided on 2026-11-09. Controls and hints now fit text 40% longer (#101); 38 list-row problems at the narrowest widths remain, held by a test ceiling, and are fixed in M16 before any translation ships | Project owner |
