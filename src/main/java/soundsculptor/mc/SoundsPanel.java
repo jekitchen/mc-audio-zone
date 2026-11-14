@@ -1,6 +1,5 @@
 package soundsculptor.mc;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +37,7 @@ import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.Workspace;
 import soundsculptor.core.trace.EntryEdit;
 import soundsculptor.core.zones.Point;
+import soundsculptor.mc.compat.Keys;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptCheckbox;
 import soundsculptor.mc.ui.SculptDropdown;
@@ -935,7 +935,7 @@ public final class SoundsPanel {
 
 	/** P toggles Pause while the list has focus and the Recently played filter is on (FR-1.3). */
 	public boolean keyPressed(KeyEvent event) {
-		if (event.key() == InputConstants.KEY_P && picker == null && state.recentOnly && list != null && host.getFocused() == list
+		if (event.key() == Keys.P && picker == null && state.recentOnly && list != null && host.getFocused() == list
 				&& !host.hasOverlay()) {
 			setPaused(!state.paused);
 			return true;

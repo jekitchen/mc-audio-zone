@@ -1,4 +1,4 @@
-package soundsculptor.mc.compat;
+package soundsculptor.gametest.compat;
 
 import java.util.function.Consumer;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
@@ -9,7 +9,7 @@ public final class NarrationCompat {
 	private NarrationCompat() {
 	}
 
-	/** The text the narrator would read for {@code source} (used by tests and diagnostics). */
+	/** The text the narrator would read for {@code source} (the game tests read narration with it). */
 	public static String collect(Consumer<NarrationElementOutput> source) {
 		ScreenNarrationCollector collector = new ScreenNarrationCollector();
 		collector.update(source);

@@ -1,5 +1,6 @@
-# Builds one jar per supported Minecraft version when a version tag (v0.1.0-alpha, ...) is pushed, and creates a DRAFT
-# GitHub release with the jars and the CHANGELOG.md entry. Nothing is published until a maintainer publishes the draft.
+# When a version tag (v0.1.0-alpha, ...) is pushed, builds the mod against every supported Minecraft version, checks the
+# builds are the same jar (one jar ships for all versions, docs/PORTING.md), and creates a DRAFT GitHub release with that
+# jar and the CHANGELOG.md entry. Nothing is published until a maintainer publishes the draft.
 # Uploading to Modrinth and CurseForge stays manual: see docs/RELEASING.md.
 name: release
 on:
@@ -44,7 +45,9 @@ jobs:
         with:
           name: jar-mc${{ matrix.minecraft }}
           # The mod jar only, not the -sources jar.
-          path: build/libs/soundsculptor-*+${{ matrix.minecraft }}.jar
+          path: |
+            build/libs/soundsculptor-*.jar
+            !build/libs/*-sources.jar
 
   draft-release:
     needs: build
@@ -54,11 +57,29 @@ jobs:
     steps:
       - name: checkout repository
         uses: actions/checkout@v6
-      - name: collect the jars
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: collect every version's jar
         uses: actions/download-artifact@v8
         with:
-          path: jars
-          merge-multiple: true
+          pattern: jar-mc*
+          path: builds
+      - name: check every version built the same jar
+        run: |
+          set -euo pipefail
+          jars=(builds/*/soundsculptor-*.jar)
+          if [ "${#jars[@]}" -lt 2 ]; then
+            echo "expected a jar from every Minecraft version, found: ${jars[*]}" >&2
+            exit 1
+          fi
+          for jar in "${jars[@]:1}"; do
+            java tools/CompareJars.java "${jars[0]}" "$jar"
+          done
+          mkdir jars
+          cp "${jars[0]}" jars/
       - name: take the changelog entry
         run: |
           version="${GITHUB_REF_NAME#v}"

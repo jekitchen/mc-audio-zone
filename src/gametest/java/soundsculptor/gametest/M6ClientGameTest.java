@@ -11,7 +11,7 @@ import soundsculptor.core.recent.PlayStatus;
 import soundsculptor.core.recent.RecentSounds;
 import soundsculptor.mc.RecentLog;
 import soundsculptor.mc.SoundsPanel;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptList;
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.List;

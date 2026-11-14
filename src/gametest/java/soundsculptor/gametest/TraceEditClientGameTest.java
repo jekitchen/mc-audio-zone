@@ -18,7 +18,7 @@ import soundsculptor.mc.SoundHook;
 import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.TraceScreen;
 import soundsculptor.mc.ZoneEditorScreen;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptDialog;
 import soundsculptor.mc.ui.SculptList;
 import com.mojang.blaze3d.platform.InputConstants;

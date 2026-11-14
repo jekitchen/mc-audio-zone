@@ -1,6 +1,5 @@
 package soundsculptor.mc.ui;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -8,6 +7,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
+import soundsculptor.mc.compat.Keys;
 
 /**
  * Modal dialog with 2 or 3 buttons (PRD 6.2), or a single OK for a message that offers no choice (an import that
@@ -124,19 +124,18 @@ public final class SculptDialog extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (event.key() == InputConstants.KEY_ESCAPE) {
+		if (event.key() == Keys.ESCAPE) {
 			choose(safeChoice);
 			return true;
 		}
 		// The buttons are one row, so Up and Down are free to scroll a long message.
 		if (isScrollable()) {
-			int by = switch (event.key()) {
-				case InputConstants.KEY_UP -> -1;
-				case InputConstants.KEY_DOWN -> 1;
-				case InputConstants.KEY_PAGEUP -> -visibleLines;
-				case InputConstants.KEY_PAGEDOWN -> visibleLines;
-				default -> 0;
-			};
+			int key = event.key();
+			int by = key == Keys.UP ? -1
+					: key == Keys.DOWN ? 1
+					: key == Keys.PAGE_UP ? -visibleLines
+					: key == Keys.PAGE_DOWN ? visibleLines
+					: 0;
 			if (by != 0) {
 				scrollBy(by);
 				return true;

@@ -9,6 +9,7 @@
 			"soundsculptor.gametest.GameTestWatchdog"
 		],
 		"fabric-client-gametest": [
+			"soundsculptor.gametest.OneJarClientGameTest",
 			"soundsculptor.gametest.M0ClientGameTest",
 			"soundsculptor.gametest.M1ClientGameTest",
 			"soundsculptor.gametest.M2ClientGameTest",

@@ -1,7 +1,7 @@
 package soundsculptor.gametest;
 
-import soundsculptor.mc.compat.KeyEventCompat;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.KeyEventCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptColorPicker;
 import soundsculptor.mc.ui.SculptDropdown;
 import soundsculptor.mc.ui.SculptList;

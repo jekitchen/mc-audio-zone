@@ -3,7 +3,21 @@ plugins {
 	id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
 
-version = "${project.mod_version}+${project.minecraft_version}"
+// One jar for every supported Minecraft version (docs/PORTING.md, "One jar for every version"). Each version is still
+// built and tested on its own (-Pminecraft_version), and every build must produce the same bytes:
+// tools/CompareJars.java checks that in CI. So nothing in the jar may depend on the version it was built against.
+def supportedMinecraft = project.supported_minecraft_versions.split(',')*.trim()
+if (!(project.minecraft_version in supportedMinecraft)) {
+	throw new GradleException("Minecraft ${project.minecraft_version} is not in supported_minecraft_versions (${supportedMinecraft.join(', ')}) in gradle.properties")
+}
+// "26.2-26.3": in the jar name and version, and in the manifest instead of the version Loom built against.
+def minecraftRange = supportedMinecraft.size() == 1 ? supportedMinecraft[0] : "${supportedMinecraft.first()}-${supportedMinecraft.last()}"
+// fabric.mod.json "minecraft" dependency: ["~26.2", "~26.3"], any one of which must match. "~26.3" is ">=26.3 <26.4-",
+// so each version's releases (26.3, 26.3.1, ...) are accepted and its snapshots and pre-releases, which Fabric Loader
+// orders before the release (26.3-pre.1 < 26.3), are not; the "-" also keeps out the next version's snapshots.
+def minecraftDependency = '[' + supportedMinecraft.collect { "\"~${it}\"" }.join(', ') + ']'
+
+version = "${project.mod_version}+mc${minecraftRange}"
 group = project.maven_group
 
 base {
@@ -26,14 +40,6 @@ if (modMenuVersion == null) {
 	throw new GradleException("No Mod Menu version for Minecraft ${project.minecraft_version}: add one to modMenuVersions in build.gradle")
 }
 
-// Version-specific source: src/main/versions/<minecraft_version>/java holds the few classes whose code differs
-// between Minecraft versions (each version keeps the same class names and public API). See docs/PORTING.md.
-def versionSources = file("src/main/versions/${project.minecraft_version}/java")
-if (!versionSources.isDirectory()) {
-	throw new GradleException("No version-specific sources for Minecraft ${project.minecraft_version}: expected ${versionSources}")
-}
-sourceSets.main.java.srcDir versionSources
-
 // Client game tests (src/gametest): launch the real game and drive it. Run with ./gradlew runClientGameTest
 fabricApi {
 	configureTests {
@@ -43,6 +49,17 @@ fabricApi {
 		enableClientGameTests = true
 		eula = true
 	}
+}
+
+// Test-only helpers whose code differs between Minecraft versions: src/gametest/versions/<minecraft_version>/java, one
+// copy per version with the same class names and public API. Main code has no such folder: it must compile to the same
+// bytes on every version (docs/PORTING.md).
+def gametestVersionSources = file("src/gametest/versions/${project.minecraft_version}/java")
+if (!gametestVersionSources.isDirectory()) {
+	throw new GradleException("No version-specific game test sources for Minecraft ${project.minecraft_version}: expected ${gametestVersionSources}")
+}
+sourceSets.matching { it.name == 'gametest' }.configureEach {
+	java.srcDir gametestVersionSources
 }
 
 // Game tests run like a release build: no per-sound log lines (M1's SoundLogger), so timings are not distorted.
@@ -73,11 +90,14 @@ dependencies {
 }
 
 processResources {
-	def props = [version: project.version, minecraft_version: project.minecraft_version]
+	def props = [version: project.version]
 	inputs.properties props
+	inputs.property 'minecraftDependency', minecraftDependency
 
 	filesMatching('fabric.mod.json') {
 		expand props
+		// The source keeps a string placeholder so it stays valid JSON; the dependency is a JSON array.
+		filter { String line -> line.replace('"@MINECRAFT_DEPENDENCY@"', minecraftDependency) }
 	}
 }
 
@@ -102,5 +122,38 @@ jar {
 
 	from('LICENSE') {
 		rename { "${it}_${projectName}" }
+	}
+
+	// After building the jar, Loom writes the Minecraft version it compiled against into the manifest
+	// (Fabric-Minecraft-Version; informational, Fabric Loader does not read it). The jar is the same for every supported
+	// version, so this action, which runs after Loom's, names the range instead. Entries keep their order and timestamps.
+	def manifestMinecraft = minecraftRange
+	inputs.property 'manifestMinecraft', manifestMinecraft
+	doLast { task ->
+		File jarFile = task.archiveFile.get().asFile
+		File rewritten = new File(jarFile.parentFile, jarFile.name + '.tmp')
+		new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
+			new java.util.zip.ZipOutputStream(new FileOutputStream(rewritten)).withCloseable { out ->
+				for (java.util.zip.ZipEntry entry : zip.entries().toList()) {
+					byte[] bytes = zip.getInputStream(entry).bytes
+					if (entry.name == 'META-INF/MANIFEST.MF') {
+						def manifest = new java.util.jar.Manifest(new ByteArrayInputStream(bytes))
+						if (manifest.mainAttributes.getValue('Fabric-Minecraft-Version') == null) {
+							throw new GradleException('Loom did not write Fabric-Minecraft-Version: check the order of the jar task actions')
+						}
+						manifest.mainAttributes.putValue('Fabric-Minecraft-Version', manifestMinecraft)
+						def buffer = new ByteArrayOutputStream()
+						manifest.write(buffer)
+						bytes = buffer.toByteArray()
+					}
+					def copy = new java.util.zip.ZipEntry(entry.name)
+					copy.time = entry.time
+					out.putNextEntry(copy)
+					out.write(bytes)
+					out.closeEntry()
+				}
+			}
+		}
+		java.nio.file.Files.move(rewritten.toPath(), jarFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
 	}
 }

@@ -1,5 +1,5 @@
-# Builds the mod and runs the pure-logic unit tests for every supported
-# Minecraft version on every push and pull request.
+# Builds the mod and runs the pure-logic unit tests for every supported Minecraft version on every push and pull
+# request, then checks that every version built the same jar (one jar ships for all of them, docs/PORTING.md).
 name: build
 on: [pull_request, push]
 
@@ -34,6 +34,47 @@ jobs:
         with:
           name: soundsculptor-mc${{ matrix.minecraft }}
           path: build/libs/
+
+  # The jar must be byte-for-byte the same whichever Minecraft version it was compiled against, so the one jar that
+  # ships is exactly what each version's build and game tests checked.
+  same-jar:
+    needs: build
+    runs-on: ubuntu-24.04
+    name: same jar for every Minecraft version
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v6
+      - name: setup jdk
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - name: collect every version's build
+        uses: actions/download-artifact@v8
+        with:
+          pattern: soundsculptor-mc*
+          path: builds
+      - name: compare the jars
+        run: |
+          set -euo pipefail
+          jars=()
+          for dir in builds/*/; do
+            jars+=("$(find "$dir" -maxdepth 1 -name 'soundsculptor-*.jar' ! -name '*-sources.jar')")
+          done
+          if [ "${#jars[@]}" -lt 2 ]; then
+            echo "expected a jar from every Minecraft version, found: ${jars[*]}" >&2
+            exit 1
+          fi
+          for jar in "${jars[@]:1}"; do
+            java tools/CompareJars.java "${jars[0]}" "$jar"
+          done
+          mkdir dist
+          cp "${jars[0]}" dist/
+      - name: capture the jar
+        uses: actions/upload-artifact@v7
+        with:
+          name: soundsculptor
+          path: dist/
 
   client-gametest:
     runs-on: ubuntu-24.04

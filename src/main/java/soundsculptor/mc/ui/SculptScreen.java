@@ -1,6 +1,5 @@
 package soundsculptor.mc.ui;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +21,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Util;
 import soundsculptor.core.ui.RowFlow;
 import soundsculptor.core.ui.WrappedLines;
+import soundsculptor.mc.compat.Keys;
 
 /**
  * Screen base (PRD 6.1, 6.2): header (title, subtitle such as the active profile, header widgets, close button),
@@ -482,16 +482,16 @@ public abstract class SculptScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
-		if (hasOverlay() && event.key() == InputConstants.KEY_ESCAPE) {
+		if (hasOverlay() && event.key() == Keys.ESCAPE) {
 			closeOverlay();
 			return true;
 		}
-		if (event.key() == InputConstants.KEY_TAB && event.hasControlDown() && !hasOverlay()) {
+		if (event.key() == Keys.TAB && event.hasControlDown() && !hasOverlay()) {
 			selectTab(currentTab + (event.hasShiftDown() ? -1 : 1));
 			return true;
 		}
 		// Ctrl+Z (Cmd+Z on Mac) undoes the last quick action while its toast shows; a text field keeps it for itself.
-		if (event.key() == InputConstants.KEY_Z && event.hasControlDownWithQuirk() && !hasOverlay() && toast != null && toast.undo != null
+		if (event.key() == Keys.Z && event.hasControlDownWithQuirk() && !hasOverlay() && toast != null && toast.undo != null
 				&& !(getFocused() instanceof net.minecraft.client.gui.components.EditBox)) {
 			pressUndo();
 			return true;

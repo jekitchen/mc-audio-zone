@@ -20,7 +20,7 @@ import soundsculptor.mc.SetEditorScreen;
 import soundsculptor.mc.SoundPickerScreen;
 import soundsculptor.mc.SoundSculptorScreen;
 import soundsculptor.mc.SoundsPanel;
-import soundsculptor.mc.compat.NarrationCompat;
+import soundsculptor.gametest.compat.NarrationCompat;
 import soundsculptor.mc.ui.SculptButton;
 import soundsculptor.mc.ui.SculptCheckbox;
 import soundsculptor.mc.ui.SculptDialog;

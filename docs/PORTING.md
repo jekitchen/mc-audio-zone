@@ -2,20 +2,53 @@
 
 PRD section 7.6 requires this list. It names every place Sound Sculptor touches version-specific Minecraft code. When porting to a new Minecraft version (PRD 10.5), work through it top to bottom, then re-run the listed tests on every supported version.
 
-Supported versions: **26.2, 26.3**. Each version gets its own jar from one source tree (Decisions Log, M0):
+Supported versions: **26.2, 26.3** (`supported_minecraft_versions` in `gradle.properties`). One jar,
+`soundsculptor-<version>+mc26.2-26.3.jar`, runs on all of them. It is still built and tested against each version:
 
 ```
 ./gradlew build runClientGameTest                                                         # 26.3 (default)
 ./gradlew build runClientGameTest -Pminecraft_version=26.2 -Pfabric_api_version=0.161.0+26.2
 ```
 
-### Where version-specific code goes
+### One jar for every version
 
-Most code compiles unchanged against every supported version, because each version gets its own jar. Only when the
-*source code* has to differ does a class go in `src/main/versions/<minecraft_version>/java/`, one copy per version,
-with the same class name and public API. Gradle adds the folder for the version being built and fails if it is
-missing. Today that is `soundsculptor.mc.compat.NarrationCompat`, `soundsculptor.mc.compat.KeyEventCompat` and `soundsculptor.mc.compat.FolderCompat`. When adding a
-version, copy the nearest version's folder and fix what does not compile.
+**Rule: main code must compile to the same bytes against every supported version.** Then the jar does not depend on
+the version it was built against, and each version's game tests ran exactly the bytes that ship. CI builds every
+version and fails if the jars differ (`same jar for every Minecraft version`); check by hand with:
+
+```
+java tools/CompareJars.java <jar built for 26.2> <jar built for 26.3>
+```
+
+It prints `IDENTICAL` or lists every entry that differs (the `-sources` jars are out of scope). The build already
+keeps the build version out of the jar: its name, its `fabric.mod.json` version and `minecraft` range
+(`["~26.2", "~26.3"]`: releases only, no snapshots or pre-releases) and the manifest's `Fabric-Minecraft-Version` all come from `supported_minecraft_versions`. Things
+in code that make a build differ, and what to do instead:
+
+- **Inlined constants.** javac copies `static final` primitives and strings into the class that uses them. Key codes
+  are the trap: `InputConstants.KEY_*` are GLFW codes in 26.2 and SDL3 codes in 26.3, so a jar would have the right keys
+  on one version only. Main code uses `soundsculptor.mc.compat.Keys` (values read from `InputConstants` at startup) and
+  never `InputConstants.KEY_*`, `KEYCODE_*`, `MOD_*` or numbers; compare keys with if/else, since `switch` needs
+  constants. Add a field to `Keys` (and to `OneJarClientGameTest`) when you need a new key.
+- **A type that moved or changed.** A method whose parameter type moved package (`RenderPipeline` in 26.3) compiles to
+  a different reference, and a nested class that became `final` changes the using class's `InnerClasses` entry
+  (`Util.OS` in 26.3). Look such members up by name once, when the class loads, with
+  `soundsculptor.mc.compat.RuntimeLookup`, and call the cached `MethodHandle` (`Draw.sprite`, `FolderCompat`). Never look
+  up per frame or per sound.
+- **An API that differs.** Pick at runtime, once, which method exists (`FolderCompat`: `Blaze3D.openPath` in 26.3,
+  `Util.getPlatform().openPath` in 26.2), and keep one public API.
+
+`OneJarClientGameTest` checks on every version that these lookups find what that version's compiler would have used.
+
+Game-test code is not shipped, so test helpers whose source has to differ live in
+`src/gametest/versions/<minecraft_version>/java/`, one copy per version with the same class names and public API:
+today `soundsculptor.gametest.compat.NarrationCompat` and `KeyEventCompat`. Gradle adds the folder for the version
+being built and fails if it is missing. Main code has no such folder.
+
+**Adding a version:** add it to `supported_minecraft_versions` (keep them consecutive: the jar's range runs from the
+oldest to the newest), to `modMenuVersions` in `build.gradle`, to the matrices in both workflows and to `ModJsonTest`;
+copy the nearest `src/gametest/versions/` folder; build every version and run `CompareJars` until it prints
+`IDENTICAL`.
 
 ## Version-sensitive touch points
 
@@ -23,14 +56,14 @@ Add a row whenever you add a Mixin, an access widener entry or a call into versi
 
 | Since | Touch point | Minecraft API used | Re-test |
 | --- | --- | --- | --- |
-| M0 | Open-screen key (`SoundSculptorClient`) | `KeyMapping(String, int, KeyMapping.Category)`, `KeyMapping.Category.register(Identifier)`, Fabric `KeyMappingHelper`, `InputConstants.KEY_*` | M0 game test |
+| M0 | Open-screen key (`SoundSculptorClient`) | `KeyMapping(String, int, KeyMapping.Category)`, `KeyMapping.Category.register(Identifier)`, Fabric `KeyMappingHelper`, default keys from `Keys` | M0 game test |
 | M0 | Opening a screen (`SoundSculptorClient.onEndTick`) | `Minecraft.gui.screen()`, `Minecraft.gui.setScreen(Screen)` | M0 game test |
 | M0 | Main screen (`soundsculptor.mc.SoundSculptorScreen`) | `Screen.extractRenderState(GuiGraphicsExtractor, …)`, `GuiGraphicsExtractor.centeredText` | M0 game test (screenshot) |
 | M1 | **Mixin** `SoundEngineMixin`: sound start | `@Inject(cancellable = true)` into `SoundEngine.play(SoundInstance)` before its call to `calculateVolume(float, SoundSource)`; since M4 a muted sound returns `SoundEngine.PlayResult.NOT_STARTED` there | M1 and M4 game tests; log has no Mixin errors |
 | M5 | **Mixin** `SoundEngineMixin`: volume | MixinExtras `@ModifyExpressionValue` on the same `calculateVolume(float, SoundSource)` call in `play` (start volume), and `@ModifyReturnValue` on `SoundEngine.calculateVolume(SoundInstance)`, which `tickInGameSound` and `refreshCategoryVolume` call. `play` must keep calling the two-argument method directly, or the factor would be applied twice | M5 game test (factors at start and on recalculation); log has no Mixin errors |
 | M1 | Sound data (`soundsculptor.mc.SoundHook`) | `SoundInstance.getSound/getVolume/getAttenuation/isRelative/getIdentifier/getSource/getX/Y/Z`, `Sound.getAttenuationDistance()`, `SoundManager.getListenerTransform().position()` | M1 game test |
-| M2 | **Drawing adapter** `soundsculptor.mc.ui.Draw`: all UI drawing | `GuiGraphicsExtractor.fill/outline/text/centeredText/enableScissor/disableScissor/setTooltipForNextFrame/textRendererForWidget`, `blitSprite(RenderPipelines.GUI_TEXTURED, …)` | M2 game test (screenshots) |
-| M2 | UI kit widgets (`soundsculptor.mc.ui.Az*`) | Extend `AbstractButton` (`extractContents`, `extractDefaultSprite`, `extractDefaultLabel`), `AbstractSliderButton`, `EditBox`; narration via `updateWidgetNarration`/`createNarrationMessage`, `NarratedElementType`; `KeyEvent.key()/hasShiftDown()/hasControlDown()` with `InputConstants.KEY_*` | M2 game test |
+| M2 | **Drawing adapter** `soundsculptor.mc.ui.Draw`: all UI drawing | `GuiGraphicsExtractor.fill/outline/text/centeredText/enableScissor/disableScissor/setTooltipForNextFrame/textRendererForWidget`, `blitSprite(RenderPipelines.GUI_TEXTURED, …)` through a `MethodHandle` found by name (the pipeline type moved in 26.3) | M2 game test (screenshots), OneJar game test |
+| M2 | UI kit widgets (`soundsculptor.mc.ui.Az*`) | Extend `AbstractButton` (`extractContents`, `extractDefaultSprite`, `extractDefaultLabel`), `AbstractSliderButton`, `EditBox`; narration via `updateWidgetNarration`/`createNarrationMessage`, `NarratedElementType`; `KeyEvent.key()/hasShiftDown()/hasControlDown()` with `Keys` | M2 game test, OneJar game test |
 | M2 | Screen base and dialog (`SculptScreen`, `SculptDialog`) | `Screen.init()` then vanilla calls `setInitialFocus()` (overridden), `extractBackground`, `addRenderableWidget`, `rebuildWidgets`, `getNarrationMessage`, `Minecraft.gui.setScreen` | M2 game test |
 | M2 | Tooltip timing (`Tooltips`) | `AbstractWidget.setTooltipDelay`, `Minecraft.getLastInputType()`; relies on vanilla showing tooltips on hover or keyboard focus (`WidgetTooltipHolder`) | Manual: hover vs Tab |
 | M2 | Icons | GUI atlas sprites at `assets/soundsculptor/textures/gui/sprites/icon/*.png` (made by `tools/make_icons.py`) | M2 screenshots |
@@ -45,8 +78,8 @@ Add a row whenever you add a Mixin, an access widener entry or a call into versi
 | M7 | **Mixin accessors** `SoundManagerAccessor` (`SoundManager.soundEngine`), `SoundEngineAccessor` (`SoundEngine.instanceToChannel`): per-tick re-check (`PlayingChannels`) | `ChannelAccess.ChannelHandle.execute(Channel::setVolume)`; vanilla removes a stopped channel from `instanceToChannel` some ticks after `stop`, and tracking follows that map | M7 game test (zone added and removed while a loop plays; stop) |
 | M7 | Zone outlines (`ZoneOutlines`) | Fabric `LevelRenderEvents.END_EXTRACTION`; vanilla `Gizmos.line(Vec3, Vec3, int, float)`, `Gizmos.billboardText(String, Vec3, TextGizmo.Style)`, `GizmoProperties.setAlwaysOnTop()`; `GameRenderer.mainCamera().position()`. Vanilla drains the frame's gizmos in `LevelRenderer.submitFeatures`, so gizmos added in `BEFORE_GIZMOS` are not drawn | M7c game test (screenshot `m7c-outline-always` must show the sphere and its label) |
 | M8 | **Mixin** `MinecraftMixin`: left-click marks a zone corner while marking (`ZoneMarking`) | `@Inject(cancellable = true)` at the head of `Minecraft.startAttack()Z` and `continueAttack(Z)V`, active only while marking | ZoneTools game test (left-click on the ground in Creative marks it and does not break it) |
-| M2 | Version-specific: `NarrationCompat`, `KeyEventCompat` | `ScreenNarrationCollector.update` (26.3 adds a `NarrationTrigger`); `KeyEvent(int, int, int)` (second field is a scancode in 26.2, a layout keycode in 26.3) | M2 game test |
-| M15 | Version-specific: `FolderCompat` (Open folder for exports and imports) | `Util.getPlatform().openPath(Path)` in 26.2; `Blaze3D.openPath(Path)` in 26.3 | Manual: Export → Open folder |
+| M2 | Game-test helpers per version (`src/gametest/versions/`): `NarrationCompat`, `KeyEventCompat` | `ScreenNarrationCollector.update` (26.3 adds a `NarrationTrigger`); `KeyEvent(int, int, int)` (second field is a scancode in 26.2, a layout keycode in 26.3) | M2 game test |
+| M15 | `FolderCompat` (Open folder for exports and imports), chosen at runtime | `Util.getPlatform().openPath(Path)` in 26.2; `Blaze3D.openPath(Path)` in 26.3 | OneJar game test (method found); manual: Export → Open folder on each version |
 | M15 | File drop on the Profiles tab (`SoundSculptorScreen.onFilesDrop`) | `Screen.onFilesDrop(List<Path>)` | ImportExport game test |
 | M1 | Range formula (`soundsculptor.core.SoundRange`) | Must match vanilla: `max(volume, 1) × attenuation distance`, infinite if relative or `NONE`; audible when strictly closer (`Vec3.closerThan`, used by `SubtitleOverlay$Subtitle.isAudibleFrom`) | `SoundRangeTest`, M1 game test |
 
@@ -62,9 +95,9 @@ Found at M0 by comparing the two game jars. Code that touches any of these needs
 | Key types | `InputConstants.Type.KEYSYM`, `SCANCODE`, `MOUSE` | `KEYBOARD`, `MOUSE` (`SCANCODE` removed) | Use `KeyMapping(String, int, Category)` and `InputConstants.getKey(String)`, which exist in both |
 | Screen narration | `updateNarratorStatus(boolean)` | Takes a `NarrationTrigger` argument; new `scheduleNarration()` | M2 UI kit (narration) |
 | World rendering | — | `LevelRenderer` changed substantially (75 signature lines differ) | M7 zone outlines |
-| **Keyboard input** | GLFW codes: `KEY_TAB` = 258, `MOD_SHIFT` = 1, `MOD_CONTROL` = 2; `KeyEvent(key, scancode, modifiers)` | **SDL3** codes: `KEY_TAB` = 43, `MOD_SHIFT` = 3, `MOD_CONTROL` = 192; `KeyEvent(key, keycode, modifiers)`, and vanilla matches shortcuts on the new layout `keycode` (`shortcutKey()`), with `KEYCODE_*` constants | Always use `InputConstants` names (values are compiled per version), never numbers. Building `KeyEvent`s goes through `KeyEventCompat` |
-| Render pipelines | `com.mojang.blaze3d.pipeline.RenderPipeline` | moved to `com.mojang.renderpearl.api.pipeline.RenderPipeline`; 26.3 also tries OpenGL then Vulkan | Source is unchanged as long as code names `RenderPipelines.GUI_TEXTURED` and never the type |
-| Narration collector | `ScreenNarrationCollector.update(Consumer)` | `update(Consumer, NarrationTrigger)`; `NarrationElementOutput` gains `narrationTrigger()` | `NarrationCompat`; never implement `NarrationElementOutput` directly |
+| **Keyboard input** | GLFW codes: `KEY_TAB` = 258, `MOD_SHIFT` = 1, `MOD_CONTROL` = 2; `KeyEvent(key, scancode, modifiers)` | **SDL3** codes: `KEY_TAB` = 43, `MOD_SHIFT` = 3, `MOD_CONTROL` = 192; `KeyEvent(key, keycode, modifiers)`, and vanilla matches shortcuts on the new layout `keycode` (`shortcutKey()`), with `KEYCODE_*` constants | Main code uses `Keys` (read at runtime), never `InputConstants.KEY_*` or numbers, which javac inlines. Tests build `KeyEvent`s through `KeyEventCompat` |
+| Render pipelines | `com.mojang.blaze3d.pipeline.RenderPipeline` | moved to `com.mojang.renderpearl.api.pipeline.RenderPipeline`; 26.3 also tries OpenGL then Vulkan | Any call taking a pipeline compiles to a different reference, so `Draw` finds `blitSprite` by name; main code never passes a `RenderPipeline` |
+| Narration collector | `ScreenNarrationCollector.update(Consumer)` | `update(Consumer, NarrationTrigger)`; `NarrationElementOutput` gains `narrationTrigger()` | `NarrationCompat` (game tests only); never implement `NarrationElementOutput` directly |
 | Vanilla tab bar | `TabButton` is abstract; only vanilla's menu tab bar has a concrete one | same | Sound Sculptor uses its own `SculptTabButton` |
 | List narration | `ContainerObjectSelectionList` narrates the row under the mouse before the focused row | prefers the focused row when narration comes from the keyboard (`narrationTrigger()`) | `SculptList` builds its own narration from the focused row, so both versions read the keyboard focus |
 | Fabric test input | `pressKey` sends `KeyEvent(key, 0, 0)` | sends the SDL keycode too; neither sends modifier bits | Tests send Shift/Ctrl combinations through `KeyEventCompat` |

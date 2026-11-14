@@ -1,11 +1,13 @@
 # Changelog
 
 All notable changes to Sound Sculptor. Versions follow `major.minor.patch`, with `-alpha` or `-beta` for test releases.
-Each release ships one jar per supported Minecraft version.
+Each release ships one jar that runs on every supported Minecraft version.
 
 ## Unreleased (1.0)
 
 ### Changes
+- **One jar for Minecraft 26.2 and 26.3**: `soundsculptor-<version>+mc26.2-26.3.jar` replaces the separate jar for each
+  version.
 - **One Sounds tab** replaces Recently Played and Search. It lists every sound the game knows and narrows as you
   type; turn on **Recently played** to see only what played in the last 3 minutes, with Pause and Sort. Every row has
   Mute, Level…, Edit entry, **Add to set…** and Why?, and the filter, search and "Apply to" choice are kept while the

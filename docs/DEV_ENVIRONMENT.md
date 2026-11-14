@@ -36,7 +36,7 @@ All versions live in [`gradle.properties`](../gradle.properties), except the Gra
 | Minecraft | 26.3 (default), 26.2 | Unobfuscated, so code uses Mojang's official names (PRD A1) |
 | Fabric Loader | 0.20.1 | |
 | Fabric Loom (Gradle plugin) | 1.19.4 | Plugin id `net.fabricmc.fabric-loom`: the non-remapping Loom used for unobfuscated 26.x |
-| Fabric API | 0.165.2+26.3 / 0.161.0+26.2 | One build per Minecraft version |
+| Fabric API | 0.165.2+26.3 / 0.161.0+26.2 | Built and tested against each Minecraft version; every build makes the same jar |
 | Mixin | bundled with Fabric Loader | Config: `src/main/resources/soundsculptor.mixins.json`, package `soundsculptor.mc.mixin` |
 | JUnit Jupiter | 6.1.3 | Pure-logic tests that run without Minecraft (PRD 7.6) |
 | Gradle | 9.8.2 | Wrapper jar SHA-256 checked against Gradle's published checksum; CI re-validates it on every run |
@@ -58,7 +58,7 @@ Run from the repo root. On Windows use `gradlew` (cmd/PowerShell) or `./gradlew`
 | Generate Minecraft sources for browsing | `./gradlew genSources` |
 | Clean | `./gradlew clean` |
 
-Output jars go to `build/libs/` as `soundsculptor-<version>+<minecraft>.jar`. Each world or server has its own profile file in `config/soundsculptor/profiles/` in the game folder (`run/` for the dev client), named after its world key: the server address, or `world_<id>.json` for a singleplayer world, whose ID is in `soundsculptor_id.txt` in the world's save folder. The files are plain JSON and safe to inspect.
+The jar goes to `build/libs/` as `soundsculptor-<version>+mc26.2-26.3.jar`, the same file whichever version it was built against (`java tools/CompareJars.java <jar> <jar>` checks two builds; see PORTING.md). Each world or server has its own profile file in `config/soundsculptor/profiles/` in the game folder (`run/` for the dev client), named after its world key: the server address, or `world_<id>.json` for a singleplayer world, whose ID is in `soundsculptor_id.txt` in the world's save folder. The files are plain JSON and safe to inspect.
 
 The first build downloads Minecraft and the dependencies (about 1–2 minutes). Later builds use the cache in `~/.gradle`.
 
@@ -73,7 +73,7 @@ PRD 9.3 asks for layouts that fit text 40% longer than English. `soundsculptor.c
 
 ## Continuous integration
 
-[`.github/workflows/build.yml`](../.github/workflows/build.yml) runs on every push and pull request. It validates the Gradle wrapper, sets up Temurin JDK 25, and builds and tests against Minecraft 26.2 and 26.3 in a matrix. The jars are uploaded as workflow artifacts. A second matrix job runs the client game tests (`runClientGameTest`) with Mesa software graphics. Loom starts the game under `xvfb-run` by itself when the `CI` variable is set, so the workflow only installs `xvfb` and the Mesa OpenGL and Vulkan drivers. The job has a 20-minute timeout, because a game that cannot create a window hangs instead of exiting. Add `-Pmodmenu=true` to `runClient` or `runClientGameTest` to run with Mod Menu installed (it is compiled against but never bundled); CI runs the 26.3 game tests with it and the 26.2 ones without. The client game tests include an accessibility check (`AccessibilityClientGameTest`) that prints an `A11Y` layout report, and the noisy-farm stress test (`M8StressClientGameTest`), which prints a `STRESS` line with the measured timings and memory; its soak phase lasts 20 seconds, and `./gradlew runClientGameTest -Psoak=1800` runs the full 30-minute soak of PRD 11.2. Game tests run with the per-sound log off; on CI the time budgets are multiplied by 4, because runners are shared machines with software graphics. The wrapper retries the Gradle download 3 times with a 60-second timeout (`retries`, `retryBackOffMs` and `networkTimeout` in `gradle-wrapper.properties`), because `services.gradle.org` sometimes returns 504 errors; keep these when running `gradlew wrapper` to upgrade Gradle. When a supported Minecraft version is added or a Fabric API version is bumped, update `gradle.properties`, both matrices and [`docs/PORTING.md`](PORTING.md).
+[`.github/workflows/build.yml`](../.github/workflows/build.yml) runs on every push and pull request. It validates the Gradle wrapper, sets up Temurin JDK 25, and builds and tests against Minecraft 26.2 and 26.3 in a matrix. The jars are uploaded as workflow artifacts. A second matrix job runs the client game tests (`runClientGameTest`) with Mesa software graphics. Loom starts the game under `xvfb-run` by itself when the `CI` variable is set, so the workflow only installs `xvfb` and the Mesa OpenGL and Vulkan drivers. The job has a 20-minute timeout, because a game that cannot create a window hangs instead of exiting. A third job (`same jar for every Minecraft version`) checks with `tools/CompareJars.java` that both builds made the same jar and uploads that jar as the `soundsculptor` artifact. Add `-Pmodmenu=true` to `runClient` or `runClientGameTest` to run with Mod Menu installed (it is compiled against but never bundled); CI runs the 26.3 game tests with it and the 26.2 ones without. The client game tests include an accessibility check (`AccessibilityClientGameTest`) that prints an `A11Y` layout report, and the noisy-farm stress test (`M8StressClientGameTest`), which prints a `STRESS` line with the measured timings and memory; its soak phase lasts 20 seconds, and `./gradlew runClientGameTest -Psoak=1800` runs the full 30-minute soak of PRD 11.2. Game tests run with the per-sound log off; on CI the time budgets are multiplied by 4, because runners are shared machines with software graphics. The wrapper retries the Gradle download 3 times with a 60-second timeout (`retries`, `retryBackOffMs` and `networkTimeout` in `gradle-wrapper.properties`), because `services.gradle.org` sometimes returns 504 errors; keep these when running `gradlew wrapper` to upgrade Gradle. When a supported Minecraft version is added or a Fabric API version is bumped, update `gradle.properties` (`supported_minecraft_versions` too), the matrices in both workflows and [`docs/PORTING.md`](PORTING.md).
 
 ## Project layout
 
@@ -84,9 +84,9 @@ src/main/java/soundsculptor/                           Mod code; client entry po
 src/main/java/soundsculptor/mc/                        Version-sensitive code only (Mixins, adapters), PRD 7.6
 src/main/java/soundsculptor/mc/ui/                     UI kit (PRD 6.2); all drawing goes through Draw.java
 src/main/java/soundsculptor/core/                      Pure Java logic with unit tests (no Minecraft classes)
-src/main/versions/<minecraft_version>/java/        Classes whose source differs per Minecraft version (see PORTING.md)
+src/gametest/versions/<minecraft_version>/java/    Game-test helpers whose source differs per Minecraft version (see PORTING.md)
 src/main/resources/assets/soundsculptor/textures/gui/sprites/icon/   GUI icons (generated by tools/make_icons.py)
-tools/                                             Developer scripts
+tools/                                             Developer scripts; CompareJars.java checks two builds made the same jar
 src/main/resources/fabric.mod.json                 Mod metadata (client-only, MIT)
 src/main/resources/soundsculptor.mixins.json           Mixin config
 src/main/resources/assets/soundsculptor/lang/          Translations (en_us.json)

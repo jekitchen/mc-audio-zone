@@ -56,7 +56,7 @@ Questions or concerns: open an issue with "fair play" in the title at
 
 ## Requirements
 
-- Minecraft Java Edition **26.2** or **26.3** (download the file for your version)
+- Minecraft Java Edition **26.2** or **26.3** (one file works on both)
 - **Fabric Loader** 0.20.1 or newer and **Fabric API**
 - Optional: **Mod Menu**, for a config button
 - Client only: don't install it on a server.
