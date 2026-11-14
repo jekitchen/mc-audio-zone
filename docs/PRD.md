@@ -15,7 +15,7 @@ maxismagical had not yet answered questions on scope, so this draft picks defaul
 | A3 | Volume in MVP is 0–100%. Boost to 200% arrives in v1. | Boost needs the riskiest engine change (raising the gain clamp without raising range). | 5, 10 |
 | A4 | Each server or world has exactly one profile, created automatically (MVP). Copying settings from another server and import/export are v1. | Fixed zones need a server/world key from day one; full profile management is a lot of UI. | 5, 10 |
 | A5 | Distances in the recently played list are shown as coarse bands (Close, Near, Far), not exact block counts. | Exact distance to an unseen mob is more than vanilla subtitles give. See FR-1.4. | 5, 8 |
-| A6 | Zone checks run when a sound starts, then every client tick (20 times a second) for sounds that are still playing. | Handles minecarts, entity-bound sounds and the moving personal bubble without per-frame cost. | 5, 7 |
+| A6 | Zone checks run when a sound starts, then every client tick (20 times a second) for sounds that are still playing. | Handles minecarts, entity-bound sounds and long sounds without per-frame cost. | 5, 7 |
 | A7 | The default hotkey that opens Sound Sculptor is **;** (semicolon). | Free in vanilla and in the 36 most-downloaded Fabric mods (K clashed with Iris, checked at M0); rebindable in Controls. | 5 |
 | A8 | English (en\_us) at launch, with every string in a language file ready for community translation. | Keeps launch small; localization is cheap to add later if planned now. | 9 |
 
@@ -42,7 +42,7 @@ Five personas drive the requirements. The accessibility persona is a first-class
 | **Tess, technical/farm player** | Runs iron farms, villager halls and redstone builds on a survival SMP. | Silence or rate-limit farm noise only near the farm; keep danger sounds. No FPS loss with 300+ sounds per second. | FR-1, FR-4, FR-6, FR-8, FR-9 |
 | **Sam, streamer/recorder** | Records or streams gameplay; viewers complain about repetitive noise. | Per-sound volume for a clean mix; settings that follow each server automatically; stable behavior on stream. | FR-5, FR-11, FR-12 |
 | **Alex, accessibility needs** | Has sound sensitivity (misophonia or sensory overload) or partial hearing loss; may use a screen reader or keyboard only. | Remove specific harsh sounds; boost quiet ones up to 200%; still *know* a muted sound happened via cues; every screen usable by keyboard and narrator. | FR-5, FR-7, FR-13 (all UI), section 6.4 |
-| **Bea, builder** | Builds for hours in creative or on a build server. | A personal bubble that quiets ambient and mob noise around them wherever they go; zone outlines that don't clutter the view. | FR-8, FR-10 |
+| **Bea, builder** | Builds for hours in creative or on a build server. | A calm Everywhere set that quiets ambient and mob noise while they build, easy to toggle on and off; zone outlines that don't clutter the view. | FR-4, FR-10 |
 | **Mo, multiplayer regular** | Plays on several servers, some with strict mod rules. | Settings that follow each server automatically; a clear statement that the mod gives no advantage, so admins allow it. | FR-11, section 8 |
 
 ## 3. Goals, non-goals and success metrics
@@ -93,7 +93,7 @@ Each story maps to the FRs that satisfy it. Release tags show when the story fir
 | US-3 | farm player | cap villager "hmm" sounds to 3 per second | the hall is calmer without going silent | FR-6 | v1 |
 | US-4 | player with hearing loss | boost quiet sounds like footsteps to 180% | I can hear them at all | FR-5 | v1 |
 | US-5 | player with sound sensitivity | mute explosions and still see a cue saying one happened | I stay safe without the shock | FR-5, FR-7 | v1 |
-| US-6 | builder | have a 16-block bubble around me that sets all ambient and mob sounds to 30% | my build sessions are calm wherever I fly | FR-8 | v1 |
+| US-6 | builder | attach a "Calm building" set with ambient and mob sounds at 30% to Everywhere and turn it on while I build | my build sessions are calm wherever I fly | FR-4, FR-8.10 | MVP |
 | US-7 | player | look at a mob and see the sounds it just made | I can mute the parrot that keeps imitating, without searching | FR-2 | v1 |
 | US-8 | player | search "villager\|zombie" and see all matching sound IDs, narrowing as I type | I can find a family of sounds and add it to a Sound Set at once | FR-3, FR-4 | MVP (plain/AND/OR), Future (regex) |
 | US-9 | multiplayer regular | have my settings switch automatically when I join each server | I don't redo setup every session | FR-11 | MVP |
@@ -311,19 +311,19 @@ When a muted sound plays, the player still sees that it happened.
 - [ ] 10 muted villagers at once: no more than 5 cue lines, with counts.
 - [ ] Turn "Show muted-sound cues" off: a muted explosion with Cue on shows nothing. Turn it back on: the cue returns. Vanilla Subtitles on or off makes no difference either way.
 
-### FR-8 Spatial zones (MVP: fixed sphere and box, Inside, hard edge; v1: the rest)
+### FR-8 Spatial zones (MVP: fixed box, Inside, hard edge; v1: the rest)
 
 A zone is a **place**: it applies the Sound Sets attached to it (FR-4) to positional sounds based on where they come from. **Everywhere** (FR-8.10) is the default place with no bounds.
 
-- **FR-8.1 Fixed anchor (MVP).** A point (x, y, z) plus the dimension (e.g. `minecraft:overworld`) and the world key of the server or singleplayer world (FR-11.1). Buttons: "Set to my position" and "Set to the block I'm looking at". A fixed zone is active only in its own world and dimension.
+- **FR-8.1 Fixed zones (MVP).** Every zone is fixed. Its anchor is the geometric center of its shape: a point (x, y, z) plus the dimension (e.g. `minecraft:overworld`) and the world key of the server or singleplayer world (FR-11.1). Buttons: "Set to my position" and "Set to the block I'm looking at". A fixed zone is active only in its own world and dimension.
 - **FR-8.1a Drawing a box (MVP).** New zones are boxes. **Mark corners** closes the zone editor; the player left-clicks a block (or presses the Sound Sculptor key; with the crosshair on no block, the block the player stands in counts) for the first corner, then again for the second. While marking, left-click never attacks or breaks anything. The box covering both corner blocks is outlined live from the first corner to the current target, and the editor comes back with it filled in. A two-line hint at the top of the screen gives the corner and the box's size so far ("Second corner · 5 × 2 × 7 blocks"), then the keys; a rebindable "Cancel marking zone corners" key (Backspace) returns unchanged. Only blocks the player can see or reach can be marked. In the editor, **Grow** and **Shrink** move one chosen side (North, South, East, West, Up, Down) by 1 block, or 5 with Shift; the opposite side stays where it is.
-- **FR-8.2 Personal bubble (v1).** The anchor is the local player's eye position, updated every tick. A profile can have several bubble zones (e.g. a small mute bubble inside a larger 50% bubble). A bubble never follows another player.
-- **FR-8.3 Shapes.** Axis-aligned box (width, height, depth 1 to 512 whole blocks, every edge on a block boundary: the center is snapped, however it was set) in MVP; spheres (radius 1 to 256 blocks) are not offered for new zones, but a sphere zone from an existing profile still works, can be edited and can be turned into a box, and spheres remain the shape of personal bubbles (v1); vertical cylinder (radius 1 to 256, height 1 to 512) in v1. The anchor is the shape's geometric center for all three, so a box or cylinder extends half its size in each direction from the anchor.
+- **FR-8.2** (Removed 2026-11-13: personal bubble zones were dropped; see the decisions log.)
+- **FR-8.3 Shapes.** Axis-aligned box (width, height, depth 1 to 512 whole blocks, every edge on a block boundary: the center is snapped, however it was set) in MVP; vertical cylinder (radius 1 to 256, height 1 to 512) in v1. The anchor is the shape's geometric center, so a box or cylinder extends half its size in each direction from the anchor.
 - **FR-8.4 Affect mode.** Inside (default, MVP): the zone affects sounds inside its shape. Outside (v1): it affects every sound outside its shape in the same dimension.
 - **FR-8.5 Edge (v1 fade; MVP hard).** Hard: weight 1 on the affected side, 0 on the other. Fade: the weight rises from 0 at the boundary to 1 at fade distance F into the affected side (F from 0.5 to 32 blocks, default 4). For Inside zones, F is measured inward from the boundary; for Outside zones, outward. Each zone uses the global default edge setting unless set to Hard or Fade itself.
 - **FR-8.6 Attached Sound Sets.** Each place (Everywhere and every zone) has an ordered list of attached Sound Sets, shown in the zone editor and on the Zones tab's Everywhere row. Each line shows the set's name, its entry count and "Also used in N places" when the set is shared, with buttons: On/Off (stops the set applying in this place without detaching it), Edit (opens the set editor, FR-4.3), Move up, Move down, and Detach. The place's Quick changes set, if any, is pinned first and has no move buttons (FR-4.10). **Attach set…** lists the library sets not yet attached here, plus **New set**. The same set cannot be attached twice to one place. A place holds up to 32 attached sets. The earlier "Add existing rule" copy is replaced by attaching the set (linked) or attaching a Duplicate (independent).
 - **FR-8.7 Which sounds.** Only positional sounds are affected. The sound's position is the sound instance's x, y, z.
-- **FR-8.8 Timing.** Zones are evaluated when a sound starts, and again every client tick (20 per second) for every sound still playing, so moving sources, long sounds and the moving bubble update. Re-evaluation changes volume only (including mute, which sets volume to 0 without stopping the sound). Repeat limits are decided at start only.
+- **FR-8.8 Timing.** Zones are evaluated when a sound starts, and again every client tick (20 per second) for every sound still playing, so moving sources and long sounds update. Re-evaluation changes volume only (including mute, which sets volume to 0 without stopping the sound). Repeat limits are decided at start only.
 - **FR-8.9 Size limits.** Up to 64 zones per profile (Everywhere not counted); performance budgets (section 9) must hold at 64.
 - **FR-8.10 Everywhere.** Every profile has exactly one **Everywhere** place. It behaves like every other zone, except that it has no bounds, applies to every sound in scope (positional and non-positional; zones apply to positional sounds only, FR-8.7), and cannot be edited (no name, color, shape, anchor, mode or edge) or removed. It is always the first row of the Zones tab, and its only controls are its attached Sound Sets (FR-8.6). It has no outline. In precedence it is always the lowest place (FR-9). It replaces the earlier global rule list.
 
@@ -336,9 +336,8 @@ A zone is a **place**: it applies the Sound Sets attached to it (FR-4) to positi
 - [ ] In Creative, left-click the ground while marking: the block is marked as a corner and not broken. While marking, the on-screen hint shows the box's size ("5 × 2 × 7 blocks"); Grow North moves only the north side; the cancel key returns to the editor unchanged.
 - [ ] Leave and rejoin the world: the zone still exists and works. Go to the Nether: it has no effect there.
 - [ ] Join a different server: the zone does not apply.
-- [ ] (v1) Bubble radius 8, attached set with group `*` at 30%: mobs within 8 blocks of you are quieter; as you walk away, a still-playing note block loop changes volume within half a second.
 - [ ] (v1) Outside-mode zone around your base, attached set with group `*:entity.*` Mute: mobs inside the base are audible, mobs outside are silent.
-- [ ] (v1) Fade 8 blocks on a 20-block sphere muting cows: walking a cow from the edge toward the center, it gets steadily quieter and is silent from 8 blocks inside.
+- [ ] (v1) Fade 8 blocks on a 20-block cylinder muting cows: walking a cow from the edge toward the center, it gets steadily quieter and is silent from 8 blocks inside.
 - [ ] Music, UI clicks and your own eating sounds are unchanged inside every zone.
 
 ### FR-9 Precedence (MVP basic; v1 with fade and Outside)
@@ -403,7 +402,7 @@ Worked examples (also the basis of the test matrix in section 11.4). "Villagers 
 ### FR-10 Zone visualization and colors (MVP outlines; v1 full)
 
 - **FR-10.1** Setting "Show zone outlines": Always, Only while editing (default), or Never. Optional hotkey to toggle (unbound by default).
-- **FR-10.2** Outlines are thin lines: box edges; sphere as three great circles; cylinder as top and bottom circles plus four vertical lines. Only zones in the current dimension within 128 blocks are drawn. A bubble outline is drawn only while that zone is being edited.
+- **FR-10.2** Outlines are thin lines: box edges; cylinder as top and bottom circles plus four vertical lines. Only zones in the current dimension within 128 blocks are drawn.
 - **FR-10.3** Not color alone: Inside zones use solid lines and Outside zones dashed lines; a fade zone also draws a fainter inner line where the fade reaches full strength; the zone's name is shown as a label at its anchor when the player is within 32 blocks.
 - **FR-10.4** Each zone has a color. New zones take the next color from a color-blind-safe palette (the 8 Okabe–Ito colors, chosen to stay distinct for the common forms of color blindness). The color picker offers the palette swatches, a hex field (e.g. `#E69F00`) with validation, and Reset to default.
 - **FR-10.5** Setting "Outlines visible through blocks" (default on). This is safe because zones are the player's own data.
@@ -423,7 +422,7 @@ Worked examples (also the basis of the test matrix in section 11.4). "Villagers 
 - [ ] An Outside zone's lines are dashed; an Inside zone's are solid.
 - [ ] Change a zone color by swatch and by hex `#56B4E9`; typing `#XYZ` shows an error.
 - [ ] Outlines render correctly with Sodium installed, and with Iris plus one popular shader pack (or a known-issue note is filed).
-- [ ] (Future) Set a sphere zone to Fill at 15%: the sphere shows as a light tint in its color; blocks and mobs inside are clearly visible.
+- [ ] (Future) Set a box zone to Fill at 15%: the box shows as a light tint in its color; blocks and mobs inside are clearly visible.
 - [ ] (Future) Walk into the filled zone: the tint fades out as you cross the edge; walk out: it returns.
 - [ ] (v1) Set opacity to 50% and to 5%: the tint gets stronger and weaker; typing 70 is refused with an error.
 - [ ] (Future) Two overlapping filled zones: both names and line styles are still readable.
@@ -431,13 +430,13 @@ Worked examples (also the basis of the test matrix in section 11.4). "Villagers 
 
 ### FR-11 Server profiles and file import/export (MVP)
 
-Each multiplayer server, Realm and singleplayer world has exactly one *profile*: its places (Everywhere and its zones, fixed and personal bubble), which Sound Sets are attached to each place and in what order, each place's Quick changes set, and profile settings (cue defaults, outline mode, default edge, show distance). Profiles are never shared or switched between servers. The Sound Set **library** (FR-4.7) is not part of any profile: it is shared by all profiles, which refer to library sets by their ID. Keybinds and UI preferences are app-wide, not per profile.
+Each multiplayer server, Realm and singleplayer world has exactly one *profile*: its places (Everywhere and its zones), which Sound Sets are attached to each place and in what order, each place's Quick changes set, and profile settings (cue defaults, outline mode, default edge, show distance). Profiles are never shared or switched between servers. The Sound Set **library** (FR-4.7) is not part of any profile: it is shared by all profiles, which refer to library sets by their ID. Keybinds and UI preferences are app-wide, not per profile.
 
 - **FR-11.1 Auto-create.** On joining, Sound Sculptor works out a world key: multiplayer = server address in lowercase with the default port 25565 removed (`play.example.net`); Realms = `realms:<realm id>`; singleplayer = `world:<ID from soundsculptor_id.txt>`. For singleplayer, Sound Sculptor writes a small file, soundsculptor\_id.txt, into the world's save folder on first join and uses the ID in it, so the profile survives folder renames and backups. If the file cannot be written (e.g. a read-only save), it falls back to the folder name and the Profiles tab says so. A copied world shares the original's ID, and so its profile, until the player clicks "Give this copy its own profile". If that key has no profile yet, one is created with Everywhere and nothing attached, no zones and default settings. Its display name is the server's name from the server list, or the world's name.
-- **FR-11.2 Copy settings from another server.** The Profiles tab has "Copy from…", which lists the other servers and worlds. Copying brings over only the parts that are not tied to a place in that world: Everywhere's attached sets, personal bubble zones with their attached sets, and profile settings. Library sets are attached as the same linked sets, not copied; Quick changes sets are copied as independent Quick changes sets (proposed). Fixed zones are never copied, because they belong to their own server. A dialog lists what will be copied ("4 Sound Sets on Everywhere, 2 bubble zones, settings") and that this server's fixed zones are kept. Choosing Copy replaces this server's Everywhere attachments, bubble zones and settings. It is a one-time copy of the attachments: later attaching or detaching on either server does not sync, but edits to a shared library set show in both, as sets are linked.
+- **FR-11.2 Copy settings from another server.** The Profiles tab has "Copy from…", which lists the other servers and worlds. Copying brings over only the parts that are not tied to a place in that world: Everywhere's attached sets, its Quick changes set, and profile settings. Library sets are attached as the same linked sets, not copied; the Quick changes set is copied as an independent Quick changes set (proposed). Zones are never copied, because they belong to their own server. A dialog lists what will be copied ("4 Sound Sets on Everywhere, its Quick changes, settings") and that this server's zones are kept. Choosing Copy replaces this server's Everywhere attachments, Everywhere's Quick changes set and settings. It is a one-time copy of the attachments: later attaching or detaching on either server does not sync, but edits to a shared library set show in both, as sets are linked.
 - **FR-11.3 Manage.** The Profiles tab lists every server and world that has a profile, with display name, world key, Sound Set and zone counts, and last joined date. Actions: Rename (display name only), Reset (back to empty defaults, with confirmation; library sets are not deleted), and Delete (removes the profile; a new empty one is created on next join; with confirmation; library sets are not deleted). The profile of the server you are connected to can be Reset but not Deleted.
 - **FR-11.4 Export.** Writes `config/soundsculptor/exports/<display name>-<date>.json` and shows an "Open folder" button. The file contains the whole profile, including fixed zones with coordinates, dimension and world key, **and a full copy of every library Sound Set attached anywhere in the profile**, so the export can be imported or restored on its own, even on a computer whose library has never had those sets.
-- **FR-11.5 Import.** Two ways: drag a file onto the game window while the Profiles tab is open (vanilla supports file drop on screens), or choose from files placed in `config/soundsculptor/imports/`. Import applies to the current server's profile. A dialog shows what the file holds and what will happen: Everywhere's attachments, bubble zones and settings replace this server's; fixed zones are imported only if their world key matches this server (restoring a backup, or a friend who plays on the same server). Fixed zones for other servers are skipped and counted ("3 fixed zones skipped: made for another server"). The Sound Sets in the file are added to the library as described in FR-11.5a, and the imported places attach them. The current profile is saved as a `.bak` before import.
+- **FR-11.5 Import.** Two ways: drag a file onto the game window while the Profiles tab is open (vanilla supports file drop on screens), or choose from files placed in `config/soundsculptor/imports/`. Import applies to the current server's profile. A dialog shows what the file holds and what will happen: Everywhere's attachments, its Quick changes set and settings replace this server's; a file's zones are fixed zones, imported only if their world key matches this server (restoring a backup, or a friend who plays on the same server). Fixed zones for other servers are skipped and counted ("3 fixed zones skipped: made for another server"). The Sound Sets in the file are added to the library as described in FR-11.5a, and the imported places attach them. The current profile is saved as a `.bak` before import.
 - **FR-11.5a Sets on import.** Each set that an imported place attaches is compared with the library; a set in the file that no imported place uses (for example, one used only by another server's fixed zones) is ignored and not added. Two sets have the same entries when their entries match one by one, in the same order, in on/off, target and settings; entry IDs and set names are not compared. An empty set is never an exact match of another set.
   - **Same set:** a library set has the same ID and the same entries. It is your own set (for example, your export imported into another world on this computer). The library set is used and the imported places attach it; nothing is duplicated.
   - **Exact match under another ID:** a library set with a different ID has the same entries. The whole import is cancelled and nothing changes. A dialog says the import failed because "\<library set name>" already has exactly these entries.
@@ -453,11 +452,11 @@ Each multiplayer server, Realm and singleplayer world has exactly one *profile*:
 
 - [ ] Join server A, mute a sound, leave, join server B: B has its own empty profile. Return to A: the mute is back.
 - [ ] Attach library set "Farm animals" on A and on B: editing it on A changes it on B too.
-- [ ] On B, Copy from A: A's Everywhere sets, bubble zones and settings appear on B; A's fixed zones do not; B's own fixed zones are untouched.
+- [ ] On B, Copy from A: A's Everywhere sets, its Quick changes set and settings appear on B; A's zones do not; B's own zones are untouched.
 - [ ] After copying, detach a set from A's Everywhere: B's Everywhere keeps it.
 - [ ] Rename B's profile, then Reset it: it returns to empty defaults, A is unaffected and the library still has every set. Deleting the profile of the server you are on is not offered.
-- [ ] Export A with two fixed zones, a bubble and two attached library sets; on another computer with an empty library, join A and import: both fixed zones have exact coordinates and dimension and are active, and both sets are in the library and attached.
-- [ ] Import A's export while on B: Everywhere sets, bubble and settings are imported; the message says 2 fixed zones were skipped.
+- [ ] Export A with two fixed zones and two attached library sets; on another computer with an empty library, join A and import: both fixed zones have exact coordinates and dimension and are active, and both sets are in the library and attached.
+- [ ] Import A's export while on B: Everywhere sets, its Quick changes set and settings are imported; the message says 2 fixed zones were skipped.
 - [ ] Change "Farm animals" in the library after exporting, then import the export: a dialog asks for a new name with "Farm animals (imported)" filled in; accepting it adds "Farm animals (imported)" and leaves other places using "Farm animals" unchanged.
 - [ ] In that name dialog, type "Farm animals": the dialog says the name is already in use and the import does not go ahead until the name is unique.
 - [ ] Import a file whose set has a different ID but exactly the same entries as a library set: the import fails with a message naming the library set, and nothing changes.
@@ -543,7 +542,7 @@ All screens are hand-built on Minecraft's own Screen and widget classes from a s
 | Sounds | Toolbar: search field with "?" help (FR-3.5), Recently played filter toggle, result count, "Apply to" selector; with the filter on, also Pause and Sort. Scrolling list of rows (FR-1.2), each with icon buttons Mute, Volume, Limit, Cue, Edit, Add to set, Why? (FR-14). In picker mode (FR-1.7): checkboxes and Like this… instead, footer "N picked · Add · Cancel". | Hear sound → ; → find row → Mute (2 actions); or type → narrow → act |
 | Inspect (v1) | Left: selected entity name and type, link legend (Linked / Likely / Uncertain). Right: its sound rows with the same buttons. "No sounds linked yet" message when empty. | Look at mob → Inspect key → row → action |
 | Sound Sets | Library list: name, entry count, where used ("Main base, Mob farm · 1 other world"); buttons Edit, Duplicate, Rename, Delete; New set button. Set editor: name; entry list (sound or group, summary, On/Off, Edit, Delete); Add sounds… (opens the picker), Type a pattern…; Attached to panel (places here, other worlds) with Attach to… and Detach; Save/Cancel. Entry editor: Mute, Level, Limit + Per source, Cue, and for a group the pattern with live preview. | New set → Add sounds → pick → set levels → Attach to zone → Save |
-| Zones | First row Everywhere (sets only). Then zones: color swatch + name + shape + mode + "Here / 120 blocks away / Other world". Zone editor: name, color picker, display (Outline; Fill and Both after 1.0) and fill opacity (after 1.0), anchor type, coordinates with "My position" button, shape and sizes, mode, edge, fade distance, and the zone's attached Sound Sets (FR-8.6: order, on/off, edit, detach, Attach set…). Outlines show while editing. | Mark corners → Attach set → Save |
+| Zones | First row Everywhere (sets only). Then zones: color swatch + name + shape + mode + "Here / 120 blocks away / Other world". Zone editor: name, color picker, display (Outline; Fill and Both after 1.0) and fill opacity (after 1.0), coordinates with "My position" button, shape and sizes, mode, edge, fade distance, and the zone's attached Sound Sets (FR-8.6: order, on/off, edit, detach, Attach set…). Outlines show while editing. | Mark corners → Attach set → Save |
 | Profiles | List of servers and worlds with a profile (name, world key, Sound Set and zone counts, last joined) with Rename, Reset, Export, Delete; "Copy from…" button for the current server; Import area ("Drop a file here or choose from the imports folder"). | Copy from another server → confirm |
 | Settings | Pages: General (hotkeys help, cue defaults, show distance), Zones (outline mode, through-blocks, default edge, fade distance), Accessibility (cue color, cue text scale, reduced motion), Diagnostics. | Change → auto-save, with reset buttons |
 
@@ -638,7 +637,7 @@ Fabric API (confirmed at M0: it has no event that can cancel or modify sounds; i
 ### 7.4 Hot path design (performance-critical)
 
 - **Sound Sets are flattened before the hot path sees them.** Whenever a set, an attachment or a place changes, each place's attached sets (in order, skipping sets and entries that are off) are flattened into one resolved lookup per place, and patterns compile once to a matcher. A per-ID cache maps each sound ID to its pre-resolved best entry per property for Everywhere and each zone, exactly as the earlier per-list cache did, so a sound start costs the same with Sound Sets as with the earlier rules and the 5 µs (typical) and 10 µs (worst case) budgets of 9.1 still hold. Editing a linked set rebuilds the lookups of every place in the current profile that uses it. A version number on the snapshot invalidates the cache.
-- Zone checks: skip for non-positional sounds; only zones in the current dimension; a cheap axis-aligned bounding-box test before the exact sphere or cylinder test.
+- Zone checks: skip for non-positional sounds; only zones in the current dimension; a cheap axis-aligned bounding-box test before the exact cylinder test.
 - No allocations per sound: reuse one mutable result object on the game thread; ring buffers of primitive arrays for the recent log and limiter timestamps; no string building or lambdas on the path.
 - Threading: the engine reads an immutable snapshot of the profile with its attached sets already flattened, swapped in one step when the player saves. File saving runs on a background thread.
 
@@ -797,7 +796,7 @@ M0–M8b were built with the earlier rule model (a global rule list and one rule
 | M4 | Global mute + storage | Mute quick action; exact-ID rules; one profile file with schemaVersion; bypass and fail-open (FR-13.1–13.2) | Threading on save |
 | M5 | Patterns + volume 0–100% + rules tab | FR-4, FR-5.1–5.3, rule editor, per-ID cache, diagnostics (FR-13.3), sound trace for global rules (FR-14) | Hot-path allocations |
 | M6 | Search | FR-3 plain, AND, OR, exclude, phrases, wildcards | ID list from resource packs |
-| M7 | Basic zones | Fixed sphere and box, Inside, hard edge, zone rules, precedence P1–P5, outlines (solid, color, label), auto-created profile per server/world (FR-11.1), sound trace extended to zones | World rendering, per-tick gain updates |
+| M7 | Basic zones | Fixed box, Inside, hard edge, zone rules, precedence P1–P5, outlines (solid, color, label), auto-created profile per server/world (FR-11.1), sound trace extended to zones | World rendering, per-tick gain updates |
 | M8 | MVP hardening | M8a: noisy-farm stress and soak tests. M8b: accessibility checklist, Mod Menu entry, mod page with fair-play section, release preparation | Performance |
 | M8c | Sound Sets | FR-4: set library and Sound Sets tab, set editor with single-sound and group entries (mute, level 0–100%; limit and cue fields kept for M9/M11), linked sets with the Attached to panel, Duplicate, delete; Everywhere as a place (FR-8.10) and attached sets on every place in order (FR-8.6); Quick changes sets (FR-4.10); precedence in set terms (FR-4.5, FR-9, P1–P5, P13–P16); trace in set terms (FR-14); profile schema 3 and library storage (7.5, FR-11.8); profiles tab, Copy from, export and import carrying sets (FR-11) | Linked-edit bookkeeping; keeping the hot-path budgets |
 | M8d | Sounds browser | FR-1 and FR-3 in one Sounds tab (full list narrowing as you type, Recently played filter, Apply to), replacing the Recently Played and Search tabs; picker mode for adding sounds to a set (FR-1.7); Like this groups (FR-4.8) | Layout at 854 × 480 |
@@ -811,7 +810,7 @@ M0–M8b were built with the earlier rule model (a global rule list and one rule
 | M10 | Volume boost to 200% | FR-5.4–5.6 with warning and range-safe gain | OpenAL gain cap; range leak |
 | M11 | Repeat limiting | FR-6 shared and per-source | Counter correctness |
 | M12 | Entity inspector | FR-2 with Linked/Likely labels | Proximity accuracy |
-| M13 | Full zones | Cylinder, personal bubble, Outside mode, fade, zone limits and cues, P6–P8, dashed and fade outlines, color picker | Fade maths, per-tick cost |
+| M13 | Full zones | Cylinder, Outside mode, fade, zone limits and cues, P6–P8, dashed and fade outlines, color picker | Fade maths, per-tick cost |
 | M14 | Profile management | FR-11.2–11.3 copy settings from another server, rename, reset, delete. Built before the alpha; reworked for Sound Sets in M8c | Link bookkeeping |
 | M15 | Import/export | FR-11.4–11.7 with validation and migrations. Built before the alpha; sets travel with exports from M8c | Validation gaps |
 | M16 | 1.0 polish | Localization pass, full compatibility pass, accessibility audit. (Trace inline editing, Undo toasts and Apply to were built before the alpha and ship in it.) | Scope creep |
@@ -821,7 +820,7 @@ M0–M8b were built with the earlier rule model (a global rule list and one rule
 - Sound Set entries by category (e.g. "all Hostile Creatures in this zone").
 - A compact on-HUD version of the recently played list.
 - Copy/paste a single zone or Sound Set as text, for sharing in chat.
-- Starter Sound Sets that ship with the mod ("quiet trading hall", "build bubble").
+- Starter Sound Sets that ship with the mod ("quiet trading hall", "calm building").
 - Time-based attachments (a Sound Set that applies only at night) using the in-game clock.
 - Per-dimension Everywhere (sets that apply everywhere in one dimension).
 - Translations contributed by the community.
@@ -874,7 +873,7 @@ Every test runs in game without reading code. Use a dedicated creative test worl
 ### 11.2 Noisy farm stress test
 
 1. Build a 9 × 9 pen with 40 villagers, 40 chickens and 20 cows, plus 8 hoppers on a fast redstone clock, and 4 iron golems. Aim for 300 or more sounds per second (diagnostics readout).
-2. Load the "stress" profile: Sound Sets on Everywhere with 50 entries (mix of single sounds and groups), 64 zones overlapping the pen (spheres, boxes, cylinders, some fade, some Outside), each with sets attached, some sets shared by several zones.
+2. Load the "stress" profile: Sound Sets on Everywhere with 50 entries (mix of single sounds and groups), 64 zones overlapping the pen (boxes, cylinders, some fade, some Outside), each with sets attached, some sets shared by several zones.
 3. Record FPS (F3) with Sound Sculptor bypassed, then active, then active with Recently Played open.
 4. **Pass:** average cost under 10 µs per sound in this worst case (under 5 µs with the typical profile, 9.1); added frame time under 1 ms; FPS with list open within 5% of closed; no stutters visible in the F3 frame graph beyond those present when bypassed.
 5. **Soak:** leave it running 30 minutes. **Pass:** no crash, memory readout stable (under 8 MB for Sound Sculptor data), no "AL error" lines in the log.
@@ -903,7 +902,7 @@ Build each case in AZ Test using a cow or villager in a boat as the source, then
 | P6 | Global cows 100%; A Inside fade 4 mutes cows; source 2 blocks inside edge | About 50% | v1 |
 | P7 | Outside zone O mutes all, anchor 40 away; Inside A 70%, anchor 6 away | 70% | v1 |
 | P8 | Global villagers 150%; A sets cue only | 150% | v1 |
-| P9 | Bubble 50% + fixed zone 20% both contain source; fixed anchor closer | 20%; walk so bubble anchor (you) is closer: 50% | v1 |
+| P9 | (Removed 2026-11-13 with the personal bubble) | | | |
 | P10 | Fixed zone in Overworld; same coordinates in the Nether | No effect in the Nether | MVP |
 | P11 | Zone mutes all; music and UI clicks | Unchanged | MVP |
 | P12 | Source minecart rolls out of a mute zone while playing | Becomes audible within 0.5 s of leaving | MVP |
@@ -958,7 +957,7 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 
 | Term | Meaning |
 | --- | --- |
-| Anchor | The point a zone is measured from: fixed coordinates, or the player for a personal bubble. For a box or cylinder, its center. |
+| Anchor | The point a zone is measured from: the zone's geometric center at fixed coordinates. |
 | Attenuation | How a sound gets quieter with distance. "Linear" sounds fade to silence at their range; "none" sounds (music, UI) do not fade. |
 | Category (sound source) | Vanilla's volume group for a sound, e.g. Hostile Creatures. Each has a slider in Options. |
 | Client-only mod | A mod installed only on the player's game; the server needs nothing. |
@@ -978,7 +977,6 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 | Mojang names (mappings) | Official names for Minecraft's code (e.g. `SoundEngine`). Java 26.x ships with them unobfuscated. |
 | Narrator | Vanilla's built-in screen reader (Ctrl+B). |
 | OpenAL | The audio library Minecraft uses to play sounds. |
-| Personal bubble | A zone that follows the local player. |
 | Place | Where Sound Sets are attached: Everywhere or a zone. Each place has an ordered list of attached sets. |
 | Positional sound | A sound with a location in the world that gets quieter with distance. |
 | Precedence | How Sound Sculptor decides which setting wins when several apply (FR-4.5, FR-9). |
@@ -998,7 +996,7 @@ The biggest risks are boost leaking range, Minecraft UI/render changes between v
 | Vanilla | Unmodified Minecraft. |
 | Vanilla hearing range | The farthest distance at which vanilla would play a sound or show its subtitle. |
 | World key | Sound Sculptor's ID for a server, Realm or singleplayer world, used to identify each profile and its fixed zones. |
-| Zone | An area (box, cylinder or sphere) with its own attached Sound Sets, affecting sounds inside or outside it. A place. |
+| Zone | An area (box or cylinder) with its own attached Sound Sets, affecting sounds inside or outside it. A place. |
 
 ## Open questions
 
@@ -1128,3 +1126,4 @@ In priority order. Answers will update the decisions log and the affected sectio
 | 2026-11-13 | Set editor Save repeats the list of places (FR-4.9) only when the set's name or entries changed; a Save that only attaches or detaches applies without it, since no other place changes. While other worlds are still being counted, a changed set always asks | Builder's call |
 | 2026-11-13 | The noisy-farm stress test is the worst case of 9.1, so it is checked against 10 µs per sound; the typical profile stays under 5 µs. FR-14's criterion and step 4 of 11.2 now say so (they still said 5 µs from before the 2026-11-09 split). M8c measured 4.18 µs typical and 5.49 µs stress | Project owner |
 | 2026-11-13 | UI wording settled in M8d: the row action that sets a sound's level is "Level…" (FR-4.3 says Level), and the set editor has **Type a pattern…** next to Add sounds… so typed patterns stay reachable (FR-4.8) | Builder's call |
+| 2026-11-13 | Personal bubble zones and sphere shapes are dropped: every zone is a fixed box (MVP) or cylinder (v1); Everywhere plus a set covers the calm-building case (US-6); Copy from carries Everywhere's sets, its Quick changes and settings only; P9 removed. The mod is unreleased, so older sphere zones are not kept. A 'within N blocks of me' range on a set or Everywhere could cover 'only sounds near me' later. | Project owner |
