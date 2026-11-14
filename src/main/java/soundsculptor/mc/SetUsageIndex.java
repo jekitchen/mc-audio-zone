@@ -1,13 +1,16 @@
 package soundsculptor.mc;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -48,6 +51,8 @@ public final class SetUsageIndex {
 	/** The files read by the last finished rebuild, or {@code null} until the first one has finished. */
 	private static volatile List<FileProfile> files;
 	private static volatile Built built = new Built(List.of(), null, SetUsage.EMPTY);
+	/** Files left out of the count and already logged; a file leaves it once it reads fine again. Indexer thread only. */
+	private static final Set<Path> SKIPPED = new HashSet<>();
 
 	private SetUsageIndex() {
 	}
@@ -114,30 +119,47 @@ public final class SetUsageIndex {
 					out.add(new FileProfile(stored.file(), key, profile));
 				}
 			}
-		} catch (IOException e) {
+		} catch (IOException | UncheckedIOException e) {
+			// The files read by the last rebuild still count, rather than none (none before the first).
 			SoundSculptorClient.LOGGER.warn("Sound Sculptor could not list {} for the Sound Set usage", store.directory(), e);
+			if (files == null) {
+				files = List.of();
+			}
+			return;
 		}
 		files = List.copyOf(out);
 	}
 
 	/**
-	 * The profile in the file, or {@code null} if it cannot be read (reading never changes a file). An unreadable file
-	 * is reported when its world is joined, so here it is only logged at debug level; anything else that goes wrong
-	 * reading it is logged and the file is skipped, so one bad file never stops the index.
+	 * The profile in the file, or {@code null} if it cannot be read (reading never changes a file), so one bad file
+	 * never stops the count. A file that is skipped is logged the first time, and again only after it has been read
+	 * fine in between, so the frequent rebuilds do not repeat the same line. An unreadable file is also reported when
+	 * its world is joined.
 	 */
 	private static Profile readFile(Path file) {
 		try {
 			if (Files.size(file) > ProfileStore.MAX_FILE_BYTES) {
-				SoundSculptorClient.LOGGER.debug("Sound Sculptor skipped {} for the Sound Set usage: the file is too large", file);
+				skipped(file, "the file is larger than 1 MB", null);
 				return null;
 			}
-			return ProfileCodec.read(Files.readString(file, StandardCharsets.UTF_8), version -> { }).profile();
+			Profile profile = ProfileCodec.read(Files.readString(file, StandardCharsets.UTF_8), version -> { }).profile();
+			SKIPPED.remove(file);
+			return profile;
 		} catch (ProfileFormatException | IOException e) {
-			SoundSculptorClient.LOGGER.debug("Sound Sculptor skipped {} for the Sound Set usage: it could not be read", file, e);
+			skipped(file, "it could not be read", e);
 			return null;
 		} catch (RuntimeException e) {
-			SoundSculptorClient.LOGGER.warn("Sound Sculptor skipped {} for the Sound Set usage", file, e);
+			skipped(file, "reading it failed", e);
 			return null;
+		}
+	}
+
+	/** Logs a skipped file once (see {@link #readFile}). */
+	private static void skipped(Path file, String why, Exception e) {
+		if (SKIPPED.add(file)) {
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor left {} out of the Sound Set usage: {}", file, why, e);
+		} else {
+			SoundSculptorClient.LOGGER.debug("Sound Sculptor left {} out of the Sound Set usage again: {}", file, why);
 		}
 	}
 }

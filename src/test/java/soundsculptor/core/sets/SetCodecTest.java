@@ -58,6 +58,12 @@ class SetCodecTest {
 	}
 
 	@Test
+	void emptyEntryIdIsRefusedWithItsPlace() {
+		assertEquals("Sound Set 'Farm animals', entry 2, id: empty.",
+				problem(file("{\"id\":\"a\",\"target\":\"*cow*\"},{\"id\":\"\",\"target\":\"*pig*\"}")));
+	}
+
+	@Test
 	void newerSchemaIsRefused() {
 		String text = problem("{\"schemaVersion\":4,\"id\":\"farm\",\"name\":\"x\",\"entries\":[]}");
 		assertTrue(text.contains("newer Sound Sculptor"), text);

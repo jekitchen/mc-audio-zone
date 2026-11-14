@@ -125,6 +125,25 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 			check(context.computeOnClient(mc -> QuickActions.isMuted(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)
 					&& QuickEntries.get(ProfileManager.profile(), "other") != null), "a refused Undo changes nothing");
 
+			// Mute then Unmute leaves the profile as it was (FR-4.10): over a library mute, the "Not muted" entry comes
+			// back without the Cue that Mute added.
+			SoundSet hush = new SoundSet("undo-hush", "Hush villagers", List.of(SetEntry.of("e1", "minecraft:entity.villager.*").withMute(true)));
+			SetEntry calm = SetEntry.of("calm", VILLAGER).withMute(false);
+			context.runOnClient(mc -> {
+				ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name())
+						.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(calm)).attach(hush.id())), ws.library().put(hush)));
+				sounds(mc).refresh();
+				sounds(mc).toggleMute(VILLAGER);
+			});
+			check(context.computeOnClient(mc -> Boolean.TRUE.equals(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER).cue())),
+					"Mute gives the entry the Cue default");
+			context.runOnClient(mc -> sounds(mc).toggleMute(VILLAGER));
+			check(context.computeOnClient(mc -> calm.equals(QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER))),
+					"Unmute puts the Not muted entry back as it was, was "
+							+ context.computeOnClient(mc -> QuickActions.quickEntry(ProfileManager.workspace(), PlaceRef.EVERYWHERE, VILLAGER)));
+			context.runOnClient(mc -> ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name()),
+					ws.library().remove(hush.id()))));
+
 			// Everywhere's Sound Sets (FR-8.6): On/Off, Move and Detach each offer Undo.
 			context.runOnClient(mc -> ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name())
 					.withEverywhere(PlaceSets.EMPTY.attach(COWS.id()).attach(PIGS.id())), ws.library().put(COWS).put(PIGS))));

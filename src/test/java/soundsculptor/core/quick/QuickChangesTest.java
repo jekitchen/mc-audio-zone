@@ -466,4 +466,113 @@ class QuickChangesTest {
 		assertEquals("soundsculptor.sets.error.entries_full", QuickActions.canPutQuickEntry(full, EVERYWHERE, SetEntry.of("new", COW)).key());
 		assertNull(QuickActions.canPutQuickEntry(full, EVERYWHERE, SetEntry.of("g7", COW)), "an existing entry can still change");
 	}
+
+	// ---- FR-4.10: Mute then Unmute leaves the profile as it was ----
+
+	/** One press of the row's Mute/Unmute, as the Sounds tab makes it: the edit from the memory, then noted in it. */
+	private static Workspace press(Workspace ws, MuteMemory memory, String worldKey) {
+		EntryEdit edit = memory.toggleMute(worldKey, ws, EVERYWHERE, COW, true);
+		QuickActionResult result = QuickActions.apply(ws, EVERYWHERE, COW, edit);
+		assertTrue(result.ok(), () -> "refused: " + result.error());
+		memory.applied(worldKey, EVERYWHERE, COW, edit, result.before(), result.after());
+		return result.after();
+	}
+
+	private static void assertMuteThenUnmuteRestores(Workspace start) {
+		MuteMemory memory = new MuteMemory();
+		assertFalse(QuickActions.isMuted(start, EVERYWHERE, COW));
+		Workspace muted = press(start, memory, "w");
+		assertTrue(QuickActions.isMuted(muted, EVERYWHERE, COW));
+		Workspace unmuted = press(muted, memory, "w");
+		assertFalse(QuickActions.isMuted(unmuted, EVERYWHERE, COW));
+		assertEquals(start, unmuted, "Mute then Unmute leaves the profile as it was");
+	}
+
+	@Test
+	void muteThenUnmuteRestoresWhenTheSoundHadNoEntry() {
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY));
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", PIG).withVolume(40)))));
+	}
+
+	/** The "Not muted" entry an earlier Unmute wrote over a library mute: Mute's default Cue must not be left on it. */
+	@Test
+	void muteThenUnmuteRestoresANotMutedEntryOverALibraryMute() {
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", COW).withMute(false)))
+				.attach(MUTES_COWS.id()), MUTES_COWS));
+	}
+
+	@Test
+	void muteThenUnmuteRestoresAnEntryWithItsOwnCue() {
+		// Its own Cue equal to the default, which the stateless Unmute would take for the one Mute added.
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", COW).withCue(true)))));
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", COW).withMute(false).withCue(false)))));
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", COW).withVolume(50)))
+				.attach(MUTES_COWS.id()), MUTES_COWS));
+		assertMuteThenUnmuteRestores(ws(PlaceSets.EMPTY.withQuickEntries(
+				List.of(SetEntry.of("e1", COW).withMute(false).withCue(true).withEnabled(false))).attach(COWS_NOT_MUTED.id()),
+				COWS_NOT_MUTED));
+	}
+
+	@Test
+	void undoOfMuteThenUnmuteStillWorks() {
+		Workspace start = ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", COW).withMute(false)))
+				.attach(MUTES_COWS.id()), MUTES_COWS);
+		MuteMemory memory = new MuteMemory();
+		Workspace muted = press(start, memory, "w");
+		EntryEdit unmute = memory.toggleMute("w", muted, EVERYWHERE, COW, true);
+		QuickActionResult result = QuickActions.apply(muted, EVERYWHERE, COW, unmute);
+		assertEquals(start, result.after());
+		memory.applied("w", EVERYWHERE, COW, unmute, result.before(), result.after());
+		UndoSlot<Workspace> undo = new UndoSlot<>();
+		undo.offer(result.before(), result.after(), "soundsculptor.sounds.toast.unmuted", List.of(COW), 1000);
+		Workspace undone = undo.undo(result.after(), 2000).orElseThrow();
+		assertEquals(muted, undone, "Undo of Unmute brings the mute back");
+		assertEquals(start, press(undone, memory, "w"), "a second Unmute after the Undo still puts the entry back exactly");
+	}
+
+	/**
+	 * Quick changes switched off with an entry of its own: Mute switches it on (FR-8.6), and the Unmute that follows
+	 * switches it back off, so the entry the player had switched off with it stops applying again.
+	 */
+	@Test
+	void muteThenUnmuteSwitchesQuickChangesBackOff() {
+		Workspace start = ws(quickOff(SetEntry.of("e1", PIG).withMute(true)));
+		assertFalse(QuickActions.isMuted(start, EVERYWHERE, PIG));
+		MuteMemory memory = new MuteMemory();
+		Workspace muted = press(start, memory, "w");
+		assertTrue(quickOn(muted.profile().everywhere()));
+		assertTrue(QuickActions.isMuted(muted, EVERYWHERE, PIG), "with Quick changes on, its pig mute applies");
+		Workspace unmuted = press(muted, memory, "w");
+		assertEquals(start, unmuted, "Mute then Unmute leaves Quick changes switched off, as it was");
+		assertFalse(QuickActions.isMuted(unmuted, EVERYWHERE, PIG));
+		assertMuteThenUnmuteRestores(ws(quickOff(SetEntry.of("e1", PIG).withMute(true), SetEntry.of("e2", COW).withVolume(40))));
+	}
+
+	/** Once something else at the place changed after the Mute, Unmute puts only the entry back: Quick changes stays on. */
+	@Test
+	void quickChangesStaysOnWhenThePlaceChangedSinceTheMute() {
+		Workspace start = ws(quickOff(SetEntry.of("e1", PIG).withMute(true)));
+		MuteMemory memory = new MuteMemory();
+		Workspace muted = press(start, memory, "w");
+		Workspace changed = apply(muted, EVERYWHERE, "minecraft:entity.hen.ambient", new EntryEdit.Volume(30));
+		Workspace unmuted = press(changed, memory, "w");
+		assertNull(quickEntry(unmuted, EVERYWHERE, COW), "the entry the Mute made is gone");
+		assertTrue(quickOn(unmuted.profile().everywhere()), "the player used Quick changes since, so it stays on");
+		assertEquals(30, quickEntry(unmuted, EVERYWHERE, "minecraft:entity.hen.ambient").volume());
+	}
+
+	/** The memory is only for the entry that Mute left: once the entry changed, Unmute works as without it. */
+	@Test
+	void anEntryChangedSinceTheMuteUnmutesAsUsual() {
+		Workspace start = ws(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("e1", COW).withMute(false)))
+				.attach(MUTES_COWS.id()), MUTES_COWS);
+		MuteMemory memory = new MuteMemory();
+		Workspace muted = press(start, memory, "w");
+		Workspace louder = apply(muted, EVERYWHERE, COW, new EntryEdit.Volume(70));
+		assertEquals(QuickActions.toggleMute(louder, EVERYWHERE, COW, true), memory.toggleMute("w", louder, EVERYWHERE, COW, true));
+		assertEquals(QuickActions.toggleMute(muted, EVERYWHERE, COW, true), memory.toggleMute("other.net", muted, EVERYWHERE, COW, true),
+				"another world's profile is not this one");
+		assertEquals(QuickActions.toggleMute(muted, PEN, COW, true), memory.toggleMute("w", muted, PEN, COW, true),
+				"another place is not this one");
+	}
 }

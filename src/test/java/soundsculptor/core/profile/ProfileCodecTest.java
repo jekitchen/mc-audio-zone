@@ -100,6 +100,28 @@ class ProfileCodecTest {
 				problem(sets("{\"sets\": SETS, \"quickChanges\": {\"id\": \"quick\", \"entries\": []}}", "[]")));
 	}
 
+	/** A library set ID follows the Sound Set file's rules (FR-11.6): an empty or malformed ID is refused with its place. */
+	@Test
+	void anAttachedSetIdThatIsNotALibraryIdIsRejected() {
+		assertEquals("Everywhere, set 1, field set: \"\" can only use a-z, 0-9 and -.",
+				problem(sets("{\"sets\": SETS}", "[{\"set\": \"\"}]")));
+		assertEquals("Everywhere, set 2, field set: \"Farm Animals\" can only use a-z, 0-9 and -.",
+				problem(sets("{\"sets\": SETS}", "[{\"set\": \"set-a\"}, {\"set\": \"Farm Animals\"}]")));
+		assertEquals("Everywhere, set 1, field set: \"deleted\" is a reserved name and can't be used as a Sound Set ID.",
+				problem(sets("{\"sets\": SETS}", "[{\"set\": \"deleted\"}]")));
+		assertEquals("Zone 1, set 1, field set: \"con\" is a reserved name and can't be used as a Sound Set ID.",
+				problem("{\"schemaVersion\": 3, \"zones\": [{\"id\": \"z1\", \"anchor\": {\"type\": \"fixed\", \"x\": 0, \"y\": 0,"
+						+ " \"z\": 0, \"dimension\": \"minecraft:overworld\", \"worldKey\": \"a.net\"}, \"shape\": {\"type\": \"cylinder\","
+						+ " \"radius\": 8, \"height\": 16}, \"sets\": [{\"set\": \"con\"}]}]}"));
+	}
+
+	@Test
+	void anEmptyQuickChangesEntryIdIsRejectedWithItsPlace() {
+		assertEquals("Everywhere, Quick changes, entry 1, id: empty.", problem(sets(
+				"{\"sets\": SETS, \"quickChanges\": {\"id\": \"quick\", \"entries\": [{\"id\": \"\", \"target\": \"*cow*\"}]}}",
+				"[{\"set\": \"quick\"}]")));
+	}
+
 	@Test
 	void aSetListedTwiceIsRejected() {
 		assertEquals("Everywhere, field sets: \"set-a\" is listed twice.",

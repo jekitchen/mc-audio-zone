@@ -55,6 +55,28 @@ class AtomicFilesTest {
 		assertEquals("new", Files.readString(file, StandardCharsets.UTF_8));
 	}
 
+	/** The {@code .bak} copy waits out a moment's hold on the backup the same way, so the save is not lost. */
+	@Test
+	@EnabledOnOs(OS.WINDOWS)
+	void backupCopyWaitsWhileTheBackupIsHeldForAMoment() throws Exception {
+		Path file = dir.resolve("held.json");
+		AtomicFiles.write(file, "one");
+		AtomicFiles.write(file, "two"); // held.json.bak now exists
+		Path bak = dir.resolve("held.json.bak");
+		SeekableByteChannel held = Files.newByteChannel(bak, StandardOpenOption.READ, ExtendedOpenOption.NOSHARE_DELETE);
+		CompletableFuture<Void> release = CompletableFuture.runAsync(() -> {
+			try {
+				held.close();
+			} catch (IOException e) {
+				throw new IllegalStateException(e);
+			}
+		}, CompletableFuture.delayedExecutor(40, TimeUnit.MILLISECONDS));
+		AtomicFiles.write(file, "three");
+		release.get(5, TimeUnit.SECONDS);
+		assertEquals("three", Files.readString(file, StandardCharsets.UTF_8));
+		assertEquals("two", Files.readString(bak, StandardCharsets.UTF_8));
+	}
+
 	/** A file that stays held fails after the retries, with the reason, and keeps its old content. */
 	@Test
 	@EnabledOnOs(OS.WINDOWS)

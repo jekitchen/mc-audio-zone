@@ -152,7 +152,7 @@ public final class PlaceSetsPanel {
 
 	private SculptButton detachButton(String setId) {
 		return Tooltips.describe(SculptButton.text(DETACH, SculptButton.widthFor(DETACH), () -> detach(setId)),
-				Component.translatable(SoundSet.QUICK_ID.equals(setId) ?"soundsculptor.place_sets.detach.quick_tip" : "soundsculptor.place_sets.detach.tip"));
+				Component.translatable(SoundSet.QUICK_ID.equals(setId) ? "soundsculptor.place_sets.detach.quick_tip" : "soundsculptor.place_sets.detach.tip"));
 	}
 
 	/** "○ Off" for a set switched off here, so the state is text and not color alone; empty when on. */

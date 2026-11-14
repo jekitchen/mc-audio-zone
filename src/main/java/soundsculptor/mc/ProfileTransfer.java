@@ -8,7 +8,6 @@ import soundsculptor.core.profile.Profile;
 import soundsculptor.core.profile.ProfileExport;
 import soundsculptor.core.profile.ProfileFormatException;
 import soundsculptor.core.profile.ProfileImport;
-import soundsculptor.core.profile.ProfileStore;
 import soundsculptor.core.sets.SetImportPlan;
 import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SoundSet;
@@ -74,28 +73,33 @@ public final class ProfileTransfer {
 	// ---- Export (FR-11.4) ----
 
 	/**
-	 * Writes the profile, with every library set it attaches, to the exports folder.
+	 * An export that was written.
 	 *
-	 * @return the file written
+	 * @param tooLargeToImport whether the file is over the 1 MB import limit (FR-11.6), so it can't be imported as it is
 	 */
-	public static Path export(String key, Profile profile) throws IOException {
+	public record Exported(Path file, boolean tooLargeToImport) {
+	}
+
+	/** Writes the profile, with every library set it attaches, to the exports folder. */
+	public static Exported export(String key, Profile profile) throws IOException {
 		Path dir = exportsDir();
 		Files.createDirectories(dir);
 		Path file = dir.resolve(ProfileExport.fileName(profile.name(), LocalDate.now()));
-		Files.writeString(file, ExportCodec.toJson(profile, key, ProfileManager.library()), StandardCharsets.UTF_8);
-		return file;
+		String text = ExportCodec.toJson(profile, key, ProfileManager.library());
+		Files.writeString(file, text, StandardCharsets.UTF_8);
+		return new Exported(file, !ExportCodec.fitsImportLimit(text));
 	}
 
 	/**
-	 * Exports and shows where the file went, with "Open folder". A file larger than the import limit (FR-11.6, 1 MB) is
-	 * still written, and the dialog warns that it can't be imported again as it is.
+	 * Exports and shows where the file went, with "Open folder". FR-11.4 asks for the whole profile with every set it
+	 * uses, so a file larger than the import limit (FR-11.6, 1 MB) is still written rather than refused, and the dialog
+	 * warns that it can't be imported again as it is. The size is measured on the text written, so only a failed write
+	 * says the export failed.
 	 */
 	public static void exportWithDialog(SculptScreen host, String key, Profile profile) {
-		Path file;
-		boolean tooLarge;
+		Exported exported;
 		try {
-			file = export(key, profile);
-			tooLarge = Files.size(file) > ProfileStore.MAX_FILE_BYTES;
+			exported = export(key, profile);
 		} catch (IOException e) {
 			SoundSculptorClient.LOGGER.error("Sound Sculptor could not export {}", key, e);
 			host.showToast(Component.translatable("soundsculptor.transfer.export_failed", e.getMessage()), null);
@@ -103,8 +107,8 @@ public final class ProfileTransfer {
 		}
 		Minecraft.getInstance().gui.setScreen(new SculptDialog(host,
 				Component.translatable("soundsculptor.transfer.exported.title"),
-				Component.translatable(tooLarge ? "soundsculptor.profiles.export.too_large" : "soundsculptor.transfer.exported.message",
-						file.getFileName().toString()),
+				Component.translatable(exported.tooLargeToImport() ? "soundsculptor.transfer.exported.too_large"
+						: "soundsculptor.transfer.exported.message", exported.file().getFileName().toString()),
 				List.of(new SculptDialog.Choice(Component.translatable("soundsculptor.transfer.open_folder"), () -> openFolder(exportsDir())),
 						new SculptDialog.Choice(Component.translatable("soundsculptor.ui.ok"), () -> { })),
 				1, 1));

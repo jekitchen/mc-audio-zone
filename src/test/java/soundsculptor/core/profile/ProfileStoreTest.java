@@ -89,6 +89,30 @@ class ProfileStoreTest {
 	}
 
 	@Test
+	void fileLargerThan1MbIsRefusedAndSetAside() throws IOException {
+		Files.createDirectories(dir);
+		Path file = store().fileFor("default");
+		Files.writeString(file, "{\"schemaVersion\": 3" + " ".repeat((int) ProfileStore.MAX_FILE_BYTES) + "}");
+		ProfileStore.LoadResult result = store().load("default", "Default");
+		assertTrue(result.failed());
+		assertEquals("The file is larger than 1 MB.", result.problem().text(EN));
+		assertEquals(Profile.empty("Default"), result.profile());
+		assertTrue(Files.exists(result.brokenCopy()));
+		assertFalse(Files.exists(file));
+	}
+
+	@Test
+	void fileOfExactly1MbStillLoads() throws IOException {
+		Files.createDirectories(dir);
+		String start = "{\"schemaVersion\": 3, \"name\": \"Big\"";
+		Files.writeString(store().fileFor("default"), start + " ".repeat((int) ProfileStore.MAX_FILE_BYTES - start.length() - 1) + "}");
+		assertEquals(ProfileStore.MAX_FILE_BYTES, Files.size(store().fileFor("default")));
+		ProfileStore.LoadResult result = store().load("default", "Default");
+		assertFalse(result.failed(), String.valueOf(result.problem()));
+		assertEquals("Big", result.profile().name());
+	}
+
+	@Test
 	void newerSchemaIsRefusedWithAPlainMessage() throws IOException {
 		Files.createDirectories(dir);
 		Files.writeString(store().fileFor("default"), "{\"schemaVersion\": 99, \"globalRules\": []}");

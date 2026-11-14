@@ -152,7 +152,7 @@ public final class SetCodec {
 			return readChecked(o, where);
 		} catch (IllegalArgumentException | IllegalStateException | ClassCastException e) {
 			// Every value is checked above; this is a last guard so a bad file can never crash the game.
-			throw new SetFormatException(Message.of(SetText.NOT_ALLOWED), e);
+			throw new SetFormatException(Message.of(SetText.NOT_ALLOWED_AT, placeOf(o, where)), e);
 		}
 	}
 
@@ -191,7 +191,7 @@ public final class SetCodec {
 			return SoundSet.quick(readEntries(top));
 		} catch (IllegalArgumentException | IllegalStateException | ClassCastException e) {
 			// Every value is checked; this is a last guard so a bad file can never crash the game.
-			throw new SetFormatException(Message.of(SetText.NOT_ALLOWED), e);
+			throw new SetFormatException(Message.of(SetText.NOT_ALLOWED_AT, where), e);
 		}
 	}
 
@@ -205,7 +205,13 @@ public final class SetCodec {
 		Map<String, Integer> firstUse = new HashMap<>();
 		for (int i = 0; i < array.size(); i++) {
 			Fields f = top.element(array, i, ENTRY_FIELDS);
-			SetEntry entry = readEntry(f);
+			SetEntry entry;
+			try {
+				entry = readEntry(f);
+			} catch (IllegalArgumentException | IllegalStateException | ClassCastException e) {
+				// The last guard (see readWithWarnings), naming the entry.
+				throw new SetFormatException(Message.of(SetText.NOT_ALLOWED_AT, f.where()), e);
+			}
 			Integer earlier = firstUse.putIfAbsent(entry.id(), i + 1);
 			if (earlier != null) {
 				throw f.problem(SetText.F_ID, Message.of(SetText.ENTRY_ID_USED, quote(entry.id()), earlier));
@@ -244,6 +250,9 @@ public final class SetCodec {
 
 	private static SetEntry readEntry(Fields e) throws SetFormatException {
 		String id = e.string("id", SetText.F_ID);
+		if (id.isEmpty()) {
+			throw e.problem(SetText.F_ID, Message.of(SetText.EMPTY_TEXT));
+		}
 		String target = e.string("target", SetText.F_TARGET);
 		SoundPattern pattern;
 		try {

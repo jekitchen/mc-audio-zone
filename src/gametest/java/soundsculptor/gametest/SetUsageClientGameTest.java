@@ -32,6 +32,7 @@ import soundsculptor.mc.SetUsageIndex;
  */
 public final class SetUsageClientGameTest implements FabricClientGameTest {
 	private static final String OTHER = "other.example.net";
+	private static final String GONE = "gone.example.net";
 	private static final String SAVE_FAILED = "Sound Sculptor could not save";
 
 	@Override
@@ -152,6 +153,43 @@ public final class SetUsageClientGameTest implements FabricClientGameTest {
 				check(stepped.contains("\"Usage step 40\""), "the newest profile is written once the file is free:\n" + stepped);
 			}
 			context.runOnClient(mc -> ProfileManager.update(p -> p.withName(name)));
+
+			// A set deleted just before joining a profile that attaches it (FR-4.11): the note names the set although
+			// deleted.json has not been written. A folder in its place makes that certain, instead of racing the saver.
+			Path deletedRecord = context.computeOnClient(mc -> ProfileManager.setStore().directory().resolve("deleted.json"));
+			String goneName = "Usage gone " + System.nanoTime(); // not in any deleted.json from an earlier run
+			SoundSet gone = new SoundSet("usage-gone", goneName, List.of(SetEntry.of("e1", "minecraft:entity.pig.ambient")));
+			context.runOnClient(mc -> {
+				ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().put(gone)));
+				ProfileManager.saveOther(GONE, Profile.empty("Gone server").withEverywhere(PlaceSets.EMPTY.attach(gone.id())));
+				ProfileManager.flushSaves();
+			});
+			blockFile(context, deletedRecord);
+			int notesBefore = context.computeOnClient(mc -> Notices.shownMessages().size());
+			context.runOnClient(mc -> {
+				ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().remove(gone.id())));
+				ProfileManager.flushSaves(); // the delete fails: deleted.json cannot be written
+				check(!ProfileManager.setStore().deletedNames().containsKey(gone.id()), "the record on disk does not have the name");
+				ProfileManager.leave();
+				ProfileManager.join(GONE, "Gone server");
+			});
+			context.waitTicks(3); // notices are shown on the next client task
+			List<String> notes = context.computeOnClient(mc -> Notices.shownMessages());
+			List<String> newNotes = notes.subList(notesBefore, notes.size());
+			check(newNotes.stream().anyMatch(n -> n.equals("'" + goneName + "' was deleted, so it was removed from Everywhere")),
+					"the note names the deleted set, was " + newNotes);
+			context.runOnClient(mc -> {
+				ProfileManager.leave();
+				ProfileManager.join(key, name);
+			});
+			unblockFile(context, deletedRecord);
+			context.runOnClient(mc -> {
+				ProfileManager.flushSaves(); // the delete is retried and now records the name
+				check(ProfileManager.setStore().deletedNames().get(gone.id()).equals(goneName), "the retried delete records the name");
+				ProfileManager.delete(GONE);
+				ProfileManager.flushSaves();
+			});
+			check(context.computeOnClient(mc -> ProfileManager.key()).equals(key), "back in this world's profile");
 
 			context.runOnClient(mc -> {
 				ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().remove("usage-fail").remove(farm.id())));

@@ -21,9 +21,15 @@ import soundsculptor.core.trace.TraceEditError;
  * editors (FR-12.7), and the result carries the before-state for the 5-second Undo toast. Not on the hot path.
  *
  * <p>An edit that clears a value never adds an entry or turns one on, an entry left setting nothing is removed, and an
- * empty Quick changes set is removed, so Mute followed by Unmute leaves the profile as it was. An edit that sets a value
- * switches the place's Quick changes back on if the player had switched it off (FR-8.6), so Mute never silently does
- * nothing.
+ * empty Quick changes set is removed. An edit that sets a value switches the place's Quick changes back on if the
+ * player had switched it off (FR-8.6), so Mute never silently does nothing.
+ *
+ * <p>Mute followed by Unmute leaves the place exactly as it was when the row's button goes through {@link MuteMemory}:
+ * Unmute puts the sound's entry back as it was before the Mute (its own Cue included, or no entry), and switches Quick
+ * changes back off if the Mute switched it on and nothing else at the place changed since. This holds within one
+ * session, also after Undo of the Unmute, while the entry is still what the Mute left. After a restart, or once the
+ * entry changed, Unmute is the plain {@link #toggleMute}, which has only the entry to go by: it clears the mute and a
+ * Cue equal to the default, or writes "Not muted", and leaves Quick changes switched on.
  */
 public final class QuickActions {
 	private QuickActions() {
@@ -65,6 +71,9 @@ public final class QuickActions {
 	 * (FR-7.6). When it is muted only by its Quick changes entry, Unmute clears that setting (and the default Cue the
 	 * mute added). When any other set at the place, or another Quick changes entry, would still mute it, Unmute writes
 	 * {@code mute=false} ("Not muted"). Builds up to two resolvers for the place: call it on a press, not per row.
+	 *
+	 * <p>Right after a quick Mute, use {@link MuteMemory#toggleMute} instead: from the entry alone, a Cue equal to the
+	 * default cannot be told from the one the Mute added, so this Unmute may keep or drop it.
 	 */
 	public static EntryEdit toggleMute(Workspace ws, PlaceRef where, String soundId, boolean cueDefault) {
 		PlaceSets place = ws.profile().place(where);
@@ -139,6 +148,17 @@ public final class QuickActions {
 	private static PlaceSets edited(PlaceSets place, String soundId, EntryEdit edit) {
 		SoundSet quick = quickOf(place);
 		SetEntry old = singleSoundEntry(quick, soundId);
+		if (edit instanceof EntryEdit.PutBack putBack) {
+			// The entry exactly as it was before a quick Mute, on or off, or none (EntryEdit.PutBack is only applied here),
+			// and Quick changes switched back off if that Mute switched it on.
+			SoundSet changedSet = putBack.entry() != null ? quick.putEntry(putBack.entry())
+					: old != null ? quick.removeEntry(old.id()) : quick;
+			PlaceSets after = place.withQuickChanges(changedSet.entries().isEmpty() ? null : changedSet);
+			if (putBack.quickOff() && after.quickChanges() != null) {
+				after = after.setEnabled(SoundSet.QUICK_ID, false);
+			}
+			return after.equals(place) ? null : after;
+		}
 		boolean setsSomething = setsAnything(edit.apply(SetEntry.of("probe", soundId)));
 		SoundSet changedSet;
 		if (old == null) {

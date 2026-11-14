@@ -58,12 +58,23 @@ public final class AppSettingsManager {
 		}
 	}
 
-	/** Waits until every queued save has been written (before the game exits). */
-	public static void flushSaves() {
+	/**
+	 * Waits until every queued save has been written (tests, and before the game exits), like
+	 * {@link ProfileManager#flushSaves()}: at most 10 seconds, and it never throws.
+	 *
+	 * @return whether the queued saves finished in time
+	 */
+	public static boolean flushSaves() {
 		try {
 			SAVER.submit(() -> { }).get(10, TimeUnit.SECONDS);
+			return true;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor stopped waiting for the settings save: interrupted");
+			return false;
 		} catch (Exception e) {
-			throw new IllegalStateException("settings save did not finish", e);
+			SoundSculptorClient.LOGGER.warn("Sound Sculptor's settings save did not finish within 10 s; it goes on in the background", e);
+			return false;
 		}
 	}
 }

@@ -36,6 +36,10 @@ public final class TraceEditor {
 	 * in the place's Quick changes for {@link SoundSet#QUICK_ID}.
 	 */
 	public static TraceEditResult edit(TraceEditContext ctx, Workspace ws, EntryLocation where, EntryEdit edit) {
+		if (edit instanceof EntryEdit.PutBack) {
+			// PutBack replaces whatever entry it is applied to; only QuickActions.apply (via addToQuickChanges) handles it.
+			throw new IllegalArgumentException("PutBack is only for a sound's Quick changes entry (QuickActions.apply)");
+		}
 		TraceEditError invalid = edit.validate();
 		if (invalid != null) {
 			return refused(ctx, ws, invalid.message());

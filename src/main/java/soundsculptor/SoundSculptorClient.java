@@ -74,10 +74,8 @@ public final class SoundSculptorClient implements ClientModInitializer {
 			if (!ProfileManager.flushSaves()) {
 				LOGGER.warn("Sound Sculptor: some saves had not finished when the game closed");
 			}
-			try {
-				AppSettingsManager.flushSaves();
-			} catch (RuntimeException e) {
-				LOGGER.warn("Sound Sculptor: the settings save had not finished when the game closed", e);
+			if (!AppSettingsManager.flushSaves()) {
+				LOGGER.warn("Sound Sculptor: the settings save had not finished when the game closed");
 			}
 		});
 		SoundLogger.registerIfEnabled();
