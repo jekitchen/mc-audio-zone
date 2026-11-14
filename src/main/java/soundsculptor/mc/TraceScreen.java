@@ -345,7 +345,7 @@ public final class TraceScreen extends SculptScreen {
 		if (where.isQuick() && isSingleSoundEntry(place, entry)) {
 			boolean muted = QuickActions.isMuted(ProfileManager.workspace(), place, soundId);
 			return SculptButton.text(muteLabel(muted), muteWidth(),
-					() -> addToQuickChanges(place, QuickActions.toggleMute(ProfileManager.workspace(), place, soundId, cueDefault())));
+					() -> addToQuickChanges(place, toggleQuickMute(place)));
 		}
 		boolean muted = Boolean.TRUE.equals(entry.mute());
 		SculptButton button = SculptButton.text(muteLabel(muted), muteWidth(),
@@ -365,6 +365,11 @@ public final class TraceScreen extends SculptScreen {
 
 	private static boolean cueDefault() {
 		return ProfileManager.profile().settings().cueDefault();
+	}
+
+	/** The sound's Mute/Unmute at a place, as on the Sounds tab: Unmute right after Mute puts the entry back exactly. */
+	private EntryEdit toggleQuickMute(PlaceRef where) {
+		return ProfileManager.mutes().toggleMute(ProfileManager.key(), ProfileManager.workspace(), where, soundId, cueDefault());
 	}
 
 	/** The library set's name, or its ID if the library no longer has it. */
@@ -415,6 +420,9 @@ public final class TraceScreen extends SculptScreen {
 	public void addToQuickChanges(PlaceRef where, EntryEdit edit) {
 		TraceEditResult result = TraceEditor.addToQuickChanges(context(), ProfileManager.workspace(), where, edit);
 		applyOne(result);
+		if (result.ok()) {
+			ProfileManager.mutes().applied(ProfileManager.key(), where, soundId, edit, result.before(), result.after());
+		}
 		if (result.ok() && lines != null) {
 			SetEntry added = QuickActions.quickEntry(result.after(), where, soundId);
 			SculptList.Row row = added == null ? null
@@ -482,7 +490,7 @@ public final class TraceScreen extends SculptScreen {
 		boolean muted = QuickActions.isMuted(ProfileManager.workspace(), where, soundId);
 		SculptButton mute = Tooltips.describe(SculptButton.text(muteLabel(muted), () -> {
 			closeOverlay();
-			addToQuickChanges(where, QuickActions.toggleMute(ProfileManager.workspace(), where, soundId, cueDefault()));
+			addToQuickChanges(where, toggleQuickMute(where));
 		}), Component.translatable("soundsculptor.trace.edit.add_quick.mute_tip")).narrationContext(() -> context);
 		SculptButton level = Tooltips.describe(SculptButton.text(Component.translatable("soundsculptor.trace.edit.volume"), () -> {
 			closeOverlay();

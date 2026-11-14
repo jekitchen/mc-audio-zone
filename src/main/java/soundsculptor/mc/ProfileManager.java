@@ -9,6 +9,7 @@ import soundsculptor.core.profile.ProfileFormatException;
 import soundsculptor.core.profile.ProfilePrune;
 import soundsculptor.core.profile.ProfileStore;
 import soundsculptor.core.profile.ProfileWriter;
+import soundsculptor.core.quick.MuteMemory;
 import soundsculptor.core.sets.LibraryWriter;
 import soundsculptor.core.sets.SetLibrary;
 import soundsculptor.core.sets.SetStore;
@@ -93,6 +94,8 @@ public final class ProfileManager {
 	 * the record (or when that save failed).
 	 */
 	private static final Map<String, String> deletedNames = new ConcurrentHashMap<>();
+	/** What recent quick Mutes changed, so Unmute puts it back exactly (FR-4.10); game thread only. */
+	private static final MuteMemory MUTES = new MuteMemory();
 
 	private ProfileManager() {
 	}
@@ -194,6 +197,11 @@ public final class ProfileManager {
 	public static Workspace workspace() {
 		Snapshot snapshot = current;
 		return new Workspace(snapshot.profile(), snapshot.library());
+	}
+
+	/** The quick Mutes the row buttons can put back (see {@link MuteMemory}); use it on the game thread. */
+	public static MuteMemory mutes() {
+		return MUTES;
 	}
 
 	/** Where library sets are saved, or {@code null} before {@link #init}. */

@@ -134,4 +134,23 @@ public sealed interface EntryEdit {
 			return onlyDefaultCue ? unmuted.withCue(null) : unmuted;
 		}
 	}
+
+	/**
+	 * Quick action Unmute right after a quick Mute ({@link soundsculptor.core.quick.MuteMemory}): puts back the
+	 * sound's single-sound entry exactly as it was before that Mute, or removes it when there was none, so Mute then
+	 * Unmute leaves the profile as it was, the entry's own Cue included. Only for Quick changes.
+	 *
+	 * @param entry the entry as it was, or {@code null} if the Mute created it
+	 */
+	record PutBack(SetEntry entry) implements EntryEdit {
+		@Override
+		public TraceEditError validate() {
+			return null;
+		}
+
+		@Override
+		public SetEntry apply(SetEntry rule) {
+			return entry != null ? entry : rule.withMute(null).withVolume(null).withLimit(null).withCue(null);
+		}
+	}
 }

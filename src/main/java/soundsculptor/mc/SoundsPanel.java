@@ -665,13 +665,16 @@ public final class SoundsPanel {
 		ApplyTarget target = applyTarget();
 		PlaceRef where = target.place();
 		Workspace ws = ProfileManager.workspace();
-		EntryEdit edit = QuickActions.toggleMute(ws, where, soundId, ws.profile().settings().cueDefault());
+		String worldKey = ProfileManager.key();
+		// Through the memory, so Unmute right after Mute puts the entry back exactly as it was.
+		EntryEdit edit = ProfileManager.mutes().toggleMute(worldKey, ws, where, soundId, ws.profile().settings().cueDefault());
 		QuickActionResult result = QuickActions.apply(ws, where, soundId, edit);
 		if (!result.ok()) {
 			host.showToast(ProfileManager.component(result.error()), null);
 			return;
 		}
 		if (result.changed()) {
+			ProfileManager.mutes().applied(worldKey, where, soundId, edit, result.before(), result.after());
 			String toastKey = edit instanceof EntryEdit.MuteWithCue ? "soundsculptor.sounds.toast.muted" : "soundsculptor.sounds.toast.unmuted";
 			QuickUndo.applyWorkspace(host, this::refreshAfterUndo, current -> QuickActions.apply(current, where, soundId, edit).after(),
 					placeKey(toastKey, target), placeArgs(soundId, target));
