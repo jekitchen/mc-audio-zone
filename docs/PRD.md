@@ -776,7 +776,7 @@ Sound Sculptor must coexist with common client mods and be defensible to server 
 ### 9.4 Compatibility and packaging
 
 - Java version as required by Minecraft 26.2 (Java 25 assumed; verify). Jar size under 1 MB.
-- Declared dependencies: Fabric Loader, Fabric API, Minecraft 26.2 and 26.3 for the first release (one jar, `>=26.2 <26.4-`), each tested; later versions added as described in 10.5. Mod Menu listed as "suggests".
+- Declared dependencies: Fabric Loader, Fabric API, Minecraft 26.2 and 26.3 for the first release (one jar, `["~26.2", "~26.3"]`: releases only, no snapshots or pre-releases; 26.4 pre-release support is planned separately), each tested; later versions added as described in 10.5. Mod Menu listed as "suggests".
 - License MIT; source on a public repository; the name contains no "Minecraft".
 
 ## 10. Release plan
