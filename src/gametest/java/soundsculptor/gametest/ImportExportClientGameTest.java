@@ -43,7 +43,7 @@ import net.minecraft.client.gui.screens.Screen;
  *   <li>A set in the file with exactly the entries of a library set under another ID cancels the import, naming that
  *       set, with only OK; nothing changes.</li>
  *   <li>Your own export imported into another world attaches the same sets; nothing is duplicated.</li>
- *   <li>Another server's export brings its sets, bubble and settings but skips its fixed zones and a set it does not
+ *   <li>Another server's export brings its sets and settings but skips its fixed zones and a set it does not
  *       have, and says so; a file with a JSON typo, a radius of 900 or nothing in it fails with a clear message and
  *       changes nothing; a file dropped on the Profiles tab is imported the same way.</li>
  *   <li>An export larger than the 1 MB import limit is still written, with a warning.</li>
@@ -74,7 +74,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 						.withZones(List.of(
 								new Zone("hall", "Trading hall", true, key, "minecraft:overworld", new Point(120.5, 64, -33.25),
 										new Shape.Box(20, 8, 12), PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("z1", "*cow*").withVolume(40)))),
-								new Zone("near", "Near", true, key, "minecraft:the_nether", new Point(-7, 30, 9), new Shape.Sphere(16), PlaceSets.EMPTY)));
+								new Zone("near", "Near", true, key, "minecraft:the_nether", new Point(-7, 30, 9), new Shape.Cylinder(16, 32), PlaceSets.EMPTY)));
 				Path exported = exportImportOnEmptyLibraryRestoresSets(context, key, original, imports, exports, written);
 				SoundSet changed = VILLAGERS.withEntries(List.of(SetEntry.of("e1", "minecraft:entity.villager.*").withVolume(80)));
 				context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(ws.profile(), ws.library().put(changed))));
@@ -148,7 +148,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 		importFromScreen(context, "backup.json", SculptDialog.class);
 		check(context.computeOnClient(mc -> mc.gui.screen().getTitle().getString()).equals("Import backup.json?"), "the import dialog");
 		String backupMessage = context.computeOnClient(mc -> mc.gui.screen().getNarrationMessage().getString());
-		check(backupMessage.contains("Its 2 Sound Sets on Everywhere, 0 bubble zones and settings will replace this world's."),
+		check(backupMessage.contains("Its 2 Sound Sets on Everywhere and settings will replace this world's."),
 				"the dialog lists what is replaced, was " + backupMessage);
 		check(backupMessage.contains("2 fixed zones made for this server will be added."), "the dialog counts the fixed zones, was " + backupMessage);
 		check(backupMessage.contains("1 Sound Set will be added to the library."), "the dialog says the set is added, was " + backupMessage);
@@ -260,7 +260,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 		check(context.computeOnClient(mc -> mc.gui.screen().getTitle().getString()).equals("Import other.json?"),
 				"the import dialog opens at once: no name clash");
 		String message = context.computeOnClient(mc -> mc.gui.screen().getNarrationMessage().getString());
-		check(message.startsWith("Import other.json?") && message.contains("Its 1 Sound Set on Everywhere, 0 bubble zones")
+		check(message.startsWith("Import other.json?") && message.contains("Its 1 Sound Set on Everywhere and settings")
 				&& !message.contains("added to the library"), "nothing is added to the library, was " + message);
 		context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(0));
 		context.waitForScreen(SoundSculptorScreen.class);
@@ -271,7 +271,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 	}
 
 	/**
-	 * Another server's export (FR-11.5): rules, bubble and settings come in; its 2 fixed zones are skipped, and both the
+	 * Another server's export (FR-11.5): rules and settings come in; its 2 fixed zones are skipped, and both the
 	 * dialog and the toast say so; this world's own fixed zones stay. A attaches a set that is neither in its file nor in
 	 * this library: it is skipped and counted (FR-11.6).
 	 */
@@ -279,11 +279,11 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 		Profile serverA = Profile.empty("Server A")
 				.withEverywhere(PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("a1", "*bee*").withVolume(20),
 						SetEntry.of("a2", "*zombie*").withMute(true))).attach("set-gametest-gone"))
-				.withZones(List.of(zoneFor("fa1", A), zoneFor("fa2", A), zoneFor("ba", A).asBubble()));
+				.withZones(List.of(zoneFor("fa1", A), zoneFor("fa2", A)));
 		write(imports.resolve("server-a.json"), ProfileCodec.toJson(serverA, A));
 		importFromScreen(context, "server-a.json", SculptDialog.class);
 		String message = context.computeOnClient(mc -> mc.gui.screen().getNarrationMessage().getString());
-		check(message.contains("Its 1 Sound Set on Everywhere, 1 bubble zone and settings"), "the counts use the singular, was " + message);
+		check(message.contains("Its 1 Sound Set on Everywhere and settings"), "the counts use the singular, was " + message);
 		check(message.contains("2 fixed zones made for another server will be skipped"), "the dialog says 2 fixed zones are skipped, was " + message);
 		check(message.contains("1 Sound Set not found, skipped."), "the dialog counts the missing set, was " + message);
 		context.takeScreenshot("import-dialog-skipped");
@@ -294,8 +294,8 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 		Profile afterA = context.computeOnClient(mc -> ProfileManager.profile());
 		check(QuickEntries.of(afterA).size() == 2 && QuickEntries.get(afterA, "a1") != null, "A's rules are imported, was " + QuickEntries.of(afterA));
 		check(afterA.everywhere().attached().size() == 1, "the missing set is not attached, was " + afterA.everywhere().attached());
-		check(afterA.zones().stream().map(Zone::id).toList().equals(List.of("hall", "near", "ba")),
-				"this world's fixed zones stay, A's bubble comes in, A's fixed zones do not, was " + afterA.zones());
+		check(afterA.zones().stream().map(Zone::id).toList().equals(List.of("hall", "near")),
+				"this world's fixed zones stay and A's do not come in, was " + afterA.zones());
 	}
 
 	/** FR-11.6: a JSON typo, a radius of 900 and an empty file each fail with a clear message; nothing changes. */
@@ -410,7 +410,7 @@ public final class ImportExportClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zoneFor(String id, String key) {
-		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(5, 70, 5), new Shape.Sphere(6), PlaceSets.EMPTY);
+		return new Zone(id, "Zone " + id, true, key, "minecraft:overworld", new Point(5, 70, 5), new Shape.Cylinder(6, 12), PlaceSets.EMPTY);
 	}
 
 	private static ExportCodec.Read parse(String json) {

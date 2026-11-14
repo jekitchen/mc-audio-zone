@@ -5,11 +5,10 @@ import soundsculptor.core.diag.MemoryEstimate;
 import soundsculptor.core.sets.EntryResolution;
 import soundsculptor.core.zones.Precedence;
 import soundsculptor.core.zones.SoundDecision;
-import soundsculptor.core.zones.Zone;
 
 /**
- * The positional sounds that are playing right now, re-decided every client tick (PRD FR-8.8), so moving sources,
- * long sounds and the moving personal bubble change volume while they play.
+ * The positional sounds that are playing right now, re-decided every client tick (PRD FR-8.8), so moving sources and
+ * long sounds change volume while they play.
  *
  * <p>How the sound hook uses it, all on the game thread:
  * <ol>
@@ -28,7 +27,7 @@ import soundsculptor.core.zones.Zone;
  * touches the hearing range (FR-5.6).
  *
  * <p>A sound whose inputs did not change since the last tick is not re-decided: same position, same profile snapshot,
- * same world and dimension, and either no personal bubbles or a player who did not move. That keeps quiet ticks
+ * same world and dimension. Zones have fixed anchors, so the player moving changes nothing. That keeps quiet ticks
  * almost free.
  *
  * <p>Allocates nothing once created. Not thread-safe.
@@ -77,12 +76,8 @@ public final class PlayingSounds {
 
 	// Inputs of the last update, to skip sounds nothing could have changed.
 	private Precedence lastPrecedence;
-	private boolean lastHasBubbles;
 	private String lastWorldKey;
 	private String lastDimension;
-	private double lastPx = Double.NaN;
-	private double lastPy = Double.NaN;
-	private double lastPz = Double.NaN;
 	private boolean lastBoostSupported;
 	private boolean lastBypassed;
 
@@ -180,32 +175,26 @@ public final class PlayingSounds {
 	 * @param precedence     the current profile snapshot
 	 * @param worldKey       the current server or world
 	 * @param dimension      the current dimension
-	 * @param px             the player's eye position, the anchor of personal bubbles
 	 * @param boostSupported whether volumes above 100% can play (FR-5.5)
 	 * @return how many sounds changed gain
 	 */
-	public int update(Precedence precedence, String worldKey, String dimension, double px, double py, double pz,
-			boolean boostSupported, GainListener listener) {
+	public int update(Precedence precedence, String worldKey, String dimension, boolean boostSupported,
+			GainListener listener) {
 		if (precedence != lastPrecedence) {
-			lastHasBubbles = hasBubbles(precedence);
 			java.util.Arrays.fill(isResolved, 0, size, false);
 		}
 		boolean everything = lastBypassed || precedence != lastPrecedence || boostSupported != lastBoostSupported
 				|| !worldKey.equals(lastWorldKey) || !dimension.equals(lastDimension);
-		boolean playerMatters = lastHasBubbles && (px != lastPx || py != lastPy || pz != lastPz);
 		lastPrecedence = precedence;
 		lastWorldKey = worldKey;
 		lastDimension = dimension;
-		lastPx = px;
-		lastPy = py;
-		lastPz = pz;
 		lastBoostSupported = boostSupported;
 		lastBypassed = false;
 
 		int changed = 0;
 		SoundDecision out = scratch;
 		for (int i = 0; i < size; i++) {
-			if (!everything && !playerMatters && !dirty[i]) {
+			if (!everything && !dirty[i]) {
 				continue;
 			}
 			dirty[i] = false;
@@ -215,7 +204,7 @@ public final class PlayingSounds {
 				isResolved[i] = true;
 			}
 			decisions++;
-			precedence.decideResolved(resolved[i], true, worldKey, dimension, xs[i], ys[i], zs[i], px, py, pz, out);
+			precedence.decideResolved(resolved[i], true, worldKey, dimension, xs[i], ys[i], zs[i], out);
 			if (report(i, Gain.finalGain(vanillaGains[i], out.volumePercent(), boostSupported), listener)) {
 				changed++;
 			}
@@ -269,7 +258,7 @@ public final class PlayingSounds {
 	 * points at belong to the rule lists' caches and are counted there.
 	 */
 	public long estimatedBytes() {
-		long bytes = MemoryEstimate.object(18 * MemoryEstimate.REFERENCE + 4 + 2 * 8 + 3 * 8 + 3)
+		long bytes = MemoryEstimate.object(18 * MemoryEstimate.REFERENCE + 4 + 2 * 8 + 2)
 				+ MemoryEstimate.object(16 * MemoryEstimate.REFERENCE + 8 * 4)
 				+ MemoryEstimate.array(8, CAPACITY) + MemoryEstimate.array(MemoryEstimate.REFERENCE, CAPACITY)
 				+ 3 * MemoryEstimate.array(8, CAPACITY) + 2 * MemoryEstimate.array(4, CAPACITY)
@@ -291,16 +280,6 @@ public final class PlayingSounds {
 	/** Sounds re-decided so far (skipped sounds do not count), for diagnostics. */
 	public long decisionCount() {
 		return decisions;
-	}
-
-	private static boolean hasBubbles(Precedence precedence) {
-		// Runs only when the profile snapshot changes (the player saved), so the list here is fine.
-		for (Zone zone : precedence.zones()) {
-			if (zone.isBubble() && zone.enabled()) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	// --- handle hash (linear probing, backward-shift deletion) ---

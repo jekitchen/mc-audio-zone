@@ -18,7 +18,7 @@ class SetUsageTest {
 	private static final PlaceSets FARM = PlaceSets.EMPTY.attach("set-farm");
 
 	private static Zone zone(String id, PlaceSets sets) {
-		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10), sets);
+		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(10, 20), sets);
 	}
 
 	private static Profile profile(String name, PlaceSets everywhere, Zone... zones) {

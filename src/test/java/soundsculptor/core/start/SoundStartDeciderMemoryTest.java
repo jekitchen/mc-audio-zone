@@ -25,7 +25,7 @@ class SoundStartDeciderMemoryTest {
 		assertEquals(decider.limiter().estimatedBytes(), decider.estimatedBytes(), "before any profile");
 
 		SetEntry limited = SetEntry.of("r", "minecraft:*").withLimit(new Limit(3, 1000, true));
-		Zone zone = new Zone("z", "Z", true, "world", "minecraft:overworld", new Point(0, 0, 0), new Shape.Sphere(10),
+		Zone zone = new Zone("z", "Z", true, "world", "minecraft:overworld", new Point(0, 0, 0), new Shape.Cylinder(10, 20),
 				quick(List.of(SetEntry.of("zr", "minecraft:entity.*").withMute(true))));
 		Precedence precedence = precedence(List.of(limited), List.of(zone));
 		decider.setProfile(precedence);

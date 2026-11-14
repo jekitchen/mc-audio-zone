@@ -26,7 +26,7 @@ class ProfilePruneTest {
 	private static final SetLibrary LIBRARY = new SetLibrary(List.of(KEPT));
 
 	private static Zone zone(String id, String name, PlaceSets sets) {
-		return new Zone(id, name, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10), sets);
+		return new Zone(id, name, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(10, 20), sets);
 	}
 
 	private static Profile profile(PlaceSets everywhere, Zone... zones) {

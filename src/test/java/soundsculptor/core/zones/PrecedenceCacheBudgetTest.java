@@ -34,7 +34,7 @@ class PrecedenceCacheBudgetTest {
 		List<Zone> zones = new ArrayList<>();
 		for (int z = 0; z < Precedence.MAX_ZONES; z++) {
 			SetEntry rule = SetEntry.of("r", "minecraft:entity.test_sound.number_1*").withMute(true);
-			zones.add(new Zone("z" + z, "Z" + z, true, WORLD, OVERWORLD, new Point(z * 100, 0, 0), new Shape.Sphere(10),
+			zones.add(new Zone("z" + z, "Z" + z, true, WORLD, OVERWORLD, new Point(z * 100, 0, 0), new Shape.Cylinder(10, 20),
 					quick(List.of(rule))));
 		}
 		return zones;

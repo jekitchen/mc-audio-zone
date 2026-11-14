@@ -53,13 +53,13 @@ public final class Diagnostics {
 				TICK.stats(now), OUTLINES.stats(now), hitRate, SoundHook.errorCount());
 	}
 
-	/** Enabled zones that can affect sounds here: this world and dimension, plus personal bubbles. */
+	/** Enabled zones that can affect sounds here: those in this world and dimension. */
 	static int activeZonesHere() {
 		String key = ProfileManager.key();
 		String dimension = WorldSession.dimension(net.minecraft.client.Minecraft.getInstance());
 		int count = 0;
 		for (Zone zone : ProfileManager.profile().zones()) {
-			if (zone.enabled() && (zone.isBubble() || (zone.worldKey().equals(key) && zone.dimension().equals(dimension)))) {
+			if (zone.enabled() && zone.worldKey().equals(key) && zone.dimension().equals(dimension)) {
 				count++;
 			}
 		}

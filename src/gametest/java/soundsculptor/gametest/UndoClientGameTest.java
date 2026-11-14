@@ -220,8 +220,8 @@ public final class UndoClientGameTest implements FabricClientGameTest {
 		PlaceSets inCoop = PlaceSets.EMPTY.attach(shared.id()).attach(COWS.id()).setEnabled(shared.id(), false);
 		context.runOnClient(mc -> {
 			ProfileManager.change(ws -> new soundsculptor.core.sets.Workspace(Profile.empty(ws.profile().name()).withZones(List.of(
-					new Zone("barn", "Barn", true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8), inBarn),
-					new Zone("coop", "Coop", true, key, "minecraft:overworld", new Point(20, -60, 0), new Shape.Sphere(8), inCoop))),
+					new Zone("barn", "Barn", true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Cylinder(8, 16), inBarn),
+					new Zone("coop", "Coop", true, key, "minecraft:overworld", new Point(20, -60, 0), new Shape.Cylinder(8, 16), inCoop))),
 					ws.library().put(COWS).put(PIGS).put(shared)));
 			ProfileManager.flushSaves();
 			main(mc).selectTab(SoundSculptorScreen.TAB_SETS);

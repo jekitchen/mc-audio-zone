@@ -29,7 +29,7 @@ class ProfileTest {
 	private static final SetLibrary LIBRARY = new SetLibrary(List.of(FARM, LOUD));
 
 	private static Zone zone(String id, PlaceSets sets) {
-		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10),
+		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(10, 20),
 				sets);
 	}
 

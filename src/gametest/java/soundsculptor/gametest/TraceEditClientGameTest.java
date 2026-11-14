@@ -66,7 +66,7 @@ public final class TraceEditClientGameTest implements FabricClientGameTest {
 			Point pen = new Point(origin.x + 6, origin.y, origin.z);
 			// The sound plays 4 blocks from the zone's anchor, so a 2-block radius no longer holds it.
 			Point spot = new Point(pen.x() + 4, pen.y(), pen.z());
-			Zone penZone = new Zone("pen", "Pen", true, key, OVERWORLD, pen, new Shape.Sphere(10), PlaceSets.EMPTY.attach(FARM.id()));
+			Zone penZone = new Zone("pen", "Pen", true, key, OVERWORLD, pen, new Shape.Cylinder(10, 20), PlaceSets.EMPTY.attach(FARM.id()));
 
 			usedInTwoPlacesShown(context, spot, penZone);
 			twoSetsOnEverywhereNamesHigherSet(context, spot);

@@ -29,7 +29,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Automated version of the M7b tests: the Zones tab and zone editor (PRD 6.1), A-2 core tasks "create a sphere zone
+ * Automated version of the M7b tests: the Zones tab and zone editor (PRD 6.1), A-2 core tasks "create a box zone
  * at your position" and "change a zone's color" with the keyboard, the zone's attached Sound Sets (FR-8.6), the FR-10.4
  * color AC, and the unsaved-changes dialog (FR-12.4).
  */
@@ -53,7 +53,7 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> main(mc).selectTab(SoundSculptorScreen.TAB_ZONES));
 			context.takeScreenshot("m7b-zones-empty");
 
-			// A-2: create a sphere zone at your position, keyboard only: New zone (Enter), then Save.
+			// A-2: create a box zone at your position, keyboard only: New zone (Enter), then Save.
 			context.runOnClient(mc -> main(mc).setFocused(main(mc).zonesPanel().newZoneButton));
 			context.getInput().pressKey(InputConstants.KEY_RETURN);
 			context.waitForScreen(ZoneEditorScreen.class);
@@ -115,7 +115,7 @@ public final class M7bClientGameTest implements FabricClientGameTest {
 			context.runOnClient(mc -> ((SculptDialog) mc.gui.screen()).choose(2));
 			context.waitForScreen(ZoneEditorScreen.class);
 			check(editor(context, e -> e.widthField.getValue()).equals("5"), "Keep editing should keep the width");
-			// A box shows width, height and depth with the drawing tools; there is no sphere for new zones.
+			// A box shows width, height and depth with the drawing tools, and no shape choice.
 			check(editor(context, e -> e.bodyWidgets().contains(e.widthField) && e.bodyWidgets().contains(e.markCornersButton)
 					&& e.bodyWidgets().contains(e.sideDropdown) && e.shapeDropdown == null), "a box shows its size and the drawing tools");
 			context.runOnClient(mc -> editorScreen(mc).save());

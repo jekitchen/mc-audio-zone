@@ -3,7 +3,6 @@ package soundsculptor.core.profile;
 import static soundsculptor.core.Fixtures.quick;
 
 import static soundsculptor.core.profile.ProfileZonesTest.SERVER;
-import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -32,12 +31,12 @@ class ImportPlanTest {
 	private static final TestEnglish EN = new TestEnglish();
 
 	private static Zone fixedOn(String id, String worldKey) {
-		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), PlaceSets.EMPTY);
+		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Cylinder(5, 10), PlaceSets.EMPTY);
 	}
 
 	private static final Profile CURRENT = new Profile("This server", new ProfileSettings(true),
-			quick(List.of(SetEntry.of("old", "x:old").withMute(true))), List.of(fixed("mine", new Shape.Sphere(4)), bubble("oldBubble")),
-			java.util.Map.of("mine", 0x111111, "oldBubble", 0x222222));
+			quick(List.of(SetEntry.of("old", "x:old").withMute(true))), List.of(fixed("mine", new Shape.Cylinder(4, 8))),
+			java.util.Map.of("mine", 0x111111));
 
 	private static final SoundSet FARM = new SoundSet("set-farm", "Farm animals", List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
 	private static final SoundSet RAIN = new SoundSet("set-rain", "Rain", List.of(SetEntry.of("e1", "*rain*").withVolume(30)));
@@ -55,7 +54,7 @@ class ImportPlanTest {
 	void fixedZonesOtherServerSkippedWithSets() {
 		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
 				.withZones(List.of(fixedOn("theirs", "other.net").withSets(PlaceSets.EMPTY.attach("set-rain").attach("set-gone")),
-						bubble("b1").withSets(PlaceSets.EMPTY.attach("set-rain"))));
+						fixedOn("b1", SERVER).withSets(PlaceSets.EMPTY.attach("set-rain"))));
 		ImportPlan plan = ImportPlan.of(CURRENT, new ExportCodec.Read(file, List.of(FARM, RAIN), List.of()), SetLibrary.EMPTY,
 				SERVER, Map.of());
 		assertNull(plan.problem());
@@ -109,7 +108,7 @@ class ImportPlanTest {
 	void anExactMatchUnderAnotherIdCancelsAndNothingChanges() {
 		SoundSet same = new SoundSet("set-mine", "My farm", FARM.entries());
 		Profile file = Profile.empty("Friend").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
-				.withZones(List.of(bubble("b1")));
+				.withZones(List.of(fixedOn("b1", SERVER)));
 		SetLibrary lib = new SetLibrary(List.of(same));
 		ImportPlan plan = ImportPlan.of(CURRENT, new ExportCodec.Read(file, List.of(FARM, RAIN), List.of()), lib, SERVER, Map.of());
 		assertEquals("The import failed because \"My farm\" already has exactly these entries.", plan.problem().text(EN));
@@ -123,7 +122,7 @@ class ImportPlanTest {
 		// The export of another world on this computer: its sets are the library's own, so they are attached, not copied.
 		SetLibrary lib = new SetLibrary(List.of(FARM, RAIN));
 		Profile other = Profile.empty("Other world").withEverywhere(PlaceSets.EMPTY.attach("set-farm"))
-				.withZones(List.of(bubble("b1").withSets(PlaceSets.EMPTY.attach("set-rain"))));
+				.withZones(List.of(fixedOn("b1", SERVER).withSets(PlaceSets.EMPTY.attach("set-rain"))));
 		ExportCodec.Read read = parse(ExportCodec.toJson(other, "world:other", lib));
 		ImportPlan plan = ImportPlan.of(CURRENT, read, lib, SERVER, Map.of());
 		assertNull(plan.problem());
@@ -182,9 +181,9 @@ class ImportPlanTest {
 	}
 
 	@Test
-	void rulesBubblesAndSettingsReplaceThisServers() {
+	void rulesAndSettingsReplaceThisServers() {
 		Profile file = new Profile("Friend", new ProfileSettings(false), quick(List.of(SetEntry.of("new", "x:new").withVolume(20))),
-				List.of(bubble("b1"), fixedOn("theirs", "other.net")), java.util.Map.of("b1", 0x333333));
+				List.of(fixedOn("b1", SERVER), fixedOn("theirs", "other.net")), java.util.Map.of("b1", 0x333333));
 		ImportPlan plan = plan(CURRENT, file);
 		Profile result = plan.result();
 		assertEquals("This server", result.name(), "the display name stays");
@@ -194,17 +193,16 @@ class ImportPlanTest {
 		assertEquals(0x111111, result.colorOf("mine"));
 		assertEquals(0x333333, result.colorOf("b1"));
 		assertEquals(1, plan.setCount(), "Everywhere's Quick changes");
-		assertEquals(1, plan.bubbleCount());
-		assertEquals(0, plan.fixedImported());
+		assertEquals(1, plan.fixedImported());
 		assertEquals(1, plan.fixedSkipped());
 	}
 
 	@Test
 	void importingABoostAsksForTheBoostConfirmFirst() {
 		// FR-5.4: the first time a profile goes above 100%, a dialog needs a confirm, however the boost arrives.
-		Zone loudBubble = bubble("b1").withSets(quick(List.of(SetEntry.of("z", "x:z").withVolume(150))));
+		Zone loudZone = fixedOn("b1", SERVER).withSets(quick(List.of(SetEntry.of("z", "x:z").withVolume(150))));
 		Profile global = new Profile("F", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("n", "x:n").withVolume(120))));
-		Profile inZone = new Profile("F", ProfileSettings.DEFAULTS, PlaceSets.EMPTY).withZones(List.of(loudBubble));
+		Profile inZone = new Profile("F", ProfileSettings.DEFAULTS, PlaceSets.EMPTY).withZones(List.of(loudZone));
 		Profile quiet = new Profile("F", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("n", "x:n").withVolume(100))));
 		assertTrue(plan(CURRENT, global).needsBoostConfirm());
 		assertTrue(plan(CURRENT, inZone).needsBoostConfirm());
@@ -241,15 +239,6 @@ class ImportPlanTest {
 	}
 
 	@Test
-	void anImportedBubbleWhoseIdClashesWithAKeptZoneGetsANewId() {
-		Profile file = new Profile("F", ProfileSettings.DEFAULTS, PlaceSets.EMPTY, List.of(bubble("mine")), java.util.Map.of("mine", 7));
-		Profile result = plan(CURRENT, file).result();
-		assertEquals(List.of("mine", "mine-2"), result.zones().stream().map(Zone::id).toList());
-		assertEquals(0x111111, result.colorOf("mine"));
-		assertEquals(7, result.colorOf("mine-2"));
-	}
-
-	@Test
 	void tooManyZonesAfterImportIsAProblem() {
 		List<Zone> many = new java.util.ArrayList<>();
 		for (int i = 0; i < 63; i++) {
@@ -267,7 +256,7 @@ class ImportPlanTest {
 	@Test
 	void summaryListsWhatHappens() {
 		Profile file = new Profile("F", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("a", "x:a"), SetEntry.of("b", "x:b"))),
-				List.of(bubble("b1"), fixedOn("t1", "other.net"), fixedOn("t2", "other.net"), fixedOn("t3", "other.net")),
+				List.of(fixedOn("b1", SERVER), fixedOn("t1", "other.net"), fixedOn("t2", "other.net"), fixedOn("t3", "other.net")),
 				java.util.Map.of());
 		ImportPlan plan = plan(CURRENT, file);
 		assertEquals(1, plan.setCount());

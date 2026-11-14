@@ -3,7 +3,6 @@ package soundsculptor.core.profile;
 import static soundsculptor.core.Fixtures.quick;
 
 import static soundsculptor.core.profile.ProfileZonesTest.SERVER;
-import static soundsculptor.core.profile.ProfileZonesTest.bubble;
 import static soundsculptor.core.profile.ProfileZonesTest.fixed;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -33,17 +32,18 @@ class ProfileOpsTest {
 	private static final TestEnglish EN = new TestEnglish();
 
 	private static Zone fixedOn(String id, String worldKey) {
-		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Sphere(5), PlaceSets.EMPTY);
+		return new Zone(id, "Z", true, worldKey, "minecraft:overworld", new Point(1, 2, 3), new Shape.Cylinder(5, 10), PlaceSets.EMPTY);
 	}
 
-	/** Server A: 2 global rules, a fixed zone and a bubble. */
+	/** Server A: 2 global rules and two zones. */
 	private static final Profile A = new Profile("Server A", new ProfileSettings(false),
 			quick(List.of(SetEntry.of("a1", "x:one").withMute(true), SetEntry.of("a2", "x:two").withVolume(30))),
-			List.of(fixedOn("aFixed", "a.net"), bubble("aBubble")), Map.of("aFixed", 1, "aBubble", 2));
+			List.of(fixedOn("aFixed", "a.net"), fixedOn("aOther", "a.net")), Map.of("aFixed", 1, "aOther", 2));
 
-	/** Server B: its own rule, fixed zone and bubble. */
+	/** Server B: its own rule and two zones. */
 	private static final Profile B = new Profile("Server B", ProfileSettings.DEFAULTS, quick(List.of(SetEntry.of("b1", "x:b"))),
-			List.of(fixed("bFixed", new Shape.Sphere(6)), bubble("bBubble")), Map.of("bFixed", 3, "bBubble", 4));
+			List.of(fixed("bFixed", new Shape.Cylinder(6, 12)), fixed("bOther", new Shape.Box(8, 8, 8))),
+			Map.of("bFixed", 3, "bOther", 4));
 
 	private static final SoundSet FARM = new SoundSet("set-farm", "Farm animals", List.of(SetEntry.of("e1", "*cow*").withVolume(40)));
 	private static final SetLibrary LIB = new SetLibrary(List.of(FARM));
@@ -54,51 +54,40 @@ class ProfileOpsTest {
 
 	@Test
 	void copyFromLinksLibrarySetsAndCopiesQuick() {
-		Profile source = A.withEverywhere(A.everywhere().attach("set-farm").attach("set-gone"))
-				.withZones(List.of(bubble("aBubble").withSets(PlaceSets.EMPTY.attach("set-gone").attach("set-farm"))));
+		Profile source = A.withEverywhere(A.everywhere().attach("set-farm").attach("set-gone"));
 		ProfileOps.Copy copy = ProfileOps.copyFrom(source, B, LIB);
 		Profile result = copy.result();
 		assertEquals(List.of(SoundSet.QUICK_ID, "set-farm"), ids(result.everywhere()),
 				"the same library set is attached (linked, not copied); a set the library lacks is dropped");
 		assertEquals(source.everywhere().quickChanges(), result.everywhere().quickChanges(), "Quick changes is copied as it is");
 		assertEquals(2, copy.setCount(), "Quick changes and Farm animals");
-		assertEquals(List.of("set-farm"), ids(result.zone("aBubble").sets()), "the bubble comes with its sets");
-		assertEquals(1, copy.bubbleCount());
 	}
 
 	@Test
-	void copyFromKeepsTargetFixedZones() {
-		Profile target = B.withZones(List.of(fixed("bFixed", new Shape.Sphere(6)).withSets(PlaceSets.EMPTY.attach("set-farm")),
-				bubble("bBubble"))).withZoneColor("bFixed", 3);
-		Profile source = A.withZones(List.of(fixedOn("aFixed", SERVER).withSets(PlaceSets.EMPTY.attach("set-farm")),
-				bubble("aBubble")));
+	void copyFromKeepsTargetZones() {
+		Profile target = B.withZones(List.of(fixed("bFixed", new Shape.Cylinder(6, 12)).withSets(PlaceSets.EMPTY.attach("set-farm")),
+				fixed("bOther", new Shape.Box(8, 8, 8)))).withZoneColor("bFixed", 3);
+		Profile source = A.withZones(List.of(fixedOn("aFixed", SERVER).withSets(PlaceSets.EMPTY.attach("set-farm"))));
 		ProfileOps.Copy copy = ProfileOps.copyFrom(source, target, LIB);
-		assertEquals(List.of("bFixed", "aBubble"), copy.result().zones().stream().map(Zone::id).toList());
-		assertEquals(target.zone("bFixed"), copy.result().zone("bFixed"), "the target's fixed zone keeps its sets");
+		assertEquals(target.zones(), copy.result().zones(), "the target's zones keep their sets; none are copied");
 		assertEquals(3, copy.result().colorOf("bFixed"));
-		assertEquals(1, copy.fixedKept());
 	}
 
 	@Test
-	void copyBringsRulesBubblesAndSettingsButNeverFixedZones() {
+	void copyBringsRulesAndSettingsButNeverZones() {
 		ProfileOps.Copy copy = ProfileOps.copyFrom(A, B, LIB);
 		Profile result = copy.result();
 		assertEquals("Server B", result.name());
 		assertEquals(A.everywhere().quickEntries(), result.everywhere().quickEntries());
 		assertEquals(A.settings(), result.settings());
-		assertEquals(List.of("bFixed", "aBubble"), result.zones().stream().map(Zone::id).toList());
-		assertEquals(3, result.colorOf("bFixed"), "B's fixed zone is untouched");
-		assertEquals(2, result.colorOf("aBubble"));
-		assertNull(result.colorOf("bBubble"), "B's bubbles are replaced");
+		assertEquals(List.of("bFixed", "bOther"), result.zones().stream().map(Zone::id).toList());
+		assertEquals(B.zoneColors(), result.zoneColors(), "B's zones are untouched");
 	}
 
 	@Test
 	void copySummaryIsWhatTheDialogLists() {
 		ProfileOps.Copy copy = ProfileOps.copyFrom(A, B, LIB);
 		assertEquals(1, copy.setCount(), "Everywhere's Quick changes");
-		assertEquals(1, copy.bubbleCount());
-		assertEquals(1, copy.fixedKept());
-		assertNull(copy.problem());
 	}
 
 	@Test
@@ -119,33 +108,24 @@ class ProfileOpsTest {
 	}
 
 	@Test
-	void copyingAFromItselfsServerStillSkipsFixedZones() {
-		// Fixed zones are never copied, even ones made for the target's own server.
+	void copyingFromTheSameServerStillSkipsItsZones() {
+		// Zones are never copied, even ones made for the target's own server.
 		Profile source = A.withZones(List.of(fixedOn("same", SERVER)));
 		ProfileOps.Copy copy = ProfileOps.copyFrom(source, B, LIB);
-		assertEquals(List.of("bFixed"), copy.result().zones().stream().map(Zone::id).toList());
+		assertEquals(List.of("bFixed", "bOther"), copy.result().zones().stream().map(Zone::id).toList());
 	}
 
 	@Test
-	void aBubbleWhoseIdClashesGetsANewId() {
-		Profile source = Profile.empty("S").withZones(List.of(bubble("bFixed")));
-		assertEquals(List.of("bFixed", "bFixed-2"), ProfileOps.copyFrom(source, B, LIB).result().zones().stream().map(Zone::id).toList());
-	}
-
-	@Test
-	void copyThatWouldPassSixtyFourZonesIsRefused() {
+	void aProfileWithTheMostZonesCanStillCopy() {
+		// Copy brings no zones, so a target at the 64-zone limit keeps exactly its own.
 		List<Zone> fixedZones = new ArrayList<>();
-		for (int i = 0; i < 60; i++) {
+		for (int i = 0; i < 64; i++) {
 			fixedZones.add(fixedOn("f" + i, SERVER));
 		}
 		Profile target = Profile.empty("T").withZones(fixedZones);
-		List<Zone> bubbles = new ArrayList<>();
-		for (int i = 0; i < 5; i++) {
-			bubbles.add(bubble("b" + i));
-		}
-		ProfileOps.Copy copy = ProfileOps.copyFrom(Profile.empty("S").withZones(bubbles), target, LIB);
-		assertEquals("After copying this profile would have 65 zones; the maximum is 64.", copy.problem().text(EN));
-		assertEquals(target, copy.result(), "nothing changes");
+		ProfileOps.Copy copy = ProfileOps.copyFrom(A, target, LIB);
+		assertEquals(target.zones(), copy.result().zones());
+		assertEquals(A.everywhere(), copy.result().everywhere());
 	}
 
 	@Test

@@ -244,7 +244,7 @@ public final class SoundSetsTabClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zone(String id, String name, String worldKey, PlaceSets sets) {
-		return new Zone(id, name, true, worldKey, "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(8), sets);
+		return new Zone(id, name, true, worldKey, "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(8, 16), sets);
 	}
 
 	private static String idOf(String name) {

@@ -16,8 +16,8 @@ class OutlineVisibilityTest {
 	private static final String WORLD = "play.example.net";
 	private static final String OVERWORLD = "minecraft:overworld";
 
-	private static Zone sphereAt(String id, double x, double radius) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Sphere(radius), PlaceSets.EMPTY);
+	private static Zone zoneAt(String id, double x, double radius) {
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(x, 0, 0), new Shape.Cylinder(radius, 2 * radius), PlaceSets.EMPTY);
 	}
 
 	private static boolean draws(Zone zone, OutlineMode mode, String editingId) {
@@ -31,39 +31,39 @@ class OutlineVisibilityTest {
 
 	@Test
 	void alwaysDrawsNearbyZones() {
-		assertTrue(draws(sphereAt("a", 20, 5), OutlineMode.ALWAYS, null));
+		assertTrue(draws(zoneAt("a", 20, 5), OutlineMode.ALWAYS, null));
 	}
 
 	@Test
 	void neverDrawsNothingEvenWhileEditing() {
-		assertFalse(draws(sphereAt("a", 20, 5), OutlineMode.NEVER, "a"));
+		assertFalse(draws(zoneAt("a", 20, 5), OutlineMode.NEVER, "a"));
 	}
 
 	@Test
 	void editingModeDrawsOnlyTheZoneBeingEdited() {
-		assertTrue(draws(sphereAt("a", 20, 5), OutlineMode.EDITING, "a"));
-		assertFalse(draws(sphereAt("b", 20, 5), OutlineMode.EDITING, "a"));
-		assertFalse(draws(sphereAt("a", 20, 5), OutlineMode.EDITING, null));
+		assertTrue(draws(zoneAt("a", 20, 5), OutlineMode.EDITING, "a"));
+		assertFalse(draws(zoneAt("b", 20, 5), OutlineMode.EDITING, "a"));
+		assertFalse(draws(zoneAt("a", 20, 5), OutlineMode.EDITING, null));
 	}
 
 	@Test
 	void onlyZonesWithin128BlocksAreDrawn() {
 		// Distance is to the nearest part of the zone, so a big zone whose edge is close still shows.
-		assertTrue(draws(sphereAt("a", 128 + 10, 10), OutlineMode.ALWAYS, null));
-		assertFalse(draws(sphereAt("a", 128 + 10.5, 10), OutlineMode.ALWAYS, null));
-		assertTrue(draws(sphereAt("a", 0, 10), OutlineMode.ALWAYS, null), "camera inside the zone");
+		assertTrue(draws(zoneAt("a", 128 + 10, 10), OutlineMode.ALWAYS, null));
+		assertFalse(draws(zoneAt("a", 128 + 10.5, 10), OutlineMode.ALWAYS, null));
+		assertTrue(draws(zoneAt("a", 0, 10), OutlineMode.ALWAYS, null), "camera inside the zone");
 	}
 
 	@Test
 	void otherDimensionsAndServersAreNotDrawn() {
-		Zone a = sphereAt("a", 10, 5);
+		Zone a = zoneAt("a", 10, 5);
 		assertFalse(OutlineVisibility.shouldDraw(a, OutlineMode.ALWAYS, null, WORLD, "minecraft:the_nether", 0, 0, 0));
 		assertFalse(OutlineVisibility.shouldDraw(a, OutlineMode.ALWAYS, null, "other.net", OVERWORLD, 0, 0, 0));
 	}
 
 	@Test
 	void disabledZonesAreDrawnOnlyWhileEdited() {
-		Zone off = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(10, 0, 0), new Shape.Sphere(5), PlaceSets.EMPTY);
+		Zone off = new Zone("a", "A", false, WORLD, OVERWORLD, new Point(10, 0, 0), new Shape.Cylinder(5, 10), PlaceSets.EMPTY);
 		assertFalse(draws(off, OutlineMode.ALWAYS, null));
 		assertTrue(draws(off, OutlineMode.ALWAYS, "a"));
 		assertTrue(draws(off, OutlineMode.EDITING, "a"));
@@ -71,8 +71,8 @@ class OutlineVisibilityTest {
 
 	@Test
 	void labelShowsWithin32BlocksOfTheAnchor() {
-		assertTrue(OutlineVisibility.showLabel(sphereAt("a", 32, 5), 0, 0, 0));
-		assertFalse(OutlineVisibility.showLabel(sphereAt("a", 32.5, 5), 0, 0, 0));
+		assertTrue(OutlineVisibility.showLabel(zoneAt("a", 32, 5), 0, 0, 0));
+		assertFalse(OutlineVisibility.showLabel(zoneAt("a", 32.5, 5), 0, 0, 0));
 	}
 
 	@Test

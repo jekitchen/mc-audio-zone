@@ -17,8 +17,7 @@ import soundsculptor.core.zones.ZoneMode;
  * around the player:
  * <ul>
  *   <li>the zone is turned on;</li>
- *   <li>a fixed zone must be in the player's world and dimension (FR-8.1); a bubble is anchored at the player, so it
- *       is checked at offset 0 wherever the player is (FR-8.2);</li>
+ *   <li>the zone must be in the player's world and dimension (FR-8.1);</li>
  *   <li>an Inside zone counts when the player is in its shape, edge included; an Outside zone counts when the player
  *       is outside its shape (FR-8.4). A fade edge does not matter: the weight at the boundary may be 0, but the
  *       player is still in the zone.</li>
@@ -29,7 +28,7 @@ public final class ApplyTo {
 	}
 
 	/**
-	 * The selector's choices for the player at {@code eye}, the same position bubbles are anchored at.
+	 * The selector's choices for the player at {@code eye}.
 	 *
 	 * @param worldKey  the current world key (FR-11.1)
 	 * @param dimension the current dimension, e.g. {@code minecraft:overworld}
@@ -39,7 +38,7 @@ public final class ApplyTo {
 		choices.add(ApplyTarget.EVERYWHERE);
 		for (Zone zone : profile.zones()) {
 			if (isStandingIn(zone, worldKey, dimension, eye)) {
-				choices.add(new ApplyTarget(zone.id(), zone.name(), zone.isBubble()));
+				choices.add(new ApplyTarget(zone.id(), zone.name()));
 			}
 		}
 		return List.copyOf(choices);
@@ -61,19 +60,11 @@ public final class ApplyTo {
 	}
 
 	private static boolean isStandingIn(Zone zone, String worldKey, String dimension, Point eye) {
-		if (!zone.enabled()) {
+		if (!zone.enabled() || !zone.worldKey().equals(worldKey) || !zone.dimension().equals(dimension)) {
 			return false;
 		}
-		boolean inShape;
-		if (zone.isBubble()) {
-			inShape = zone.shape().contains(0, 0, 0);
-		} else {
-			if (!zone.worldKey().equals(worldKey) || !zone.dimension().equals(dimension)) {
-				return false;
-			}
-			Point a = zone.anchor();
-			inShape = zone.shape().contains(eye.x() - a.x(), eye.y() - a.y(), eye.z() - a.z());
-		}
+		Point a = zone.anchor();
+		boolean inShape = zone.shape().contains(eye.x() - a.x(), eye.y() - a.y(), eye.z() - a.z());
 		return inShape == (zone.mode() == ZoneMode.INSIDE);
 	}
 }

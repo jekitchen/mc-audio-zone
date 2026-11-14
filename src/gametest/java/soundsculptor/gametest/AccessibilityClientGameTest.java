@@ -761,7 +761,7 @@ public final class AccessibilityClientGameTest implements FabricClientGameTest {
 	}
 
 	private static Zone zone(String id, String name, String key) {
-		return new Zone(id, name, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Sphere(8),
+		return new Zone(id, name, true, key, "minecraft:overworld", new Point(0, -60, 0), new Shape.Cylinder(8, 16),
 				PlaceSets.EMPTY.withQuickEntries(List.of(SetEntry.of("r1", "*cow*").withVolume(40))));
 	}
 

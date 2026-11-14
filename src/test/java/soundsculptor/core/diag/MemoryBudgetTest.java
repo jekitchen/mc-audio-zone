@@ -75,7 +75,7 @@ class MemoryBudgetTest {
 	private static LastPlays fullLastPlays() {
 		LastPlays plays = new LastPlays();
 		for (int i = 0; i < LastPlays.CAPACITY + 10; i++) {
-			plays.record(id(i), true, "world", "minecraft:overworld", i, 64, 0, 1, 64, 1, 80F, false, false);
+			plays.record(id(i), true, "world", "minecraft:overworld", i, 64, 0, 80F, false, false);
 		}
 		return plays;
 	}
@@ -147,7 +147,7 @@ class MemoryBudgetTest {
 		List<Zone> zones = new ArrayList<>();
 		for (int z = 0; z < Precedence.MAX_ZONES; z++) {
 			zones.add(new Zone("zone_" + z, "Zone " + z, true, "world", "minecraft:overworld", new Point(z * 100, 0, 0),
-					new Shape.Sphere(10), quick(List.of(SetEntry.of("r", "minecraft:*").withMute(true)))));
+					new Shape.Cylinder(10, 20), quick(List.of(SetEntry.of("r", "minecraft:*").withMute(true)))));
 		}
 		Precedence precedence = precedence(List.of(SetEntry.of("g", "minecraft:*").withVolume(50)), zones);
 		soundsculptor.core.sets.EntryResolution[] out = new soundsculptor.core.sets.EntryResolution[zones.size() + 1];

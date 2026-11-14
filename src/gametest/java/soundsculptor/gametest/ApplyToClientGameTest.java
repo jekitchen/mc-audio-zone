@@ -38,7 +38,7 @@ public final class ApplyToClientGameTest implements FabricClientGameTest {
 			Vec3 eye = context.computeOnClient(mc -> mc.player.getEyePosition());
 			Zone pen = new Zone("pen", "Pen", true, key, "minecraft:overworld", new Point(eye.x, eye.y, eye.z), new Shape.Box(9, 9, 9), PlaceSets.EMPTY);
 			Zone far = new Zone("far", "Far barn", true, key, "minecraft:overworld", new Point(eye.x + 500, eye.y, eye.z),
-					new Shape.Sphere(8), PlaceSets.EMPTY);
+					new Shape.Cylinder(8, 16), PlaceSets.EMPTY);
 			context.runOnClient(mc -> ProfileManager.update(p -> Profile.empty(p.name()).withZones(List.of(pen, far))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);

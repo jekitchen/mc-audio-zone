@@ -25,7 +25,7 @@ class LibraryOpsTest {
 	private static final SoundSet FARM = new SoundSet("set-farm", "Farm animals", List.of(SetEntry.of("e1", "x:cow").withVolume(30)));
 
 	private static Zone zone(String id, PlaceSets sets) {
-		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(10), sets);
+		return new Zone(id, "Zone " + id, true, "world:1", "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(10, 20), sets);
 	}
 
 	private static Workspace ws(PlaceSets everywhere, SetLibrary library, Zone... zones) {

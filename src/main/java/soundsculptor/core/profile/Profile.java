@@ -24,7 +24,7 @@ import java.util.Set;
  * @param name     display name
  * @param settings profile settings
  * @param everywhere the Sound Sets attached to Everywhere (FR-8.10), and its Quick changes
- * @param zones    fixed zones and personal bubbles, in the order the player sees them
+ * @param zones    the zones, all fixed (FR-8.1), in the order the player sees them
  * @param zoneColors outline color of each zone that has one, as {@code 0xRRGGBB}, keyed by zone ID
  * @param lastJoined when the player last joined this server or world (FR-11.3), or null if never
  * @param boostConfirmed whether the player has confirmed the boost dialog for this profile (FR-5.4: asked once per

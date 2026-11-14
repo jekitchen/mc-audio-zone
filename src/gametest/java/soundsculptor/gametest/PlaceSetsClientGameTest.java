@@ -265,7 +265,7 @@ public final class PlaceSetsClientGameTest implements FabricClientGameTest {
 
 			context.runOnClient(mc -> ProfileManager.change(ws -> new Workspace(Profile.empty(ws.profile().name())
 					.withEverywhere(PlaceSets.EMPTY.attach(LOUD.id()))
-					.withZones(List.of(new Zone("pen", "Pen", true, key, "minecraft:overworld", new Point(0, 64, 0), new Shape.Sphere(8),
+					.withZones(List.of(new Zone("pen", "Pen", true, key, "minecraft:overworld", new Point(0, 64, 0), new Shape.Cylinder(8, 16),
 							PlaceSets.EMPTY.attach(LOUD.id()).attach(QUIET.id())))), ws.library().put(LOUD).put(QUIET))));
 			context.setScreen(SoundSculptorScreen::new);
 			context.waitForScreen(SoundSculptorScreen.class);

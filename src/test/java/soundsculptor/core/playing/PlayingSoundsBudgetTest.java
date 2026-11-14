@@ -11,8 +11,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * PRD section 9.1: re-deciding the playing sounds must cost under 0.2 ms per tick, and allocate nothing. Measured at
- * the worst case: the stress profile (50 global rules, 64 zones including bubbles and fades), as many sounds as vanilla
- * can play at once, and every source and the player moving every tick, so nothing can be skipped.
+ * the worst case: the stress profile (50 global rules, 64 zones including fades), as many sounds as vanilla can play at
+ * once, and every source moving every tick, so nothing can be skipped.
  */
 class PlayingSoundsBudgetTest {
 	private static final String WORLD = "world:stress";
@@ -41,13 +41,12 @@ class PlayingSoundsBudgetTest {
 		return ((i * 53 + tick * 3) % 90) / 10.0 - 4.5;
 	}
 
-	/** One tick in which every source and the player moved a little. */
+	/** One tick in which every source moved a little. */
 	private void tick(int tick) {
 		for (int i = 0; i < SOUNDS; i++) {
 			playing.move(i, x(i, tick), StressProfile.PEN_Y, z(i, tick));
 		}
-		double px = (tick % 20) / 10.0 - 1;
-		playing.update(precedence, WORLD, OVERWORLD, px, StressProfile.PLAYER.y(), 0, true, listener);
+		playing.update(precedence, WORLD, OVERWORLD, true, listener);
 	}
 
 	@Test

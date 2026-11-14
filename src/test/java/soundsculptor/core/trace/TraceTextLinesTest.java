@@ -30,8 +30,8 @@ class TraceTextLinesTest {
 	private static final String AMBIENT = "minecraft:entity.villager.ambient";
 	private static final LastPlay PLAY = new LastPlay(true, WORLD, OVERWORLD, 0, 0, 0, 60, false, false);
 
-	private static Zone sphere(String id, SetEntry... rules) {
-		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), quick(List.of(rules)));
+	private static Zone cylinder(String id, SetEntry... rules) {
+		return new Zone(id, id, true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Cylinder(20, 40), quick(List.of(rules)));
 	}
 
 	private static SoundTrace trace(List<SetEntry> everywhere, List<Zone> zones) {
@@ -53,7 +53,7 @@ class TraceTextLinesTest {
 	@Test
 	void linesJoinToTheCopyTraceText() {
 		SoundTrace t = trace(List.of(SetEntry.of("w", "*villager*").withMute(true), SetEntry.of("e", AMBIENT).withVolume(60)),
-				List.of(sphere("z", SetEntry.of("zr", "*villager*").withVolume(20)), sphere("empty")));
+				List.of(cylinder("z", SetEntry.of("zr", "*villager*").withVolume(20)), cylinder("empty")));
 		StringBuilder joined = new StringBuilder();
 		for (TraceText.Line line : TraceText.lines(t, EN)) {
 			joined.append(line.text()).append('\n');
@@ -66,8 +66,8 @@ class TraceTextLinesTest {
 		SetEntry wildcard = SetEntry.of("w", "*villager*").withMute(true);
 		SetEntry exact = SetEntry.of("e", AMBIENT).withVolume(60);
 		SetEntry zoneEntry = SetEntry.of("zr", "*villager*").withVolume(20);
-		Zone z = sphere("z", zoneEntry);
-		Zone empty = sphere("empty");
+		Zone z = cylinder("z", zoneEntry);
+		Zone empty = cylinder("empty");
 		SoundTrace t = trace(List.of(wildcard, exact), List.of(z, empty));
 		List<TraceText.Line> lines = TraceText.lines(t, EN);
 
@@ -112,7 +112,7 @@ class TraceTextLinesTest {
 		SetLibrary library = new SetLibrary(List.of(farm));
 		SetEntry quickEntry = SetEntry.of("q", AMBIENT).withVolume(60);
 		PlaceSets everywhere = PlaceSets.EMPTY.attach("farm").withQuickEntries(List.of(quickEntry));
-		Zone pen = new Zone("pen", "Pen", true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Sphere(20), PlaceSets.EMPTY.attach("farm"));
+		Zone pen = new Zone("pen", "Pen", true, WORLD, OVERWORLD, new Point(1, 0, 0), new Shape.Cylinder(20, 40), PlaceSets.EMPTY.attach("farm"));
 		SoundTrace t = SoundTracer.trace(new Precedence(everywhere, List.of(pen), library), library, setId -> 2, AMBIENT, PLAY, false, false);
 		List<TraceText.Line> lines = TraceText.lines(t, EN);
 

@@ -11,18 +11,14 @@ import soundsculptor.core.sets.PlaceRef;
  *
  * @param zoneId   the zone's ID, or {@code null} for Everywhere
  * @param zoneName the zone's name for the label, or {@code null} for Everywhere
- * @param bubble   whether the zone is a personal bubble, which gets its own label
  */
-public record ApplyTarget(String zoneId, String zoneName, boolean bubble) {
+public record ApplyTarget(String zoneId, String zoneName) {
 	/** Everywhere. */
-	public static final ApplyTarget EVERYWHERE = new ApplyTarget(null, null, false);
+	public static final ApplyTarget EVERYWHERE = new ApplyTarget(null, null);
 
 	public ApplyTarget {
 		if ((zoneId == null) != (zoneName == null)) {
 			throw new IllegalArgumentException("a zone target needs both an ID and a name");
-		}
-		if (zoneId == null && bubble) {
-			throw new IllegalArgumentException("Everywhere is not a bubble");
 		}
 	}
 
@@ -40,7 +36,7 @@ public record ApplyTarget(String zoneId, String zoneName, boolean bubble) {
 		if (isEverywhere()) {
 			return "soundsculptor.sounds.apply_to.everywhere";
 		}
-		return bubble ? "soundsculptor.sounds.apply_to.bubble" : "soundsculptor.sounds.apply_to.zone";
+		return "soundsculptor.sounds.apply_to.zone";
 	}
 
 	/** The label arguments: nothing for Everywhere, else the zone's name. */

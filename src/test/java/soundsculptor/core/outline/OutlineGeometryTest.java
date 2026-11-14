@@ -13,7 +13,7 @@ import soundsculptor.core.zones.Zone;
 
 import org.junit.jupiter.api.Test;
 
-/** PRD FR-10.2: box edges; a sphere as three great circles. Coordinates are world coordinates. */
+/** PRD FR-10.2: box edges; a cylinder's top and bottom circles. Coordinates are world coordinates. */
 class OutlineGeometryTest {
 	private static Zone zone(Point anchor, Shape shape) {
 		return new Zone("z", "Z", true, "w", "minecraft:overworld", anchor, shape, PlaceSets.EMPTY);
@@ -37,55 +37,29 @@ class OutlineGeometryTest {
 	}
 
 	@Test
-	void sphereIsThreeClosedGreatCirclesOnTheSurface() {
-		Point c = new Point(0, 70, 0);
-		double r = 10;
-		Outline o = OutlineGeometry.of(zone(c, new Shape.Sphere(r)));
-		assertEquals(0, o.segmentCount() % 3);
-		for (int i = 0; i < o.segmentCount(); i++) {
-			assertEquals(r, dist(o.x1(i), o.y1(i), o.z1(i), c), 1e-9, "every point is on the sphere");
-			assertEquals(r, dist(o.x2(i), o.y2(i), o.z2(i), c), 1e-9);
-		}
-		int perCircle = o.segmentCount() / 3;
-		// Each circle closes: its last segment ends where its first begins.
-		for (int k = 0; k < 3; k++) {
+	void cylinderCirclesAreClosedAndLevel() {
+		Point c = new Point(3, 70, -4);
+		Outline o = OutlineGeometry.of(zone(c, new Shape.Cylinder(10, 6)));
+		int perCircle = (o.segmentCount() - 4) / 2;
+		// The bottom circle, then the top one; each closes: its last segment ends where its first begins.
+		for (int k = 0; k < 2; k++) {
 			int first = k * perCircle;
 			int last = first + perCircle - 1;
 			assertEquals(o.x1(first), o.x2(last), 1e-9);
 			assertEquals(o.y1(first), o.y2(last), 1e-9);
 			assertEquals(o.z1(first), o.z2(last), 1e-9);
-		}
-	}
-
-	@Test
-	void eachSphereCircleLiesInOneAxisPlane() {
-		Outline o = OutlineGeometry.of(zone(new Point(0, 0, 0), new Shape.Sphere(5)));
-		int perCircle = o.segmentCount() / 3;
-		for (int k = 0; k < 3; k++) {
-			boolean flatX = true;
-			boolean flatY = true;
-			boolean flatZ = true;
-			for (int i = k * perCircle; i < (k + 1) * perCircle; i++) {
-				flatX &= Math.abs(o.x1(i)) < 1e-9;
-				flatY &= Math.abs(o.y1(i)) < 1e-9;
-				flatZ &= Math.abs(o.z1(i)) < 1e-9;
+			for (int i = first; i <= last; i++) {
+				assertEquals(k == 0 ? 67 : 73, o.y1(i), 1e-9, "circle " + k + " is level");
+				assertEquals(10, Math.hypot(o.x1(i) - c.x(), o.z1(i) - c.z()), 1e-9, "on the rim");
 			}
-			assertTrue(flatX || flatY || flatZ, "circle " + k);
 		}
 	}
 
 	@Test
-	void biggerSpheresGetSmootherCirclesWithinLimits() {
-		int small = OutlineGeometry.of(zone(new Point(0, 0, 0), new Shape.Sphere(1))).segmentCount() / 3;
-		int big = OutlineGeometry.of(zone(new Point(0, 0, 0), new Shape.Sphere(256))).segmentCount() / 3;
+	void biggerCylindersGetSmootherCirclesWithinLimits() {
+		int small = (OutlineGeometry.of(zone(new Point(0, 0, 0), new Shape.Cylinder(1, 2))).segmentCount() - 4) / 2;
+		int big = (OutlineGeometry.of(zone(new Point(0, 0, 0), new Shape.Cylinder(256, 512))).segmentCount() - 4) / 2;
 		assertEquals(OutlineGeometry.MIN_CIRCLE_SEGMENTS, small);
 		assertEquals(OutlineGeometry.MAX_CIRCLE_SEGMENTS, big);
-	}
-
-	private static double dist(double x, double y, double z, Point c) {
-		double dx = x - c.x();
-		double dy = y - c.y();
-		double dz = z - c.z();
-		return Math.sqrt(dx * dx + dy * dy + dz * dz);
 	}
 }

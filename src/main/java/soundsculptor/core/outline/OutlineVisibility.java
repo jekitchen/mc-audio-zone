@@ -38,10 +38,6 @@ public final class OutlineVisibility {
 				}
 				break;
 		}
-		if (zone.isBubble()) {
-			// A bubble is around the player wherever they are, and drawn only while it is being edited (FR-10.2).
-			return editing;
-		}
 		if (!worldKey.equals(zone.worldKey()) || !dimension.equals(zone.dimension())) {
 			return false;
 		}
