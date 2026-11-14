@@ -39,6 +39,9 @@ final class ProfileText {
 	static final String QUICK_NOT_FIRST = "soundsculptor.profile.problem.value.quick_not_first";
 	static final String QUICK_UNLISTED = "soundsculptor.profile.problem.value.quick_unlisted";
 	static final String SET_TWICE = "soundsculptor.profile.problem.value.set_twice";
+	/** The Sound Set file's ID messages, for a place's reference to a library set. */
+	static final String BAD_SET_ID = "soundsculptor.sets.file.problem.value.bad_id";
+	static final String RESERVED_SET_ID = "soundsculptor.sets.file.problem.value.reserved_id";
 	static final String TOO_MANY_SETS = "soundsculptor.profile.problem.value.too_many_sets";
 
 	// The file as a whole.

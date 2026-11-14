@@ -108,17 +108,16 @@ public final class SoundPickerScreen extends SculptScreen {
 	 * limit and stays.
 	 */
 	public void add() {
-		Message full = picker.canAdd();
+		// Checked against the draft as it is now (PickerModel.canAddTo), so every entry below fits.
+		SoundSet current = draft.build();
+		Message full = picker.canAddTo(current);
 		if (full != null) {
 			showToast(ProfileManager.component(full), null);
 			return;
 		}
-		SoundSet added = picker.addTo(draft.build());
-		for (SetEntry entry : added.entries()) {
-			if (draft.entry(entry.id()) == null && !draft.putEntry(entry)) {
-				// The draft refused it (full): say why and stay, as when the picks pass the limit.
-				showToast(ProfileManager.component(draft.canPut(entry)), null);
-				return;
+		for (SetEntry entry : picker.addTo(current).entries()) {
+			if (draft.entry(entry.id()) == null) {
+				draft.putEntry(entry);
 			}
 		}
 		closeNow();

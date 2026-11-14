@@ -30,6 +30,7 @@ final class SetText {
 	static final String RESERVED_ID = "soundsculptor.sets.file.problem.value.reserved_id";
 	static final String NOT_QUICK = "soundsculptor.sets.file.problem.value.not_quick";
 	static final String ENTRY_ID_USED = "soundsculptor.sets.file.problem.value.entry_id_used";
+	static final String EMPTY_TEXT = "soundsculptor.sets.file.problem.value.empty";
 
 	// The file as a whole.
 	static final String NOT_SET = "soundsculptor.sets.file.problem.not_set";
@@ -37,6 +38,7 @@ final class SetText {
 	static final String NAME_TOO_LONG = "soundsculptor.sets.file.problem.name_too_long";
 	static final String TOO_MANY_ENTRIES = "soundsculptor.sets.file.problem.too_many_entries";
 	static final String ID_MISMATCH = "soundsculptor.sets.file.problem.id_mismatch";
+	static final String NOT_ALLOWED_AT = "soundsculptor.sets.file.problem.not_allowed_at";
 
 	// The folder.
 	static final String FILE_PROBLEM = "soundsculptor.sets.store.problem";
@@ -58,7 +60,6 @@ final class SetText {
 	static final String ITEM_NOT_OBJECT = "soundsculptor.profile.problem.item_not_object";
 	static final String NOT_JSON = "soundsculptor.profile.problem.not_json";
 	static final String NOT_JSON_AT = "soundsculptor.profile.problem.not_json_at";
-	static final String NOT_ALLOWED = "soundsculptor.profile.problem.not_allowed";
 	static final String TOO_LARGE = "soundsculptor.profile.problem.too_large";
 	static final String UNREADABLE = "soundsculptor.profile.problem.unreadable";
 	static final String EMPTY = "soundsculptor.profile.problem.empty";

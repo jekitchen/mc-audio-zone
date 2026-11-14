@@ -122,4 +122,45 @@ class PickerModelTest {
 		assertEquals("soundsculptor.sets.error.entries_full", picker.canAdd().key());
 		assertSame(full, picker.addTo(full));
 	}
+
+	/**
+	 * Add checks the set as it is when Add is pressed (the set editor's draft), not as it was when the picker opened:
+	 * picks that fit then but not now are refused with the limit, and nothing is added.
+	 */
+	@Test
+	void addIsCheckedAgainstTheSetAsItIsNow() {
+		List<SetEntry> entries = new ArrayList<>();
+		for (int i = 1; i <= 510; i++) {
+			entries.add(SetEntry.of("e" + i, "minecraft:test.s" + i));
+		}
+		SoundSet opened = new SoundSet("s1", "Big", entries);
+		PickerModel picker = new PickerModel(opened);
+		picker.toggleSound(COW);
+		picker.toggleSound(PIG);
+		assertNull(picker.canAdd(), "two picks fit the set as the picker found it");
+		assertNull(picker.canAddTo(opened));
+		SoundSet grown = opened.putEntry(SetEntry.of("e511", "minecraft:test.s511"));
+		assertEquals("soundsculptor.sets.error.entries_full", picker.canAddTo(grown).key());
+		assertSame(grown, picker.addTo(grown));
+		SoundSet hasCow = opened.putEntry(SetEntry.of("e511", COW));
+		assertNull(picker.canAddTo(hasCow), "a pick the set already has is not added, so it takes no room");
+		assertEquals(SoundSet.MAX_ENTRIES, picker.addTo(hasCow).entries().size());
+	}
+
+	/** Text that is not a sound ID or pattern is never in the set and cannot be ticked: the toggles ignore it. */
+	@Test
+	void invalidTextIsIgnored() {
+		PickerModel picker = new PickerModel(set(SetEntry.of("e1", COW)));
+		for (String bad : new String[] {"", "  ", "a:b:c", "minecraft:", "villager hurt!"}) {
+			picker.toggleSound(bad);
+			picker.toggleGroup(bad);
+			assertFalse(picker.inSet(bad), bad);
+			assertFalse(picker.groupInSet(bad), bad);
+			assertFalse(picker.picked(bad), bad);
+			assertFalse(picker.groupPicked(bad), bad);
+		}
+		assertEquals(0, picker.pickedCount());
+		picker.toggleSound(PIG);
+		assertEquals(1, picker.pickedCount(), "valid picks still work");
+	}
 }

@@ -210,4 +210,13 @@ class EntryResolverTest {
 		new Limit(1, 50, true);
 		new Limit(100, 10_000, false);
 	}
+
+	/** Winners are packed as 21-bit positions, so a list too long for that fails at once instead of resolving wrongly. */
+	@Test
+	void moreEntriesThanThePackingHoldsFailsFast() {
+		SetEntry one = SetEntry.of("e1", "*cow*").withMute(true);
+		IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+				() -> EntryResolver.of(java.util.Collections.nCopies(EntryResolver.NO_RULE, one)));
+		assertTrue(e.getMessage().contains(String.valueOf(EntryResolver.NO_RULE - 1)), e.getMessage());
+	}
 }

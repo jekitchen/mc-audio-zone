@@ -38,7 +38,8 @@ public final class EntryResolver {
 	 */
 	static final int MAX_RESULTS = 128;
 	private static final long RESOLUTION_BYTES = MemoryEstimate.object(6 * MemoryEstimate.REFERENCE);
-	private static final int NO_RULE = 0x1FFFFF;
+	/** Marks "no winner" in a packed result; positions are 21 bits, so a list has fewer entries than this. */
+	static final int NO_RULE = 0x1FFFFF;
 
 	private static final Comparator<SetEntry> MOST_SPECIFIC_FIRST = Comparator
 			.comparing((SetEntry r) -> !r.pattern().isExact())
@@ -90,6 +91,12 @@ public final class EntryResolver {
 				entries.add(entry);
 				sets.add(layer.setId());
 			}
+		}
+		if (entries.size() >= NO_RULE) {
+			// Results pack each winner's position in 21 bits. The limits (Quick changes and 32 sets of 512 entries)
+			// keep a place far below this; past it, a position would be read as another entry's.
+			throw new IllegalArgumentException("a place can have at most " + (NO_RULE - 1) + " enabled entries, not "
+					+ entries.size());
 		}
 		this.ordered = entries.toArray(new SetEntry[0]);
 		this.orderedSets = sets.toArray(new String[0]);

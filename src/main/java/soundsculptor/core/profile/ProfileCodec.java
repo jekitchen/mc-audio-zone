@@ -303,6 +303,15 @@ public final class ProfileCodec {
 				if (quick && i > 0) {
 					throw p.problem("sets", ProfileText.QUICK_NOT_FIRST);
 				}
+				if (!quick) {
+					// The same rules as a Sound Set file's ID, so the reference can name a set file (FR-11.6, FR-11.8).
+					if (!SetCodec.ID_PATTERN.matcher(id).matches()) {
+						throw a.problem("set", ProfileText.BAD_SET_ID, quote(id));
+					}
+					if (SetCodec.isReservedId(id)) {
+						throw a.problem("set", ProfileText.RESERVED_SET_ID, quote(id));
+					}
+				}
 				if (!seen.add(id)) {
 					throw p.problem("sets", ProfileText.SET_TWICE, quote(id));
 				}

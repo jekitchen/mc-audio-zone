@@ -15,9 +15,9 @@ import soundsculptor.core.sets.SoundSet;
  * set cannot be picked. Add creates one entry per pick with no settings, in the order they were ticked.
  *
  * <p>A single-sound entry's target is the sound ID and a group's target is its pattern, so both are compared as
- * normalized pattern text, as the entry editor stores them. An entry that is turned off is still in the set. Every
- * method that takes a sound ID or a pattern parses it, so text that is not a valid pattern throws
- * {@link InvalidPatternException}; the picker only passes known sound IDs and {@link LikeThis} patterns.
+ * normalized pattern text, as the entry editor stores them. An entry that is turned off is still in the set. Text that
+ * is not a valid sound ID or pattern is never in the set and cannot be ticked: the toggles ignore it (the picker only
+ * passes known sound IDs and {@link LikeThis} patterns, so this is a guard, not a feature).
  */
 public final class PickerModel {
 	private final SoundSet target;
@@ -43,18 +43,14 @@ public final class PickerModel {
 	}
 
 	/**
-	 * Ticks or unticks a sound. Does nothing for a sound already in the set.
-	 *
-	 * @throws InvalidPatternException if {@code soundId} is not a valid sound ID
+	 * Ticks or unticks a sound. Does nothing for a sound already in the set, or for text that is not a sound ID.
 	 */
 	public void toggleSound(String soundId) {
 		toggle(normalize(soundId));
 	}
 
 	/**
-	 * Ticks or unticks a group. Does nothing for a group already in the set.
-	 *
-	 * @throws InvalidPatternException if {@code pattern} is not a valid pattern
+	 * Ticks or unticks a group. Does nothing for a group already in the set, or for text that is not a pattern.
 	 */
 	public void toggleGroup(String pattern) {
 		toggle(normalize(pattern));
@@ -80,6 +76,20 @@ public final class PickerModel {
 	}
 
 	/**
+	 * {@code null} if the picks not yet in {@code set} fit in it, else the "entries full" problem. Check the set as it is
+	 * when Add is pressed: it may differ from the one the picker opened on.
+	 */
+	public Message canAddTo(SoundSet set) {
+		int fresh = 0;
+		for (String pick : picks) {
+			if (!inSet(set, pick)) {
+				fresh++;
+			}
+		}
+		return fresh == 0 ? null : set.canAdd(fresh);
+	}
+
+	/**
 	 * Adds one enabled entry per pick that is not yet in {@code set}, in the order ticked. Returns {@code set}
 	 * unchanged if the entries would not fit.
 	 */
@@ -101,7 +111,7 @@ public final class PickerModel {
 	}
 
 	private void toggle(String text) {
-		if (inTarget.contains(text)) {
+		if (text == null || inTarget.contains(text)) {
 			return;
 		}
 		if (!picks.remove(text)) {
@@ -118,7 +128,12 @@ public final class PickerModel {
 		return false;
 	}
 
+	/** The normalized pattern text, or {@code null} for text that is not a valid pattern (never in a set or picked). */
 	private static String normalize(String text) {
-		return SoundPattern.of(text).text();
+		try {
+			return SoundPattern.of(text).text();
+		} catch (InvalidPatternException e) {
+			return null;
+		}
 	}
 }
